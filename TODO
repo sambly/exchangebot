@@ -1,0 +1,15 @@
+
+
+ACCOUNT
+
+
+добавить := b.client.NewGetAccountService().Do(b.ctx)
+
+type Balance struct {
+    Asset    string
+    Free     float64
+    Lock     float64
+    Leverage float64
+}
+
+разобраться со Snapshot может там есть интересные даннные 
