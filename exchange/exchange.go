@@ -7,6 +7,8 @@ import (
 	"main/model"
 	"main/service"
 	"sync"
+
+	"golang.org/x/exp/slices"
 )
 
 var (
@@ -25,35 +27,37 @@ func (o *OrderError) Error() string {
 	return fmt.Sprintf("order error: %v", o.Err)
 }
 
-type DataFeed struct {
-	Data chan model.Candle
+type MarketsStatFeed struct {
+	Data chan model.MarketsStat
 	Err  chan error
 }
 
 type DataFeedSubscription struct {
-	timeframe               string
 	exchange                service.Exchange
 	Pairs                   []string
-	DataFeeds               map[string]*DataFeed
+	MarketsStatFeeds        map[string]*MarketsStatFeed
 	SubscriptionsByDataFeed map[string][]Subscription
 }
 
 type Subscription struct {
 	consumer DataFeedConsumer
 }
-type DataFeedConsumer func(model.Candle)
+type DataFeedConsumer func(model.MarketsStat)
 
-func NewDataFeed(exchange service.Exchange, timeframe string) *DataFeedSubscription {
+func NewDataFeed(exchange service.Exchange, pairs []string) *DataFeedSubscription {
 	return &DataFeedSubscription{
-		timeframe:               timeframe,
 		exchange:                exchange,
-		Pairs:                   make([]string, 0),
-		DataFeeds:               make(map[string]*DataFeed),
+		Pairs:                   pairs,
+		MarketsStatFeeds:        make(map[string]*MarketsStatFeed),
 		SubscriptionsByDataFeed: make(map[string][]Subscription),
 	}
 }
 func (d *DataFeedSubscription) Subscribe(pair string, consumer DataFeedConsumer) {
-	d.Pairs = append(d.Pairs, pair)
+	if idx := slices.Index(d.Pairs, pair); idx == -1 {
+		d.Pairs = append(d.Pairs, pair)
+	}
+
+	//d.Pairs = append(d.Pairs, pair)
 	d.SubscriptionsByDataFeed[pair] = append(d.SubscriptionsByDataFeed[pair], Subscription{
 		consumer: consumer,
 	})
@@ -61,9 +65,9 @@ func (d *DataFeedSubscription) Subscribe(pair string, consumer DataFeedConsumer)
 
 func (d *DataFeedSubscription) Connect() {
 	for _, pair := range d.Pairs {
-		ccandle, cerr := d.exchange.CandlesSubscription(context.Background(), pair, d.timeframe)
-		d.DataFeeds[pair] = &DataFeed{
-			Data: ccandle,
+		cmarket, cerr := d.exchange.MarketsSubscription(context.Background(), pair)
+		d.MarketsStatFeeds[pair] = &MarketsStatFeed{
+			Data: cmarket,
 			Err:  cerr,
 		}
 	}
@@ -72,18 +76,18 @@ func (d *DataFeedSubscription) Connect() {
 func (d *DataFeedSubscription) Start(loadSync bool) {
 	d.Connect()
 	wg := new(sync.WaitGroup)
-	for key, feed := range d.DataFeeds {
+	for key, feed := range d.MarketsStatFeeds {
 		wg.Add(1)
-		go func(key string, feed *DataFeed) {
+		go func(key string, feed *MarketsStatFeed) {
 			for {
 				select {
-				case candle, ok := <-feed.Data:
+				case cmarket, ok := <-feed.Data:
 					if !ok {
 						wg.Done()
 						return
 					}
 					for _, subscription := range d.SubscriptionsByDataFeed[key] {
-						subscription.consumer(candle)
+						subscription.consumer(cmarket)
 					}
 				case err := <-feed.Err:
 					if err != nil {

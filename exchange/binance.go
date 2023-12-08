@@ -170,6 +170,59 @@ func (b *Binance) CandlesSubscription(ctx context.Context, pair, period string) 
 	return ccandle, cerr
 }
 
+func (b *Binance) MarketsSubscription(ctx context.Context, pair string) (chan model.MarketsStat, chan error) {
+	cmarket := make(chan model.MarketsStat)
+	cerr := make(chan error)
+
+	go func() {
+		ba := &backoff.Backoff{
+			Min: 100 * time.Millisecond,
+			Max: 1 * time.Second,
+		}
+
+		for {
+			done, _, err := binance.WsMarketStatServe(pair, func(event *binance.WsMarketStatEvent) {
+				ba.Reset()
+
+				price, _ := strconv.ParseFloat(event.LastPrice, 64)
+				ch24, _ := strconv.ParseFloat(event.PriceChangePercent, 64)
+				volume, _ := strconv.ParseFloat(event.QuoteVolume, 64)
+
+				marketStat := model.MarketsStat{
+					Pair:   event.Symbol,
+					Time:   time.Unix(0, event.Time*int64(time.Millisecond)),
+					Price:  price,
+					Ch24:   ch24,
+					Volume: volume,
+				}
+
+				cmarket <- marketStat
+
+			}, func(err error) {
+				cerr <- err
+			})
+			if err != nil {
+				cerr <- err
+				close(cerr)
+				close(cmarket)
+				return
+			}
+
+			select {
+			case <-ctx.Done():
+				close(cerr)
+				close(cmarket)
+				return
+			case <-done:
+				time.Sleep(ba.Duration())
+			}
+		}
+	}()
+
+	return cmarket, cerr
+
+}
+
 func (b *Binance) CandlesByLimit(ctx context.Context, pair, period string, limit int) ([]model.Candle, error) {
 	candles := make([]model.Candle, 0)
 	klineService := b.client.NewKlinesService()

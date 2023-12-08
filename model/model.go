@@ -38,6 +38,14 @@ type AssetData struct {
 	FullPrice float64
 }
 
+type MarketsStat struct {
+	Pair   string
+	Time   time.Time
+	Price  float64
+	Ch24   float64
+	Volume float64
+}
+
 type Candle struct {
 	Pair      string
 	Time      time.Time

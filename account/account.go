@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 	"main/model"
+	"main/prices"
 	"main/service"
 	"sync"
 
@@ -11,19 +12,18 @@ import (
 
 type Account struct {
 	sync.Mutex
-	exchange  service.Exchange
-	assetsKey []string                // пары к USDT которые есть на на Spot, Flexible, Staking
-	assets    map[string]*model.Asset // Сруктура пары к USDT
+	exchange    service.Exchange
+	AssetPrices *prices.AsetsPrices
+	AssetsKey   []string                // пары к USDT которые есть на на Spot, Flexible, Staking
+	Assets      map[string]*model.Asset // Сруктура пары к USDT
 }
 
-func NewAccount(exchange service.Exchange) (*Account, error) {
+func NewAccount(exchange service.Exchange, assetPrices *prices.AsetsPrices) (*Account, error) {
 	acc := Account{
-		exchange:  exchange,
-		assetsKey: make([]string, 0),
-		assets:    make(map[string]*model.Asset),
-	}
-	if err := acc.UpdateAssets(); err != nil {
-		return nil, err
+		exchange:    exchange,
+		AssetsKey:   make([]string, 0),
+		Assets:      make(map[string]*model.Asset),
+		AssetPrices: assetPrices,
 	}
 	return &acc, nil
 }
@@ -33,9 +33,9 @@ func (acc *Account) UpdateAssets() (err error) {
 	acc.Lock()
 	defer acc.Unlock()
 	// Обнуляем позиции для последующего обновления
-	acc.assetsKey = make([]string, 0)
+	acc.AssetsKey = make([]string, 0)
 	// Сбрасываем состояние On (наличие элемента в структуре)
-	for _, item := range acc.assets {
+	for _, item := range acc.Assets {
 		item.On = false
 		item.CommonData = nil
 		item.SpotData = nil
@@ -62,9 +62,9 @@ func (acc *Account) UpdateAssets() (err error) {
 	acc.feederAssets(assetsStaking, "AssetStaking")
 
 	// Если позиция удаленна , удаляем ее из App
-	for key := range acc.assets {
-		if !acc.assets[key].On {
-			delete(acc.assets, key)
+	for key := range acc.Assets {
+		if !acc.Assets[key].On {
+			delete(acc.Assets, key)
 		}
 	}
 
@@ -76,35 +76,38 @@ func (acc *Account) feederAssets(data []model.AssetData, typeData string) {
 	for _, value := range data {
 
 		valueAsset := value.AssetBase + "USDT"
-		if idx := slices.Index(acc.assetsKey, valueAsset); idx == -1 {
-			acc.assetsKey = append(acc.assetsKey, valueAsset)
+		if idx := slices.Index(acc.AssetsKey, valueAsset); idx == -1 {
+			acc.AssetsKey = append(acc.AssetsKey, valueAsset)
 		}
-		if _, ok := acc.assets[valueAsset]; !ok {
-			acc.assets[valueAsset] = &model.Asset{Name: valueAsset, On: true}
+		if _, ok := acc.Assets[valueAsset]; !ok {
+			acc.Assets[valueAsset] = &model.Asset{Name: valueAsset, On: true}
 		}
 
+		if _, ok := acc.AssetPrices.MarketsStat[valueAsset]; ok {
+			acc.Assets[valueAsset].Price = acc.AssetPrices.MarketsStat[valueAsset].Price
+		}
 		assetData := &model.AssetData{
 			AssetBase: valueAsset,
 			Amount:    value.Amount,
-			FullPrice: acc.assets[valueAsset].Price * value.Amount,
+			FullPrice: acc.Assets[valueAsset].Price * value.Amount,
 		}
-		if acc.assets[valueAsset].CommonData == nil {
-			acc.assets[valueAsset].CommonData = &model.AssetData{AssetBase: valueAsset, Amount: 0, FullPrice: 0}
+		if acc.Assets[valueAsset].CommonData == nil {
+			acc.Assets[valueAsset].CommonData = &model.AssetData{AssetBase: valueAsset, Amount: 0, FullPrice: 0}
 		}
 
 		if typeData == "AssetSpot" {
-			acc.assets[valueAsset].SpotData = assetData
-			acc.assets[valueAsset].CommonData.Amount = acc.assets[valueAsset].CommonData.Amount + acc.assets[valueAsset].SpotData.Amount
+			acc.Assets[valueAsset].SpotData = assetData
+			acc.Assets[valueAsset].CommonData.Amount = acc.Assets[valueAsset].CommonData.Amount + acc.Assets[valueAsset].SpotData.Amount
 		}
 		if typeData == "AssetFlexible" {
-			acc.assets[valueAsset].FlexibleData = assetData
-			acc.assets[valueAsset].CommonData.Amount = acc.assets[valueAsset].CommonData.Amount + acc.assets[valueAsset].FlexibleData.Amount
+			acc.Assets[valueAsset].FlexibleData = assetData
+			acc.Assets[valueAsset].CommonData.Amount = acc.Assets[valueAsset].CommonData.Amount + acc.Assets[valueAsset].FlexibleData.Amount
 		}
 		if typeData == "AssetStaking" {
-			acc.assets[valueAsset].StakingData = assetData
-			acc.assets[valueAsset].CommonData.Amount = acc.assets[valueAsset].CommonData.Amount + acc.assets[valueAsset].StakingData.Amount
+			acc.Assets[valueAsset].StakingData = assetData
+			acc.Assets[valueAsset].CommonData.Amount = acc.Assets[valueAsset].CommonData.Amount + acc.Assets[valueAsset].StakingData.Amount
 		}
-		acc.assets[valueAsset].CommonData.FullPrice = acc.assets[valueAsset].CommonData.Amount * acc.assets[valueAsset].Price
+		acc.Assets[valueAsset].CommonData.FullPrice = acc.Assets[valueAsset].CommonData.Amount * acc.Assets[valueAsset].Price
 	}
 
 }

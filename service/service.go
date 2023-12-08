@@ -20,4 +20,5 @@ type Feeder interface {
 	GetAssetsSpot(ctx context.Context) ([]model.AssetData, error)
 	GetAssetsFlexible(ctx context.Context) ([]model.AssetData, error)
 	GetAssetsStaking(ctx context.Context) ([]model.AssetData, error)
+	MarketsSubscription(ctx context.Context, pair string) (chan model.MarketsStat, chan error)
 }

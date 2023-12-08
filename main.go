@@ -5,8 +5,10 @@ import (
 	"log"
 	"os"
 
+	"main/application"
 	"main/exchange"
 	"main/model"
+	"main/telegram"
 
 	"github.com/joho/godotenv"
 )
@@ -27,6 +29,16 @@ func main() {
 	secretKey, exists := os.LookupEnv("API_SECRET")
 	if !exists {
 		log.Fatal("No .env str API_SECRET found")
+	}
+
+	tlgToken, exists := os.LookupEnv("TELEGRAM_TOKEN")
+	if !exists {
+		log.Fatal("No .env str TELEGRAM_TOKEN found")
+	}
+
+	tlgUser, exists := os.LookupEnv("TELEGRAM_USER")
+	if !exists {
+		log.Fatal("No .env str TELEGRAM_USER found")
 	}
 
 	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(apiKey, secretKey))
@@ -61,12 +73,21 @@ func main() {
 	// }
 	// defer db.Close()
 
-	app, err := NewApp(binance, settings)
+	app, err := application.NewApp(
+		binance,
+		settings,
+		log.New(infoLogFile, "INFO\t", log.Ldate|log.Ltime),
+		log.New(errorLogFile, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
-	app.infoLog = log.New(infoLogFile, "INFO\t", log.Ldate|log.Ltime)
-	app.errorLog = log.New(errorLogFile, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
-	//app.Run()
+	appTelegram, err := telegram.NewTelegram(app, tlgToken, tlgUser)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	appTelegram.Start()
+	app.Run()
 }
