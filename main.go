@@ -50,6 +50,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	//pairs := []string{"BTCUSDT", "ETHUSDT"}
+
 	settings := model.Settings{
 		Pairs:     pairs,
 		Timeframe: "1m",

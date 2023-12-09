@@ -1,13 +1,10 @@
 package prices
 
 import (
-	"fmt"
 	"main/model"
-	"sync"
 )
 
 type AsetsPrices struct {
-	mtx         sync.Mutex
 	MarketsStat map[string]*model.MarketsStat
 	Change      map[string]*ChangeData // Словарь где ключ элемент periods, "ch3_m" value изменения за этот период
 }
@@ -29,14 +26,12 @@ func NewAssetsPrices() (*AsetsPrices, error) {
 }
 
 func (ap *AsetsPrices) OnMarket(ms model.MarketsStat) {
-	ap.mtx.Lock()
-	defer ap.mtx.Lock()
 
 	if _, ok := ap.MarketsStat[ms.Pair]; !ok {
 		ap.MarketsStat[ms.Pair] = &model.MarketsStat{}
 	}
 
-	fmt.Println("OnMarket true")
+	ap.MarketsStat[ms.Pair].Pair = ms.Pair
 	ap.MarketsStat[ms.Pair].Price = ms.Price
 	ap.MarketsStat[ms.Pair].Time = ms.Time
 	ap.MarketsStat[ms.Pair].Price = ms.Price
