@@ -3,8 +3,10 @@ package model
 import "time"
 
 type Settings struct {
-	Pairs     []string
-	Timeframe string
+	Pairs          []string
+	Timeframe      string
+	ChangePeriods  []string
+	WeightProcents map[string]float64
 }
 
 type AssetInfo struct {

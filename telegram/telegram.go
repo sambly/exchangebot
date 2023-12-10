@@ -3,6 +3,7 @@ package telegram
 import (
 	"fmt"
 	"main/application"
+	"main/notification"
 	"strconv"
 	"strings"
 	"time"
@@ -16,9 +17,10 @@ type Telegram struct {
 	client      *tele.Bot
 	app         *application.Application
 	tlgUser     int64
+	Messages    *notification.Notification
 }
 
-func NewTelegram(app *application.Application, tlgToken, tlgUser string) (*Telegram, error) {
+func NewTelegram(app *application.Application, tlgToken, tlgUser string, notification *notification.Notification) (*Telegram, error) {
 
 	poller := &tele.LongPoller{Timeout: 10 * time.Second}
 	user, _ := strconv.ParseInt(tlgUser, 10, 64)
@@ -48,8 +50,13 @@ func NewTelegram(app *application.Application, tlgToken, tlgUser string) (*Teleg
 		btnBalance = menu.Text("Balance")
 	)
 
-	command := []tele.Command{}
-	err = client.SetCommands(command)
+	commandPeriods := []tele.Command{
+		{Text: "/ch3m", Description: "Изменение за 3м"},
+		{Text: "/ch15m", Description: "Изменение за 15м"},
+		{Text: "/ch1h", Description: "Изменение за 1ч"},
+		{Text: "/ch4h", Description: "Изменение за 4ч"},
+	}
+	err = client.SetCommands(commandPeriods)
 	if err != nil {
 		return nil, err
 	}
@@ -63,6 +70,7 @@ func NewTelegram(app *application.Application, tlgToken, tlgUser string) (*Teleg
 		defaultMenu: menu,
 		app:         app,
 		tlgUser:     user,
+		Messages:    notification,
 	}
 
 	client.Handle("/start", func(c tele.Context) error {
@@ -70,15 +78,17 @@ func NewTelegram(app *application.Application, tlgToken, tlgUser string) (*Teleg
 	})
 
 	client.Handle(&btnBalance, func(c tele.Context) error {
-		fmt.Println("Зашли")
 		bufer := ""
 		for _, item := range bot.getAssets() {
 			bufer = bufer + item + "\n"
 		}
-		fmt.Println(bufer)
 		return c.Send(bufer)
 	})
 
+	client.Handle("/ch3m", bot.hanlePeriods)
+	client.Handle("/ch15m", bot.hanlePeriods)
+	client.Handle("/ch1h", bot.hanlePeriods)
+	client.Handle("/ch4h", bot.hanlePeriods)
 	client.Handle(tele.OnText, bot.differentMess)
 
 	return bot, nil
@@ -90,6 +100,15 @@ func (t Telegram) Start() error {
 	if err != nil {
 		return err
 	}
+
+	go func(message chan string) {
+		for mes := range message {
+			_, err := t.client.Send(&tele.User{ID: int64(362513407)}, mes, t.defaultMenu)
+			if err != nil {
+				fmt.Printf("Ошибка отправки сообщения")
+			}
+		}
+	}(t.Messages.Message)
 
 	return nil
 }
@@ -104,12 +123,13 @@ func (t Telegram) differentMess(c tele.Context) error {
 	asset := strings.ToUpper(c.Text()) + "USDT"
 	assets := t.app.Account.Assets
 	assetsKey := t.app.Account.AssetsKey
+	marketStat := t.app.AssetsPrices.MarketsStat
+	change := t.app.AssetsPrices.ChangePrices
 	if idx := slices.Index(assetsKey, asset); idx >= 0 {
 		fullPrice := assets[asset].CommonData.FullPrice
-		//ch24 := t.app.Assets[asset].Ch_24
+		ch24 := marketStat[asset].Ch24
 
-		//text = fmt.Sprintf("----%s----\nСтоимость	%.1f\nch24	%.1f\n", asset, fullPrice, ch24)
-		text = fmt.Sprintf("----%s----\nСтоимость	%.1f\n", asset, fullPrice)
+		text = fmt.Sprintf("----%s----\nСтоимость	%.1f\nch24	%.1f\n", asset, fullPrice, ch24)
 
 		var fullPriceSpot, fullPriceFlexible, AssetStaking float64
 
@@ -135,23 +155,49 @@ func (t Telegram) differentMess(c tele.Context) error {
 			}
 
 		}
+		text = text + "----------------\n"
+		for key, value := range change[asset] {
+			text = text + fmt.Sprintf("%s		%.2f\n", key, value.СhangePercent)
+		}
 	}
 
 	return c.Send(text)
 }
 
+func (t Telegram) hanlePeriods(c tele.Context) error {
+	text := ""
+	period := c.Text()[1:]
+	assets := t.getPeriods(period)
+	for _, item := range assets {
+		text = text + fmt.Sprintf("%s\n", item)
+	}
+	return c.Send(text)
+}
+
+func (t Telegram) getPeriods(period string) []string {
+	change := t.app.AssetsPrices.ChangePrices
+	var out []string
+	for _, asset := range t.app.Account.Assets {
+		if _, ok := change[asset.Name][period]; ok {
+			if asset.CommonData.FullPrice >= t.app.BaseAmountAsset {
+				s := fmt.Sprintf("%s:		%.2f", asset.Name[:len(asset.Name)-len("USDT")], change[asset.Name][period].СhangePercent)
+				out = append(out, s)
+			}
+		}
+	}
+	return out
+}
+
 func (t Telegram) getAssets() []string {
 	err := t.app.Account.UpdateAssets()
 	if err != nil {
-		fmt.Println("эта ошибка")
 		fmt.Println(err)
 	}
-
+	marketStat := t.app.AssetsPrices.MarketsStat
 	var out []string
 	for _, asset := range t.app.Account.Assets {
 		if asset.CommonData.FullPrice >= t.app.BaseAmountAsset {
-			//s := fmt.Sprintf("%s: %.1f💲  24ch: %-5.1f", asset.Name[:len(asset.Name)-len("USDT")], asset.CommonData.FullPrice, asset.Ch_24)
-			s := fmt.Sprintf("%s: %.1f💲 ", asset.Name[:len(asset.Name)-len("USDT")], asset.CommonData.FullPrice)
+			s := fmt.Sprintf("%s: %.1f💲  24ch: %-5.1f", asset.Name[:len(asset.Name)-len("USDT")], asset.CommonData.FullPrice, marketStat[asset.Name].Ch24)
 			out = append(out, s)
 		}
 	}

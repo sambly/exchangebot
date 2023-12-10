@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 	"main/model"
+	"main/notification"
 	"main/prices"
 	"main/service"
 	"sync"
@@ -12,26 +13,26 @@ import (
 
 type Account struct {
 	sync.Mutex
-	exchange    service.Exchange
-	AssetPrices *prices.AsetsPrices
-	AssetsKey   []string                // пары к USDT которые есть на на Spot, Flexible, Staking
-	Assets      map[string]*model.Asset // Сруктура пары к USDT
+	exchange     service.Exchange
+	Notification *notification.Notification
+	AssetPrices  *prices.AsetsPrices
+	AssetsKey    []string                // пары к USDT которые есть на на Spot, Flexible, Staking
+	Assets       map[string]*model.Asset // Сруктура пары к USDT
 }
 
-func NewAccount(exchange service.Exchange, assetPrices *prices.AsetsPrices) (*Account, error) {
+func NewAccount(exchange service.Exchange, assetPrices *prices.AsetsPrices, notification *notification.Notification) (*Account, error) {
 	acc := Account{
-		exchange:    exchange,
-		AssetsKey:   make([]string, 0),
-		Assets:      make(map[string]*model.Asset),
-		AssetPrices: assetPrices,
+		exchange:     exchange,
+		AssetsKey:    make([]string, 0),
+		Assets:       make(map[string]*model.Asset),
+		AssetPrices:  assetPrices,
+		Notification: notification,
 	}
 	return &acc, nil
 }
 
 func (acc *Account) UpdateAssets() (err error) {
 
-	acc.Lock()
-	defer acc.Unlock()
 	// Обнуляем позиции для последующего обновления
 	acc.AssetsKey = make([]string, 0)
 	// Сбрасываем состояние On (наличие элемента в структуре)
@@ -80,8 +81,9 @@ func (acc *Account) feederAssets(data []model.AssetData, typeData string) {
 			acc.AssetsKey = append(acc.AssetsKey, valueAsset)
 		}
 		if _, ok := acc.Assets[valueAsset]; !ok {
-			acc.Assets[valueAsset] = &model.Asset{Name: valueAsset, On: true}
+			acc.Assets[valueAsset] = &model.Asset{Name: valueAsset}
 		}
+		acc.Assets[valueAsset].On = true
 
 		if _, ok := acc.AssetPrices.MarketsStat[valueAsset]; ok {
 			acc.Assets[valueAsset].Price = acc.AssetPrices.MarketsStat[valueAsset].Price

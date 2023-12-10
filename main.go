@@ -8,6 +8,7 @@ import (
 	"main/application"
 	"main/exchange"
 	"main/model"
+	"main/notification"
 	"main/telegram"
 
 	"github.com/joho/godotenv"
@@ -45,16 +46,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	pairs, err := binance.GetPairsToUSDT()
-	if err != nil {
-		log.Fatal(err)
-	}
+	// pairs, err := binance.GetPairsToUSDT()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	//pairs := []string{"BTCUSDT", "ETHUSDT"}
+	pairs := []string{"BTCUSDT", "ETHUSDT", "SANDUSDT", "FTTUSDT"}
 
 	settings := model.Settings{
-		Pairs:     pairs,
-		Timeframe: "1m",
+		Pairs:          pairs,
+		Timeframe:      "1m",
+		ChangePeriods:  []string{"ch3m", "ch15m", "ch1h", "ch4h"},
+		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
 	}
 
 	infoLogFile, err := os.OpenFile("log/info.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -75,21 +78,24 @@ func main() {
 	// }
 	// defer db.Close()
 
+	notification := &notification.Notification{Message: make(chan string)}
+
 	app, err := application.NewApp(
 		binance,
 		settings,
 		log.New(infoLogFile, "INFO\t", log.Ldate|log.Ltime),
 		log.New(errorLogFile, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile),
+		notification,
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	appTelegram, err := telegram.NewTelegram(app, tlgToken, tlgUser)
+	appTelegram, err := telegram.NewTelegram(app, tlgToken, tlgUser, notification)
 	if err != nil {
 		log.Fatal(err)
-		return
 	}
+
 	appTelegram.Start()
 	app.Run()
 }
