@@ -1,6 +1,7 @@
 package prices
 
 import (
+	"fmt"
 	"main/model"
 	"main/notification"
 )
@@ -30,6 +31,18 @@ func NewAssetsPrices(pairs, periods []string, weightProcents map[string]float64,
 		ChangePrices:   make(map[string]map[string]*ChangeData),
 		Notification:   notification,
 	}
+	for _, pair := range pairs {
+		asetsPrices.MarketsStat[pair] = &model.MarketsStat{Pair: pair}
+	}
+	for _, pair := range pairs {
+		for _, period := range periods {
+			if _, ok := asetsPrices.ChangePrices[pair]; !ok {
+				asetsPrices.ChangePrices[pair] = map[string]*ChangeData{}
+			}
+			asetsPrices.ChangePrices[pair][period] = &ChangeData{}
+		}
+	}
+
 	return asetsPrices
 }
 
@@ -50,10 +63,11 @@ func (ap *AsetsPrices) OnMarket(ms model.MarketsStat) {
 
 func (ap *AsetsPrices) UpdateChanges(period string) {
 
+	fmt.Println(period)
+
 	for _, pair := range ap.Pairs {
 
 		marketStat := ap.MarketsStat[pair]
-		changeData := ap.ChangePrices[pair][period]
 
 		// Инициализация для всех переодов
 		if period == "" {
@@ -64,15 +78,16 @@ func (ap *AsetsPrices) UpdateChanges(period string) {
 				}
 			}
 		} else {
+			changeData := ap.ChangePrices[pair][period]
 			if changeData.LastPrice > 0 {
 				changeData.СhangePercent = (marketStat.Price / changeData.LastPrice * 100) - 100
 				changeData.ChangePercentVolume = (marketStat.Volume / changeData.LastVolume * 100) - 100
 				changeData.LastPrice = marketStat.Price
 				changeData.LastVolume = marketStat.Volume
 
-				// if changeData.СhangePercent >= changeData.WeightPercent {
-				// 	a.telegram.NotificationWeightPercent(pair, period, changeData.СhangePercent)
-				// }
+				if changeData.СhangePercent >= ap.WeightProcents[period] {
+					ap.Notification.NotificationWeightPercent(pair, period, changeData.СhangePercent)
+				}
 
 			} else {
 				if marketStat.Price > 0 {
@@ -81,12 +96,6 @@ func (ap *AsetsPrices) UpdateChanges(period string) {
 				}
 			}
 		}
-
-		if changeData.СhangePercent >= ap.WeightProcents[period] {
-			ap.Notification.NotificationWeightPercent(pair, period, changeData.СhangePercent)
-
-		}
-
 	}
 
 }

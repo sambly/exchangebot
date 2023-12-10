@@ -57,7 +57,7 @@ func (app *Application) Run() error {
 	for _, pair := range app.settings.Pairs {
 		app.dataFeed.Subscribe(pair, app.AssetsPrices.OnMarket)
 	}
-	app.dataFeed.Start(true)
+	go app.dataFeed.Start(true)
 
 	//Для предварительного заполения цен всех пар, может сделать меньше время, просто добавляет погрешность для 10m
 	var tickerInterval_Init time.Duration = time.Second * 10 // Здесь выставить 40
