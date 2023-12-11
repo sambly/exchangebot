@@ -3,6 +3,7 @@ package telegram
 import (
 	"fmt"
 	"main/application"
+	"main/log"
 	"main/notification"
 	"strconv"
 	"strings"
@@ -27,13 +28,13 @@ func NewTelegram(app *application.Application, tlgToken, tlgUser string, notific
 
 	userMiddleware := tele.NewMiddlewarePoller(poller, func(u *tele.Update) bool {
 		if u.Message == nil || u.Message.Sender == nil {
-			fmt.Printf("no message, ", u.Message)
+			log.MyLogger.InfoLog.Println("No message")
 			return false
 		}
 		if u.Message.Sender.ID == user {
 			return true
 		}
-		fmt.Printf("invalid user, ", u.Message)
+		log.MyLogger.InfoLog.Println("Invalid user")
 		return false
 	})
 
@@ -103,13 +104,13 @@ func (t Telegram) Start() error {
 
 	go func(message chan string) {
 		for mes := range message {
-			_, err := t.client.Send(&tele.User{ID: int64(362513407)}, mes, t.defaultMenu)
+			_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, t.defaultMenu)
 			if err != nil {
-				fmt.Printf("Ошибка отправки сообщения")
+				log.MyLogger.ErrorOut(fmt.Errorf("Error send message tlg: %v", err))
 			}
 		}
 	}(t.Messages.Message)
-
+	log.MyLogger.InfoLog.Println("Telegram started")
 	return nil
 }
 
@@ -117,8 +118,6 @@ func (t Telegram) differentMess(c tele.Context) error {
 
 	text := ""
 
-	fmt.Println("----------------------")
-	fmt.Println(c.Text())
 	// Выбор определенной пары
 	asset := strings.ToUpper(c.Text()) + "USDT"
 	assets := t.app.Account.Assets

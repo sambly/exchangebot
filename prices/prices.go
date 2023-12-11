@@ -1,7 +1,6 @@
 package prices
 
 import (
-	"fmt"
 	"main/model"
 	"main/notification"
 )
@@ -62,8 +61,6 @@ func (ap *AsetsPrices) OnMarket(ms model.MarketsStat) {
 }
 
 func (ap *AsetsPrices) UpdateChanges(period string) {
-
-	fmt.Println(period)
 
 	for _, pair := range ap.Pairs {
 

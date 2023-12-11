@@ -3,14 +3,12 @@ package application
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"main/account"
 	"main/exchange"
 	"main/model"
 	"main/notification"
 	"main/prices"
 	"main/service"
-	"runtime/debug"
 	"time"
 )
 
@@ -19,15 +17,13 @@ type Application struct {
 	exchange service.Exchange
 	dataFeed *exchange.DataFeedSubscription
 	database *sql.DB
-	infoLog  *log.Logger
-	errorLog *log.Logger
 
 	AssetsPrices    *prices.AsetsPrices
 	Account         *account.Account
 	BaseAmountAsset float64
 }
 
-func NewApp(exch service.Exchange, settings model.Settings, infoLog, errorLog *log.Logger, notification *notification.Notification) (*Application, error) {
+func NewApp(exch service.Exchange, settings model.Settings, notification *notification.Notification) (*Application, error) {
 
 	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.WeightProcents, notification)
 
@@ -41,12 +37,10 @@ func NewApp(exch service.Exchange, settings model.Settings, infoLog, errorLog *l
 		exchange: exch,
 		dataFeed: exchange.NewDataFeed(exch, settings.Pairs),
 		//database: db,
-		infoLog:  infoLog,
-		errorLog: errorLog,
 
 		Account:         account,
 		AssetsPrices:    assetsPrices,
-		BaseAmountAsset: 0.001,
+		BaseAmountAsset: 1,
 	}
 
 	return app, nil
@@ -116,15 +110,6 @@ func (app *Application) Run() error {
 				fmt.Printf("%v", err)
 				return err
 			}
-
 		}
 	}
-
-	return nil
-}
-
-func (app *Application) logError(err error) {
-	trace := fmt.Sprintf("%s\n%s", err.Error(), debug.Stack())
-	log.Println(err.Error())
-	app.errorLog.Output(2, trace)
 }
