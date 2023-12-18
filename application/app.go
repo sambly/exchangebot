@@ -73,27 +73,27 @@ func (app *Application) Run() error {
 		select {
 		case <-ticker_Init.C:
 			app.AssetsPrices.UpdateChanges("")
-			err := app.Account.UpdateAssets()
-			if err != nil {
-				fmt.Printf("%v", err)
-				return err
-			}
+			//err := app.Account.UpdateAssets()
+			// if err != nil {
+			// 	fmt.Printf("%v", err)
+			// 	return err
+			// }
 			ticker_Init.Stop()
 
 		case <-ticker_3m.C:
 			app.AssetsPrices.UpdateChanges("ch3m")
-			err := app.Account.UpdateAssets()
-			if err != nil {
-				fmt.Printf("%v", err)
-				return err
-			}
+			// err := app.Account.UpdateAssets()
+			// if err != nil {
+			// 	fmt.Printf("%v", err)
+			// 	return err
+			// }
 		case <-ticker_15m.C:
 			app.AssetsPrices.UpdateChanges("ch15m")
-			err := app.Account.UpdateAssets()
-			if err != nil {
-				fmt.Printf("%v", err)
-				return err
-			}
+			// err := app.Account.UpdateAssets()
+			// if err != nil {
+			// 	fmt.Printf("%v", err)
+			// 	return err
+			// }
 
 		case <-ticker_1h.C:
 			app.AssetsPrices.UpdateChanges("ch1h")
