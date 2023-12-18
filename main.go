@@ -9,6 +9,7 @@ import (
 	"main/model"
 	"main/notification"
 	"main/telegram"
+	"main/web"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -77,7 +78,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	appTelegram.Start()
+
+	web := web.NewWeb(app)
+	web.Run()
+
 	app.Run()
 }
