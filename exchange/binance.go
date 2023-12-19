@@ -304,7 +304,7 @@ func (b *Binance) GetPairsToUSDT() ([]string, error) {
 	}
 	allPairs := make([]string, 0)
 	for _, value := range infoPairs.Symbols {
-		if value.QuoteAsset == "USDT" { // Только пары с USDT
+		if value.QuoteAsset == "USDT" && value.Status == "TRADING" { // Только пары с USDT
 			allPairs = append(allPairs, value.BaseAsset+value.QuoteAsset)
 		}
 	}

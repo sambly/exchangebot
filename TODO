@@ -35,3 +35,5 @@ log.MyLogger.InfoLog.Println("Telegram started")
 исключить всякие пары типо EOSDOWNUSDT
 
 почему то по некоторыми монетам , нет объема EPSUSDT типо ее 
+
+подумать как не перезагружать график 
