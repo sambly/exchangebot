@@ -4,7 +4,7 @@
 
 
 $(function(){
-
+  
 
 });
 
@@ -58,25 +58,25 @@ function forming_tickers_list(changePrices) {
         tr.addEventListener("click",() => {
             let pair = tr.querySelector('[name="pair"]').innerHTML;
                  new TradingView.widget(
-                    {
-                        "height": "500",
-                        "symbol": "BINANCE:"+pair,
-                        "interval": "D",
-                        "timezone": "Etc/UTC",
-                        "theme": "Light",
-                        "style": "1",
-                        "locale": "en",
-                        "toolbar_bg": "#f1f3f6",
-                        "enable_publishing": false,
-                        "allow_symbol_change": true,
-                        "container_id": "tradingview_3418f"
-                    }
-                    );
+                 {
+                    "height": "500",
+                    "symbol": "BINANCE:"+pair,
+                    "interval": "15",
+                    "timezone": "Europe/Moscow",
+                    "theme": "Light",
+                    "style": "1",
+                    "locale": "ru",
+                    "toolbar_bg": "#f1f3f6",
+                    "enable_publishing": false,
+                    "allow_symbol_change": true,
+                    "container_id": "tradingview_3418f"      
+                }
+                );
 
 
-        });
-    };
-
+    });
+};
+  
 
     // Сортировка таблицы
     const pair = document.querySelectorAll(".pair");
