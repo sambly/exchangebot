@@ -1,9 +1,16 @@
 
+
+.tickers-list {
+  font-size: smaller;
+}
+
+.chart {
+  height: 500px;
+}
+
 .col {
   text-align: center;
 }
-
-
 
 table {
 table-layout: fixed;
@@ -47,32 +54,21 @@ display: none !important;
 
 
 th:nth-child(1),td:nth-child(1) {
-width: 6%;
+width: 40%;
 }   
 th:nth-child(2),td:nth-child(2) {
 width: 15%;
 }
 th:nth-child(3),td:nth-child(3) {
-width: 10%;
+width: 15%;
 }
 th:nth-child(4),td:nth-child(4) {
-width: 10%;
+width: 15%;
 }
 th:nth-child(5),td:nth-child(5) {
-width: 10%;
+width: 15%;
 }
-th:nth-child(6),td:nth-child(6) {
-width: 10%;
-}
-th:nth-child(7),td:nth-child(7) {
-width: 10%;
-}
-th:nth-child(8),td:nth-child(8) {
-width: 10%;
-}
-th:nth-child(9),td:nth-child(9) {
-width: 19%;
-}
+
 
 
 
@@ -95,10 +91,10 @@ width: 19%;
 }
 @media (min-width: 1200px) {
 /* стили для lg-устройств */
-
+/* 
 *{
   font-size:medium !important;
-}
+} */
 
 }
 

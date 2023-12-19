@@ -5,10 +5,8 @@
 
 $(function(){
 
-   
 
 });
-
 
 
 function forming_page (pairs,changePrices) {
@@ -20,24 +18,13 @@ function forming_page (pairs,changePrices) {
         selectPairs.prepend(option)
     }
 
-    forming_tickers_list(changePrices)
+    forming_tickers_list(changePrices);
 
 }
 
 function forming_tickers_list(changePrices) {
-    //console.log(changePrices);
 
-    for (var item in changePrices){
-
-
-        console.log(item)
-        console.log(changePrices[item])
-
-    }
-
-
-
-    const heads = ['ch3m','ch15m'];
+    const heads = ['ch3m','ch15m','ch1h','ch4h'];
     const tbody = document.querySelector("tbody");
     const th = document.querySelectorAll("thead th");
 
@@ -51,21 +38,79 @@ function forming_tickers_list(changePrices) {
         }
         colorSet = !colorSet
 
-        row.className = item;
+        row.className = "pair";
         let cell = row.insertCell();
         cell.innerHTML = item; 
-        cell.setAttribute("name",item); 
+        cell.setAttribute("name","pair"); 
 
         for (let j = 0; j < heads.length; j++) {
             let cell = row.insertCell();
-            let value = changePrices[item][heads[j]]["СhangePercent"];
+            let value = changePrices[item][heads[j]]["СhangePercent"].toFixed(2);
             cell.innerHTML = value;  
             cell.setAttribute("name",heads[j]);
         }       
     };
 
+
+    // выбор определенной пары
+    let rows = tbody.rows;
+    for (let tr of rows) { 
+        tr.addEventListener("click",() => {
+            let pair = tr.querySelector('[name="pair"]').innerHTML;
+                 new TradingView.widget(
+                    {
+                        "height": "500",
+                        "symbol": "BINANCE:"+pair,
+                        "interval": "D",
+                        "timezone": "Etc/UTC",
+                        "theme": "Light",
+                        "style": "1",
+                        "locale": "en",
+                        "toolbar_bg": "#f1f3f6",
+                        "enable_publishing": false,
+                        "allow_symbol_change": true,
+                        "container_id": "tradingview_3418f"
+                    }
+                    );
+
+
+        });
+    };
+
+
+    // Сортировка таблицы
+    const pair = document.querySelectorAll(".pair");
+    let sortDirection;
+    th.forEach((col, idx) => {
+    col.addEventListener("click", () => {
+        sortDirection = !sortDirection;
+
+        col.classList.add("thead-flash-once");
+
+        const rowsArrFromNodeList = Array.from(pair);
+        const filteredRows = rowsArrFromNodeList.filter(
+        (item) => item.style.display != "none"
+        );
+
+        filteredRows
+        .sort((a, b) => {
+            return a.childNodes[idx].innerHTML.localeCompare(
+            b.childNodes[idx].innerHTML,
+            "en",
+            { numeric: true, sensitivity: "base" }
+            );
+        })
+        .forEach((row) => {
+            sortDirection
+            ? tbody.insertBefore(row, tbody.childNodes[tbody.length])
+            : tbody.insertBefore(row, tbody.childNodes[0]);
+        });
+    });
+    });
         
 }
+
+
 
 
 

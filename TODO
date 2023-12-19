@@ -27,3 +27,11 @@ type Balance struct {
 
 
 log.MyLogger.InfoLog.Println("Telegram started")
+
+
+
+сделать ограничение по объему в монетах 
+
+исключить всякие пары типо EOSDOWNUSDT
+
+почему то по некоторыми монетам , нет объема EPSUSDT типо ее 
