@@ -58,32 +58,6 @@ func DbConnection() (*sql.DB, error) {
 	return db, nil
 }
 
-func CreateFeederTables(db *sql.DB) error {
-
-	query := `CREATE TABLE IF NOT EXISTS candles(
-		Id int primary key auto_increment,
-		Time datetime,
-		Pair text,
-		Open text,
-		Close text,
-		High text,
-		Low text,
-		Volume text
-		)`
-
-	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancelfunc()
-	res, err := db.ExecContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("error %s when creating license table", err)
-	}
-	_, err = res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("error %s when getting rows affected", err)
-	}
-	return nil
-}
-
 func InsertCandlesTables(db *sql.DB, candle model.Candle) error {
 
 	query := "INSERT INTO candles (Time,Pair,Open,Close,High,Low,Volume) VALUES (?,?,?,?,?,?,?)"
@@ -114,4 +88,51 @@ func InsertCandlesTables(db *sql.DB, candle model.Candle) error {
 	}
 
 	return nil
+}
+
+func SelectCandlesTable(db *sql.DB) ([]model.Candle, error) {
+
+	query := "select Time,Pair,Open,Close,Low,High,Volume,QuoteVolume,AmountTrade,AmountTradeBuy,ActiveBuyVolume from candles LIMIT 3000000;"
+
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancelfunc()
+	stmt, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("error %s when preparing SQL statement", err)
+	}
+	defer stmt.Close()
+	rows, err := stmt.QueryContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	candles := []model.Candle{}
+	for rows.Next() {
+		candle := model.Candle{}
+		if err := rows.Scan(
+			&candle.Time,
+			&candle.Pair,
+			&candle.Open,
+			&candle.Close,
+			&candle.Low,
+			&candle.High,
+			&candle.Volume,
+			&candle.QuoteVolume,
+			&candle.AmountTrade,
+			&candle.AmountTradeBuy,
+			&candle.ActiveBuyVolume,
+			//&candle.ActiveBuyQuoteVolume,
+		); err != nil {
+			return nil, err
+		}
+
+		candle.AmountTradeAsk = candle.AmountTrade - candle.AmountTradeBuy
+		candle.ActiveAskVolume = candle.Volume - candle.ActiveBuyVolume
+		candles = append(candles, candle)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return candles, nil
 }

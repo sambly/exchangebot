@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"main/application"
+	"main/database"
 	"main/exchange"
 	mylog "main/log"
 	"main/model"
@@ -61,13 +62,21 @@ func main() {
 		Timeframe:      "1m",
 		ChangePeriods:  []string{"ch3m", "ch15m", "ch1h", "ch4h"},
 		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
+		LengthOfTime:   1080,
 	}
+
+	db, err := database.DbConnection()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
 	notification := &notification.Notification{Message: make(chan string)}
 
 	app, err := application.NewApp(
 		binance,
 		settings,
+		db,
 		notification,
 	)
 	if err != nil {

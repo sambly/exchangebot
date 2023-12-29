@@ -7,6 +7,7 @@ type Settings struct {
 	Timeframe      string
 	ChangePeriods  []string
 	WeightProcents map[string]float64
+	LengthOfTime   int64
 }
 
 type AssetInfo struct {
@@ -49,15 +50,28 @@ type MarketsStat struct {
 }
 
 type Candle struct {
-	Pair      string
-	Time      time.Time
-	UpdatedAt time.Time
-	Open      float64
-	Close     float64
-	Low       float64
-	High      float64
-	Volume    float64
-	Complete  bool
+	Pair                 string
+	Time                 time.Time
+	UpdatedAt            time.Time
+	Open                 float64
+	Close                float64
+	Low                  float64
+	High                 float64
+	StartT               bool
+	Price                float64
+	Volume               float64
+	QuoteVolume          float64
+	AmountTrade          int64
+	AmountTradeBuy       int64
+	ActiveBuyVolume      float64
+	ActiveBuyQuoteVolume float64
+
+	AmountTradeAsk       int64
+	ActiveAskVolume      float64
+	ActiveAskQuoteVolume float64
+
+	Complete      bool
+	CompleteTrade bool
 
 	// Aditional collums from CSV inputs
 	Metadata map[string]float64

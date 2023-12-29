@@ -23,9 +23,9 @@ type Application struct {
 	BaseAmountAsset float64
 }
 
-func NewApp(exch service.Exchange, settings model.Settings, notification *notification.Notification) (*Application, error) {
+func NewApp(exch service.Exchange, settings model.Settings, db *sql.DB, notification *notification.Notification) (*Application, error) {
 
-	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.WeightProcents, notification)
+	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.WeightProcents, settings.LengthOfTime, db, notification)
 
 	account, err := account.NewAccount(exch, assetsPrices, notification)
 	if err != nil {
@@ -36,7 +36,7 @@ func NewApp(exch service.Exchange, settings model.Settings, notification *notifi
 		settings: settings,
 		exchange: exch,
 		dataFeed: exchange.NewDataFeed(exch, settings.Pairs),
-		//database: db,
+		database: db,
 
 		Account:         account,
 		AssetsPrices:    assetsPrices,
