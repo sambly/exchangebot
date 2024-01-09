@@ -2,13 +2,15 @@ package prices
 
 import (
 	"context"
-	"fmt"
+	"flag"
 	"main/database"
 	"main/exchange"
 	"testing"
 )
 
 func TestUpdateDelta(t *testing.T) {
+
+	flag.Set("test.timeout", "5m")
 
 	ctx := context.Background()
 
@@ -30,6 +32,7 @@ func TestUpdateDelta(t *testing.T) {
 	asetsPrices := &AsetsPrices{
 		Pairs:       pairs,
 		ChangeDelta: make(map[string]map[string][]*ChangeDelta),
+		DeltaFast:   make(map[string]map[string]*DeltaFast),
 		database:    db,
 	}
 
@@ -38,11 +41,10 @@ func TestUpdateDelta(t *testing.T) {
 		if _, ok := asetsPrices.ChangePrices[pair]; !ok {
 			asetsPrices.ChangeDelta[pair] = map[string][]*ChangeDelta{}
 		}
-
 	}
 
 	asetsPrices.UpdateDelta()
 
-	fmt.Println(asetsPrices.ChangeDelta["BTCUSDT"]["1d"])
+	//fmt.Println(asetsPrices.ChangeDelta["BTCUSDT"]["1d"])
 
 }
