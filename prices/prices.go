@@ -2,7 +2,6 @@ package prices
 
 import (
 	"database/sql"
-	"fmt"
 	"main/database"
 	"main/model"
 	"main/notification"
@@ -12,6 +11,7 @@ import (
 type AsetsPrices struct {
 	Pairs          []string
 	Periods        []string
+	PeriodsDelta   []string
 	WeightProcents map[string]float64
 	MarketsStat    map[string]*model.MarketsStat
 	ChangePrices   map[string]map[string]*ChangeData
@@ -57,6 +57,7 @@ func NewAssetsPrices(pairs, periods []string, weightProcents map[string]float64,
 	asetsPrices := &AsetsPrices{
 		Pairs:          pairs,
 		Periods:        periods,
+		PeriodsDelta:   []string{"5m", "30m", "1h", "4h", "1d"},
 		WeightProcents: weightProcents,
 		MarketsStat:    make(map[string]*model.MarketsStat),
 		ChangePrices:   make(map[string]map[string]*ChangeData),
@@ -70,13 +71,17 @@ func NewAssetsPrices(pairs, periods []string, weightProcents map[string]float64,
 		asetsPrices.MarketsStat[pair] = &model.MarketsStat{Pair: pair}
 	}
 	for _, pair := range pairs {
+		if _, ok := asetsPrices.ChangePrices[pair]; !ok {
+			asetsPrices.ChangePrices[pair] = map[string]*ChangeData{}
+			asetsPrices.ChangeDelta[pair] = map[string][]*ChangeDelta{}
+		}
 		for _, period := range periods {
-			if _, ok := asetsPrices.ChangePrices[pair]; !ok {
-				asetsPrices.ChangePrices[pair] = map[string]*ChangeData{}
-				asetsPrices.ChangeDelta[pair] = map[string][]*ChangeDelta{}
-			}
 			asetsPrices.ChangePrices[pair][period] = &ChangeData{}
 		}
+		for _, period := range asetsPrices.PeriodsDelta {
+			asetsPrices.ChangeDelta[pair][period] = []*ChangeDelta{}
+		}
+
 	}
 
 	return asetsPrices
@@ -133,13 +138,11 @@ func (ap *AsetsPrices) UpdateChanges(period string) {
 	}
 }
 
-func (ap *AsetsPrices) UpdateDelta() {
-
-	//rang := 10080 // minut (неделя)
+func (ap *AsetsPrices) UpdateDelta() error {
 
 	candles, err := database.SelectCandlesTable(ap.database)
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 
 	frame := map[string]map[string]*ChangeDelta{}
@@ -170,27 +173,28 @@ func (ap *AsetsPrices) UpdateDelta() {
 			}
 
 			switch {
-			case frame[pair]["5m"].MinuteCount%5 == 0:
+			case frame[pair]["5m"].MinuteCount == 5:
 				ap.ChangeDelta[pair]["5m"] = append(ap.ChangeDelta[pair]["5m"], frame[pair]["5m"])
 				frame[pair]["5m"].Clear()
 
-			case frame[pair]["30m"].MinuteCount%30 == 0:
+			case frame[pair]["30m"].MinuteCount == 30:
 				ap.ChangeDelta[pair]["30m"] = append(ap.ChangeDelta[pair]["30m"], frame[pair]["30m"])
 				frame[pair]["30m"].Clear()
 
-			case frame[pair]["1h"].MinuteCount%60 == 0:
+			case frame[pair]["1h"].MinuteCount == 60:
 				ap.ChangeDelta[pair]["1h"] = append(ap.ChangeDelta[pair]["1h"], frame[pair]["1h"])
 				frame[pair]["1h"].Clear()
 
-			case frame[pair]["4h"].MinuteCount%240 == 0:
+			case frame[pair]["4h"].MinuteCount == 240:
 				ap.ChangeDelta[pair]["4h"] = append(ap.ChangeDelta[pair]["4h"], frame[pair]["4h"])
 				frame[pair]["4h"].Clear()
 
-			case frame[pair]["1d"].MinuteCount%720 == 0:
+			case frame[pair]["1d"].MinuteCount == 720:
 				ap.ChangeDelta[pair]["1d"] = append(ap.ChangeDelta[pair]["1d"], frame[pair]["1d"])
 				frame[pair]["1d"].Clear()
 			}
 		}
+
 	}
 
 	period := []string{"5m", "30m", "1h", "4h", "1d"}
@@ -213,5 +217,5 @@ func (ap *AsetsPrices) UpdateDelta() {
 		}
 
 	}
-
+	return nil
 }

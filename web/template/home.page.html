@@ -13,36 +13,77 @@
     </div>
   </div>
 
-  
-  <div class="row mt-5">
+  <div class = "button-control mt-5">
+    <button type="button" class="btn btn-light" id = "btn-price">Цена</button>
+    <button type="button" class="btn btn-light" id = "btn-volume">Объем </button>
+    <button type="button" class="btn btn-light" id = "btn-volume-update">Обновить </button>
+  </div>
 
+  <div class="row mt-3">         
       <div class="col-4">
-        <div class="tickers-list">
-          <div class="scroll-table table-sm" style="overflow-x:auto;" >  
-            <table class="table table-hover table-borderless">
-              <thead style="background-color: rgb(239, 239, 239);">
-                <tr>
-                  <th scope="col">
-                    Пара
-                  </th>
-                  <th scope="col">
-                    ch3m
-                  </th>
-                  <th scope="col">
-                    ch15m
-                  </th>
-                  <th scope="col">
-                    ch1
-                  </th>
-                  <th scope="col">
-                    ch4
-                  </th>
-                </tr>
-              </thead>    
-              <tbody></tbody>
-            </table>
-          </div> 
+        <div id = "ch_price"> 
+          <div class="tickers-list">
+            <div class="scroll-table table-sm" style="overflow-x:auto;" >  
+              <table class="table table-hover table-borderless">
+                <thead style="background-color: rgb(239, 239, 239);">
+                  <tr>
+                    <th scope="col">
+                      Пара
+                    </th>
+                    <th scope="col">
+                      ch3m
+                    </th>
+                    <th scope="col">
+                      ch15m
+                    </th>
+                    <th scope="col">
+                      ch1
+                    </th>
+                    <th scope="col">
+                      ch4
+                    </th>
+                  </tr>
+                </thead>    
+                <tbody></tbody>
+              </table>
+            </div> 
+          </div>
         </div>
+
+        <div id = "ch_volume"> 
+
+          <div class = "buttons-frame mt-1">
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-light  btn-sm" id = "btn-price">5m</button>
+              <button type="button" class="btn btn-light  btn-sm" id = "btn-volume">30m </button>
+              <button type="button" class="btn btn-light  btn-sm" id = "btn-volume-update">1h </button>
+              <button type="button" class="btn btn-light  btn-sm" id = "btn-volume-update">4h </button>
+              <button type="button" class="btn btn-light  btn-sm" id = "btn-volume-update">1d </button>
+            </div>
+          </div>
+
+          <div class="tickers-list  mt-1">
+            <div class="scroll-table table-sm" style="overflow-x:auto;" >  
+              <table class="table table-hover table-borderless">
+                <thead style="background-color: rgb(239, 239, 239);">
+                  <tr>
+                    <th scope="col">
+                      Пара
+                    </th>
+                    <th scope="col">
+                      Объем
+                    </th>
+                    <th scope="col">
+                      Сделки
+                    </th>
+                  </tr>
+                </thead>    
+                <tbody></tbody>
+              </table>
+            </div> 
+          </div>
+        </div>
+
       </div>
 
       <div class="col-8">

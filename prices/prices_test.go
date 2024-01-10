@@ -29,12 +29,7 @@ func TestUpdateDelta(t *testing.T) {
 	}
 	defer db.Close()
 
-	asetsPrices := &AsetsPrices{
-		Pairs:       pairs,
-		ChangeDelta: make(map[string]map[string][]*ChangeDelta),
-		DeltaFast:   make(map[string]map[string]*DeltaFast),
-		database:    db,
-	}
+	asetsPrices := NewAssetsPrices(pairs, []string{}, nil, 0, db, nil)
 
 	for _, pair := range pairs {
 
