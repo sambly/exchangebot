@@ -17,7 +17,7 @@ type ViewData struct {
 	Menu         []Menu
 	Pairs        []string
 	ChangePrices map[string]map[string]*prices.ChangeData
-	ChangeDelta  map[string]map[string][]*prices.ChangeDelta
+	ChangeDelta  map[string]map[string][]prices.ChangeDelta
 	DeltaFast    map[string]map[string]*prices.DeltaFast
 }
 
@@ -54,11 +54,13 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		web.logError(err)
 	}
-	// data, err := json.Marshal(web.App.AssetsPrices)
-	// if err != nil {
-	// 	web.logError(err)
-	// }
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(web.App.AssetsPrices.DeltaFast)
+}
+
+func (web *Web) updateFrame(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(web.App.AssetsPrices.DeltaFast)
+
 }

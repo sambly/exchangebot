@@ -15,7 +15,7 @@ type AsetsPrices struct {
 	WeightProcents map[string]float64
 	MarketsStat    map[string]*model.MarketsStat
 	ChangePrices   map[string]map[string]*ChangeData
-	ChangeDelta    map[string]map[string][]*ChangeDelta
+	ChangeDelta    map[string]map[string][]ChangeDelta
 	DeltaFast      map[string]map[string]*DeltaFast
 	database       *sql.DB
 	Notification   *notification.Notification
@@ -50,7 +50,12 @@ func (cd *ChangeDelta) Clear() {
 
 type DeltaFast struct {
 	Volume float64
-	Trades int64
+	Trades float64
+}
+
+func (df *DeltaFast) Clear() {
+	df.Volume = 0
+	df.Trades = 0
 }
 
 func NewAssetsPrices(pairs, periods []string, weightProcents map[string]float64, lenghtTime int64, db *sql.DB, notification *notification.Notification) *AsetsPrices {
@@ -61,7 +66,7 @@ func NewAssetsPrices(pairs, periods []string, weightProcents map[string]float64,
 		WeightProcents: weightProcents,
 		MarketsStat:    make(map[string]*model.MarketsStat),
 		ChangePrices:   make(map[string]map[string]*ChangeData),
-		ChangeDelta:    make(map[string]map[string][]*ChangeDelta),
+		ChangeDelta:    make(map[string]map[string][]ChangeDelta),
 		DeltaFast:      make(map[string]map[string]*DeltaFast),
 		database:       db,
 		Notification:   notification,
@@ -73,13 +78,15 @@ func NewAssetsPrices(pairs, periods []string, weightProcents map[string]float64,
 	for _, pair := range pairs {
 		if _, ok := asetsPrices.ChangePrices[pair]; !ok {
 			asetsPrices.ChangePrices[pair] = map[string]*ChangeData{}
-			asetsPrices.ChangeDelta[pair] = map[string][]*ChangeDelta{}
+			asetsPrices.ChangeDelta[pair] = map[string][]ChangeDelta{}
+			asetsPrices.DeltaFast[pair] = map[string]*DeltaFast{}
 		}
 		for _, period := range periods {
 			asetsPrices.ChangePrices[pair][period] = &ChangeData{}
 		}
 		for _, period := range asetsPrices.PeriodsDelta {
-			asetsPrices.ChangeDelta[pair][period] = []*ChangeDelta{}
+			asetsPrices.ChangeDelta[pair][period] = []ChangeDelta{}
+			asetsPrices.DeltaFast[pair][period] = &DeltaFast{}
 		}
 
 	}
@@ -145,74 +152,64 @@ func (ap *AsetsPrices) UpdateDelta() error {
 		return err
 	}
 
-	frame := map[string]map[string]*ChangeDelta{}
+	frame := map[string]map[string]ChangeDelta{}
+
+	for _, pair := range ap.Pairs {
+		frame[pair] = map[string]ChangeDelta{}
+		for _, period := range ap.PeriodsDelta {
+			frame[pair][period] = ChangeDelta{}
+			ap.ChangeDelta[pair][period] = nil
+			ap.DeltaFast[pair][period].Clear()
+		}
+	}
 
 	for _, candle := range candles {
 
-		if idx := slices.Index(ap.Pairs, candle.Pair); idx >= 0 {
-
-			pair := candle.Pair
-
-			if _, ok := frame[pair]; !ok {
-				frame[pair] = map[string]*ChangeDelta{}
-				frame[pair]["5m"] = &ChangeDelta{}
-				frame[pair]["30m"] = &ChangeDelta{}
-				frame[pair]["1h"] = &ChangeDelta{}
-				frame[pair]["4h"] = &ChangeDelta{}
-				frame[pair]["1d"] = &ChangeDelta{}
-			}
+		pair := candle.Pair
+		if idx := slices.Index(ap.Pairs, pair); idx >= 0 {
 
 			for key := range frame[pair] {
-				frame[pair][key].Volume += candle.Volume
-				frame[pair][key].VolumeBuy += candle.ActiveBuyVolume
-				frame[pair][key].VolumeAsk += candle.ActiveAskVolume
-				frame[pair][key].Trades += candle.AmountTrade
-				frame[pair][key].TradesBuy += candle.AmountTradeBuy
-				frame[pair][key].TradesAsk += candle.AmountTradeAsk
-				frame[pair][key].MinuteCount += 1
+				frameCope := frame[pair][key]
+				frameCope.Volume += candle.Volume
+				frameCope.VolumeBuy += candle.ActiveBuyVolume
+				frameCope.VolumeAsk += candle.ActiveAskVolume
+				frameCope.Trades += candle.AmountTrade
+				frameCope.TradesBuy += candle.AmountTradeBuy
+				frameCope.TradesAsk += candle.AmountTradeAsk
+				frameCope.MinuteCount += 1
+				frame[pair][key] = frameCope
 			}
 
-			switch {
-			case frame[pair]["5m"].MinuteCount == 5:
+			if frame[pair]["5m"].MinuteCount == 5 {
 				ap.ChangeDelta[pair]["5m"] = append(ap.ChangeDelta[pair]["5m"], frame[pair]["5m"])
-				frame[pair]["5m"].Clear()
-
-			case frame[pair]["30m"].MinuteCount == 30:
+				frame[pair]["5m"] = ChangeDelta{}
+			}
+			if frame[pair]["30m"].MinuteCount == 30 {
 				ap.ChangeDelta[pair]["30m"] = append(ap.ChangeDelta[pair]["30m"], frame[pair]["30m"])
-				frame[pair]["30m"].Clear()
-
-			case frame[pair]["1h"].MinuteCount == 60:
+				frame[pair]["30m"] = ChangeDelta{}
+			}
+			if frame[pair]["1h"].MinuteCount == 60 {
 				ap.ChangeDelta[pair]["1h"] = append(ap.ChangeDelta[pair]["1h"], frame[pair]["1h"])
-				frame[pair]["1h"].Clear()
-
-			case frame[pair]["4h"].MinuteCount == 240:
+				frame[pair]["1h"] = ChangeDelta{}
+			}
+			if frame[pair]["4h"].MinuteCount == 240 {
 				ap.ChangeDelta[pair]["4h"] = append(ap.ChangeDelta[pair]["4h"], frame[pair]["4h"])
-				frame[pair]["4h"].Clear()
-
-			case frame[pair]["1d"].MinuteCount == 720:
+				frame[pair]["4h"] = ChangeDelta{}
+			}
+			if frame[pair]["1d"].MinuteCount == 720 {
 				ap.ChangeDelta[pair]["1d"] = append(ap.ChangeDelta[pair]["1d"], frame[pair]["1d"])
-				frame[pair]["1d"].Clear()
+				frame[pair]["1d"] = ChangeDelta{}
 			}
 		}
 
 	}
 
-	period := []string{"5m", "30m", "1h", "4h", "1d"}
-
 	for _, pair := range ap.Pairs {
-		if _, ok := ap.DeltaFast[pair]; !ok {
-			ap.DeltaFast[pair] = map[string]*DeltaFast{}
-			ap.DeltaFast[pair]["5m"] = &DeltaFast{}
-			ap.DeltaFast[pair]["30m"] = &DeltaFast{}
-			ap.DeltaFast[pair]["1h"] = &DeltaFast{}
-			ap.DeltaFast[pair]["4h"] = &DeltaFast{}
-			ap.DeltaFast[pair]["1d"] = &DeltaFast{}
-		}
-
-		for _, per := range period {
-			if len(ap.ChangeDelta[pair][per]) > 2 {
-				ap.DeltaFast[pair][per].Volume = ap.ChangeDelta[pair][per][len(ap.ChangeDelta[pair][per])-1].Volume - ap.ChangeDelta[pair][per][len(ap.ChangeDelta[pair][per])-2].Volume
-				ap.DeltaFast[pair][per].Trades = ap.ChangeDelta[pair][per][len(ap.ChangeDelta[pair][per])-1].Trades - ap.ChangeDelta[pair][per][len(ap.ChangeDelta[pair][per])-2].Trades
+		for _, period := range ap.PeriodsDelta {
+			val := ap.ChangeDelta[pair][period]
+			if len(ap.ChangeDelta[pair][period]) >= 2 {
+				ap.DeltaFast[pair][period].Volume = ap.ChangeDelta[pair][period][len(val)-1].Volume/ap.ChangeDelta[pair][period][len(val)-2].Volume*100 - 100
+				ap.DeltaFast[pair][period].Trades = float64(val[len(val)-1].Trades)/float64(val[len(val)-2].Trades)*100 - 100
 			}
 		}
 

@@ -55,7 +55,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//pairs := []string{"BTCUSDT", "ETHUSDT", "SANDUSDT", "FTTUSDT"}
+	// pairs := []string{"BTCUSDT"}
 
 	settings := model.Settings{
 		Pairs:          pairs,

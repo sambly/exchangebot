@@ -12,9 +12,8 @@ $(function(){
         document.querySelector("#ch_price").classList.add('hidden');
         document.querySelector("#ch_volume").classList.remove('hidden');
      });
-     $('#btn-volume-update').click(function(e){   
+    $('#btn-volume-update').click(function(e){   
         e.preventDefault();  
-
         $.ajax({
             url: '/updatefull',
             type: 'POST',
@@ -23,23 +22,45 @@ $(function(){
             contentType: 'application/json; charset=utf-8',
             processData: false,
             success: function (response) {
-                console.log(response); 
+                forming_tickers_list_volume(response);
             },
             error: function (response) {
             },
             
         });
 	});
+    $('.btnFrame').click(function(e){    
+        e.preventDefault();
+        let currentBtn = $(this);
+        let allButton = $('.btnFrame');
+        for (let but of allButton) {
+            but.classList.remove('active');
+        }
+        currentBtn.addClass('active');
 
 
-
+        let frame = e.target.innerText;
+        $.ajax({
+            url: '/updateframe',
+            type: 'POST',
+            method: 'POST',
+            //data: JSON.stringify(e.target.innerHTML),
+            cache: false,
+            contentType: 'application/json; charset=utf-8',
+            processData: false,
+            success: function (response) {
+                forming_tickers_list_volume(response,frame);
+            },
+            error: function (response) {
+            },
+            
+        });
+     });
 
 });
 
 
-function forming_page (pairs,changePrices) {
-
-
+function forming_page (pairs,changePrices,deltaFast) {
 
     document.querySelector("#ch_price").classList.remove('hidden');
     document.querySelector("#ch_volume").classList.add('hidden');
@@ -52,14 +73,14 @@ function forming_page (pairs,changePrices) {
     }
 
     forming_tickers_list(changePrices);
-
+    forming_tickers_list_volume(deltaFast);
 }
 
 function forming_tickers_list(changePrices) {
 
     const heads = ['ch3m','ch15m','ch1h','ch4h'];
     const tbody = document.querySelector("tbody");
-    const th = document.querySelectorAll("thead th");
+    const th =  document.querySelectorAll("thead[name=thead-price] th");
 
     let colorSet = false
     for (var item in changePrices) {
@@ -71,7 +92,7 @@ function forming_tickers_list(changePrices) {
         }
         colorSet = !colorSet
 
-        row.className = "pair";
+        row.className = "pair-price";
         let cell = row.insertCell();
         cell.innerHTML = item; 
         cell.setAttribute("name","pair"); 
@@ -108,49 +129,49 @@ function forming_tickers_list(changePrices) {
 
 
     });
-};
+    };
   
-
     // Сортировка таблицы
-    const pair = document.querySelectorAll(".pair");
+    const pair = document.querySelectorAll(".pair-price");
     let sortDirection;
     th.forEach((col, idx) => {
-    col.addEventListener("click", () => {
-        sortDirection = !sortDirection;
+        col.addEventListener("click", () => {
+            sortDirection = !sortDirection;
 
-        col.classList.add("thead-flash-once");
+            col.classList.add("thead-flash-once");
 
-        const rowsArrFromNodeList = Array.from(pair);
-        const filteredRows = rowsArrFromNodeList.filter(
-        (item) => item.style.display != "none"
-        );
-
-        filteredRows
-        .sort((a, b) => {
-            return a.childNodes[idx].innerHTML.localeCompare(
-            b.childNodes[idx].innerHTML,
-            "en",
-            { numeric: true, sensitivity: "base" }
+            const rowsArrFromNodeList = Array.from(pair);
+            const filteredRows = rowsArrFromNodeList.filter(
+            (item) => item.style.display != "none"
             );
-        })
-        .forEach((row) => {
-            sortDirection
-            ? tbody.insertBefore(row, tbody.childNodes[tbody.length])
-            : tbody.insertBefore(row, tbody.childNodes[0]);
+
+            filteredRows
+            .sort((a, b) => {
+                return a.childNodes[idx].innerHTML.localeCompare(
+                b.childNodes[idx].innerHTML,
+                "en",
+                { numeric: true, sensitivity: "base" }
+                );
+            })
+            .forEach((row) => {
+                sortDirection
+                ? tbody.insertBefore(row, tbody.childNodes[tbody.length])
+                : tbody.insertBefore(row, tbody.childNodes[0]);
+            });
         });
-    });
     });
         
 }
 
-function forming_tickers_list_volume(changePrices,frame) {
+function forming_tickers_list_volume(deltaFast,frame='5m') {
 
-    const heads = ['ch3m','ch15m','ch1h','ch4h'];
-    const tbody = document.querySelector("tbody");
-    const th = document.querySelectorAll("thead th");
+    const tbody = document.querySelector("#table-delta");
+    tbody.innerHTML = '';
+    const th = document.querySelectorAll("thead[name=thead-delta] th");
+   
 
     let colorSet = false
-    for (var item in changePrices) {
+    for (var item in deltaFast) {
         let row = tbody.insertRow(-1);
         if (colorSet){
             row.style.backgroundColor = 'rgb(' + 239 + ',' + 239 + ',' + 239 + ')';
@@ -159,78 +180,56 @@ function forming_tickers_list_volume(changePrices,frame) {
         }
         colorSet = !colorSet
 
-        row.className = "pair";
+        row.className = "pair-delta";
         let cell = row.insertCell();
         cell.innerHTML = item; 
         cell.setAttribute("name","pair"); 
 
-        for (let j = 0; j < heads.length; j++) {
-            let cell = row.insertCell();
-            let value = changePrices[item][heads[j]]["СhangePercent"].toFixed(2);
-            cell.innerHTML = value;  
-            cell.setAttribute("name",heads[j]);
-        }       
+        cell = row.insertCell();
+        let value = deltaFast[item][frame]["Volume"].toFixed(2);
+        cell.innerHTML = value;  
+        cell.setAttribute("name",'volume');
+        
+        cell = row.insertCell();
+        value = deltaFast[item][frame]["Trades"].toFixed(2);
+        cell.innerHTML = value;  
+        cell.setAttribute("name",'trades');   
     };
 
-
-    // выбор определенной пары
-    let rows = tbody.rows;
-    for (let tr of rows) { 
-        tr.addEventListener("click",() => {
-            let pair = tr.querySelector('[name="pair"]').innerHTML;
-                 new TradingView.widget(
-                 {
-                    "height": "500",
-                    "symbol": "BINANCE:"+pair,
-                    "interval": "15",
-                    "timezone": "Europe/Moscow",
-                    "theme": "Light",
-                    "style": "1",
-                    "locale": "ru",
-                    "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false,
-                    "allow_symbol_change": true,
-                    "container_id": "tradingview_3418f"      
-                }
-                );
-
-
-    });
-};
-  
-
     // Сортировка таблицы
-    const pair = document.querySelectorAll(".pair");
+    const pair = document.querySelectorAll(".pair-delta");
     let sortDirection;
     th.forEach((col, idx) => {
-    col.addEventListener("click", () => {
-        sortDirection = !sortDirection;
+        col.addEventListener("click", () => {
+            sortDirection = !sortDirection;
 
-        col.classList.add("thead-flash-once");
+            col.classList.add("thead-flash-once");
 
-        const rowsArrFromNodeList = Array.from(pair);
-        const filteredRows = rowsArrFromNodeList.filter(
-        (item) => item.style.display != "none"
-        );
-
-        filteredRows
-        .sort((a, b) => {
-            return a.childNodes[idx].innerHTML.localeCompare(
-            b.childNodes[idx].innerHTML,
-            "en",
-            { numeric: true, sensitivity: "base" }
+            const rowsArrFromNodeList = Array.from(pair);
+            const filteredRows = rowsArrFromNodeList.filter(
+            (item) => item.style.display != "none"
             );
-        })
-        .forEach((row) => {
-            sortDirection
-            ? tbody.insertBefore(row, tbody.childNodes[tbody.length])
-            : tbody.insertBefore(row, tbody.childNodes[0]);
+
+            filteredRows
+            .sort((a, b) => {
+                return a.childNodes[idx].innerHTML.localeCompare(
+                b.childNodes[idx].innerHTML,
+                "en",
+                { numeric: true, sensitivity: "base" }
+                );
+            })
+            .forEach((row) => {
+                sortDirection
+                ? tbody.insertBefore(row, tbody.childNodes[tbody.length])
+                : tbody.insertBefore(row, tbody.childNodes[0]);
+            });
         });
     });
-    });
-        
-}
 
+
+
+};
+  
 
 
 

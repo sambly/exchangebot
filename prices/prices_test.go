@@ -12,9 +12,7 @@ func TestUpdateDelta(t *testing.T) {
 
 	flag.Set("test.timeout", "5m")
 
-	ctx := context.Background()
-
-	binance, err := exchange.NewBinance(ctx)
+	binance, err := exchange.NewBinance(context.Background())
 	if err != nil {
 		t.Error(err)
 	}
@@ -30,13 +28,6 @@ func TestUpdateDelta(t *testing.T) {
 	defer db.Close()
 
 	asetsPrices := NewAssetsPrices(pairs, []string{}, nil, 0, db, nil)
-
-	for _, pair := range pairs {
-
-		if _, ok := asetsPrices.ChangePrices[pair]; !ok {
-			asetsPrices.ChangeDelta[pair] = map[string][]*ChangeDelta{}
-		}
-	}
 
 	asetsPrices.UpdateDelta()
 

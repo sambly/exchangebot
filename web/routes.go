@@ -8,6 +8,7 @@ func (app *Web) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", app.home)
 	mux.HandleFunc("/updatefull", app.updateFull)
+	mux.HandleFunc("/updateframe", app.updateFrame)
 
 	fileServer := http.FileServer(http.Dir("web/static/"))
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
