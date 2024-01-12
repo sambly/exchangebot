@@ -1,16 +1,13 @@
-
-
-
-
-
 $(function(){
-    $('#btn-price').click(function(e){    
-       document.querySelector("#ch_price").classList.remove('hidden');
-       document.querySelector("#ch_volume").classList.add('hidden');
+    $('#btn-price').click(function(e){   
+        $("#list-ch-price").show();
+        $("#list-ch-volume").hide();
+        $("#btn-graph").hide();
 	});
-    $('#btn-volume').click(function(e){   
-        document.querySelector("#ch_price").classList.add('hidden');
-        document.querySelector("#ch_volume").classList.remove('hidden');
+    $('#btn-volume').click(function(e){  
+        $("#list-ch-price").hide();
+        $("#list-ch-volume").show(); 
+        $("#btn-graph").show();
      });
     $('#btn-volume-update').click(function(e){   
         e.preventDefault();  
@@ -52,18 +49,116 @@ $(function(){
                 forming_tickers_list_volume(response,frame);
             },
             error: function (response) {
-            },
-            
+            },    
         });
      });
 
+     $('.btnGraph').click(function(e){    
+        e.preventDefault();
+        let currentBtn = $(this);
+        let allButton = $('.btnGraph');
+        for (let but of allButton) {
+            but.classList.remove('active');
+        }
+        currentBtn.addClass('active');
+
+        if (e.target.innerText === 'Цена'){
+            $('#chart-price').show()
+            $('#chart-volume').hide()
+        }
+        if (e.target.innerText === 'Объем'){
+            $('#chart-price').hide()
+            $('#chart-volume').show()
+        }  
+
+        chart_volume();
+
+     });
+
+
+
+
+
 });
 
+function chart_volume(){
+
+    let dataFull;
+
+    let request = {Pair: 'BTCUSDT',Frame: '5m'};
+    $.ajax({
+        url: '/getChangeDelta',
+        type: 'POST',
+        method: 'POST',
+        data: JSON.stringify(request),
+        cache: false,
+        contentType: 'application/json; charset=utf-8',
+        processData: false,
+        success: function (response) {
+            console.log(typeof(response));
+            dataFull = response;
+            // Default Volume 
+            let dataVolume = []; 
+            for (let item of dataFull) {
+                dataVolume.push({time:item.Time,value:item.Volume})
+            }
+
+         
+
+            // const dataVolume = [
+            //     { time: '2016-07-18', value: 80.01 },
+            //     { time: '2016-07-25', value: 80.09 },
+            //     { time: '2016-08-01', value: 81.23 },
+
+            // ]
+
+
+            const chartOptions = {
+                layout: {
+                    textColor: 'black',
+                    background: { type: 'solid', color: 'white' },
+                },
+                height: 500,
+                //autosize:true,
+            }; 
+            
+            let chart_div = document.getElementById('chart-volume');
+            chart_div.innerHTML = '';
+
+            const chart = LightweightCharts.createChart(chart_div,chartOptions);
+            chart.applyOptions({
+                rightPriceScale: {
+                    scaleMargins: {
+                        top: 0.1,
+                        bottom: 0.1,
+                    },
+                },
+            });
+
+            const lineSeries = chart.addLineSeries({ color: '#2962FF' });
+            lineSeries.setData(dataVolume);
+            chart.timeScale().fitContent();
+
+
+        },
+        error: function (response) {
+        },    
+    });
+
+
+
+
+
+
+}
 
 function forming_page (pairs,changePrices,deltaFast) {
 
-    document.querySelector("#ch_price").classList.remove('hidden');
-    document.querySelector("#ch_volume").classList.add('hidden');
+    $("#list-ch-price").show();
+    $("#list-ch-volume").hide();
+    $("#btn-graph").hide();
+    $('#chart-price').show();
+
 
     let selectPairs = document.querySelector('#pairs'); 
     for (index in pairs) {
@@ -74,12 +169,13 @@ function forming_page (pairs,changePrices,deltaFast) {
 
     forming_tickers_list(changePrices);
     forming_tickers_list_volume(deltaFast);
+
 }
 
 function forming_tickers_list(changePrices) {
 
     const heads = ['ch3m','ch15m','ch1h','ch4h'];
-    const tbody = document.querySelector("tbody");
+    const tbody = document.querySelector("#tbody-price");
     const th =  document.querySelectorAll("thead[name=thead-price] th");
 
     let colorSet = false
@@ -165,7 +261,7 @@ function forming_tickers_list(changePrices) {
 
 function forming_tickers_list_volume(deltaFast,frame='5m') {
 
-    const tbody = document.querySelector("#table-delta");
+    const tbody = document.querySelector("#tbody-delta");
     tbody.innerHTML = '';
     const th = document.querySelectorAll("thead[name=thead-delta] th");
    

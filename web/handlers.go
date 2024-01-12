@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"main/prices"
 	"net/http"
 )
@@ -62,5 +63,19 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 func (web *Web) updateFrame(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(web.App.AssetsPrices.DeltaFast)
+
+}
+
+func (web *Web) getChangeDelta(w http.ResponseWriter, r *http.Request) {
+
+	data := map[string]string{}
+
+	bodyByte, _ := io.ReadAll(r.Body)
+
+	if err := json.Unmarshal(bodyByte, &data); err != nil {
+		web.logError(err)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(web.App.AssetsPrices.ChangeDelta[data["Pair"]][data["Frame"]])
 
 }

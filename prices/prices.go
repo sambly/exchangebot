@@ -29,6 +29,7 @@ type ChangeData struct {
 	ChangePercentVolume float64
 }
 type ChangeDelta struct {
+	Time        int64
 	Volume      float64
 	VolumeBuy   float64
 	VolumeAsk   float64
@@ -177,6 +178,7 @@ func (ap *AsetsPrices) UpdateDelta() error {
 				frameCope.TradesBuy += candle.AmountTradeBuy
 				frameCope.TradesAsk += candle.AmountTradeAsk
 				frameCope.MinuteCount += 1
+				frameCope.Time = candle.Time.Unix()
 				frame[pair][key] = frameCope
 			}
 

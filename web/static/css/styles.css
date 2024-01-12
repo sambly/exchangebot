@@ -1,10 +1,6 @@
 
 
 
-.hidden {
-  display: none;
-}
-
 .tickers-list {
   font-size: smaller;
 }
@@ -17,7 +13,7 @@
   text-align: center;
 }
 
-table {
+#table-price,#table-delta {
 table-layout: fixed;
 width:100%;
 }
@@ -43,7 +39,7 @@ tbody td {
 text-align: center;
 word-break: break-all;
 } 
-.toast {
+/* .toast {
 position: fixed;
 right: 20px;
 top: 20px;
@@ -52,27 +48,38 @@ z-index: 99;
 
 .toast:not(.showing):not(.show) {
 display: none !important;
-}
+} */
 
 
 
 
 
-th:nth-child(1),td:nth-child(1) {
+#table-price th:nth-child(1),#table-price  td:nth-child(1) {
 width: 40%;
 }   
-th:nth-child(2),td:nth-child(2) {
+#table-price th:nth-child(2), #table-price td:nth-child(2) {
 width: 15%;
 }
-th:nth-child(3),td:nth-child(3) {
+#table-price th:nth-child(3), #table-price td:nth-child(3) {
 width: 15%;
 }
-th:nth-child(4),td:nth-child(4) {
+#table-price th:nth-child(4),#table-price  td:nth-child(4) {
 width: 15%;
 }
-th:nth-child(5),td:nth-child(5) {
+#table-price th:nth-child(5),#table-price  td:nth-child(5) {
 width: 15%;
 }
+
+#table-delta th:nth-child(1), #table-delta td:nth-child(1) {
+width: 40%;
+}   
+#table-delta th:nth-child(2), #table-delta td:nth-child(2) {
+width: 30%;
+}
+#table-delta th:nth-child(3), #table-delta td:nth-child(3) {
+width: 30%;
+}
+
 
 
 
