@@ -1,9 +1,11 @@
 $(function(){
+
     $('#btn-price').click(function(e){   
         $("#list-ch-price").show();
         $("#list-ch-volume").hide();
         $("#btn-graph").hide();
 	});
+
     $('#btn-volume').click(function(e){  
         $("#list-ch-price").hide();
         $("#list-ch-volume").show(); 
@@ -71,7 +73,7 @@ $(function(){
             $('#chart-volume').show()
         }  
 
-        chart_volume();
+        chart_volume_update();
 
      });
 
@@ -81,9 +83,25 @@ $(function(){
 
 });
 
-function chart_volume(){
 
-    let dataFull;
+
+
+
+
+function change_pair(){
+    
+
+    if($('#btn-graph').css('display') == "none"){
+
+    }
+
+console.log($("#btn-graph"));
+}
+
+
+
+function chart_volume_update(pair,frame){
+
 
     let request = {Pair: 'BTCUSDT',Frame: '5m'};
     $.ajax({
@@ -95,23 +113,11 @@ function chart_volume(){
         contentType: 'application/json; charset=utf-8',
         processData: false,
         success: function (response) {
-            console.log(typeof(response));
-            dataFull = response;
-            // Default Volume 
+            let dataFull = response;
             let dataVolume = []; 
             for (let item of dataFull) {
                 dataVolume.push({time:item.Time,value:item.Volume})
             }
-
-         
-
-            // const dataVolume = [
-            //     { time: '2016-07-18', value: 80.01 },
-            //     { time: '2016-07-25', value: 80.09 },
-            //     { time: '2016-08-01', value: 81.23 },
-
-            // ]
-
 
             const chartOptions = {
                 layout: {
@@ -119,7 +125,6 @@ function chart_volume(){
                     background: { type: 'solid', color: 'white' },
                 },
                 height: 500,
-                //autosize:true,
             }; 
             
             let chart_div = document.getElementById('chart-volume');
@@ -159,18 +164,28 @@ function forming_page (pairs,changePrices,deltaFast) {
     $("#btn-graph").hide();
     $('#chart-price').show();
 
-
+    // Select pairs
     let selectPairs = document.querySelector('#pairs'); 
+    let selectPairsList = document.querySelector('#pairslistOptions'); 
     for (index in pairs) {
         let option = new Option(pairs[index],pairs[index]);
-        option.setAttribute("selected","false");
-        selectPairs.prepend(option)
-    }
+        selectPairsList.prepend(option)
+    } 
+    selectPairs.value="BTCUSDT";
+
+    selectPairs.addEventListener('change',(e)=>{
+        change_pair();
+    });
 
     forming_tickers_list(changePrices);
     forming_tickers_list_volume(deltaFast);
 
 }
+
+
+
+
+
 
 function forming_tickers_list(changePrices) {
 
