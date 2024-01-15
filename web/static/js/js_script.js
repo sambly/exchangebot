@@ -2,15 +2,22 @@ $(function(){
 
     $('#btn-price').click(function(e){   
         $("#list-ch-price").show();
+        $("#chart-price").show();
         $("#list-ch-volume").hide();
-        $("#btn-graph").hide();
+        $("#panel-chart-volume").hide();
+        
+        let pair = document.querySelector('#pairs');        
+        chart_price_update(pair.value); 
 	});
 
-    $('#btn-volume').click(function(e){  
+    $('#btn-volume').click(function(e){ 
+        $("#list-ch-volume").show();
+        $("#panel-chart-volume").show();  
         $("#list-ch-price").hide();
-        $("#list-ch-volume").show(); 
-        $("#btn-graph").show();
+        $("#chart-price").hide();
+        chart_volume_update();
      });
+
     $('#btn-volume-update').click(function(e){   
         e.preventDefault();  
         $.ajax({
@@ -28,6 +35,7 @@ $(function(){
             
         });
 	});
+
     $('.btnFrame').click(function(e){    
         e.preventDefault();
         let currentBtn = $(this);
@@ -49,61 +57,110 @@ $(function(){
             processData: false,
             success: function (response) {
                 forming_tickers_list_volume(response,frame);
+                chart_volume_update();
             },
             error: function (response) {
             },    
         });
      });
-
-     $('.btnGraph').click(function(e){    
-        e.preventDefault();
-        let currentBtn = $(this);
-        let allButton = $('.btnGraph');
-        for (let but of allButton) {
-            but.classList.remove('active');
-        }
-        currentBtn.addClass('active');
-
-        if (e.target.innerText === 'Цена'){
-            $('#chart-price').show()
-            $('#chart-volume').hide()
-        }
-        if (e.target.innerText === 'Объем'){
-            $('#chart-price').hide()
-            $('#chart-volume').show()
-        }  
-
-        chart_volume_update();
-
-     });
-
-
-
-
-
 });
 
 
+function forming_page (pairs,changePrices,deltaFast) {
 
+    $("#list-ch-price").show();
+    $("#chart-price").show();
+    $("#list-ch-volume").hide();
+    $("#panel-chart-volume").hide(); 
 
+    // Select pairs
+    let selectPairs = document.querySelector('#pairs'); 
+    let selectPairsList = document.querySelector('#pairslistOptions'); 
+    for (index in pairs) {
+        let option = new Option(pairs[index],pairs[index]);
+        selectPairsList.prepend(option)
+    } 
+    selectPairs.value="BTCUSDT";
 
+    selectPairs.addEventListener('change',(e)=>{
+        let pair = document.querySelector('#pairs');
+        change_pair(pair.value);
+    });
 
-function change_pair(){
-    
+    let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
+    checkboxes.forEach((checkbox,index)=>{
+        checkbox.addEventListener('change',(e)=>{
+            // Сбросить все галочки 
+            checkboxes.forEach((checkboxClear,index)=>{
+                checkboxClear.checked = false;
+            });
+            checkbox.checked = true; 
+            chart_volume_update();
+        }) 
+    }) 
 
-    if($('#btn-graph').css('display') == "none"){
+    forming_tickers_list(changePrices);
+    forming_tickers_list_volume(deltaFast);
 
-    }
-
-console.log($("#btn-graph"));
 }
 
 
 
-function chart_volume_update(pair,frame){
+function change_pair(pair){
+    
+
+    let selectPairs = document.querySelector('#pairs');
+    selectPairs.value=pair; 
+
+    if($('#list-ch-price').css('display') == "block"){
+        chart_price_update(pair);
+    }
+    if($('#list-ch-volume').css('display') == "block"){
+        chart_volume_update();
+    }
+}
 
 
-    let request = {Pair: 'BTCUSDT',Frame: '5m'};
+function chart_price_update(pair){
+    new TradingView.widget(
+        {
+           "height": "500",
+           "symbol": "BINANCE:"+ pair,
+           "interval": "15",
+           "timezone": "Europe/Moscow",
+           "theme": "Light",
+           "style": "1",
+           "locale": "ru",
+           "toolbar_bg": "#f1f3f6",
+           "enable_publishing": false,
+           "allow_symbol_change": true,
+           "container_id": "tradingview_3418f"      
+       }
+       );
+}
+
+function chart_volume_update(){
+
+    let pair = document.querySelector('#pairs'); 
+    let frames = document.querySelectorAll('.btnFrame');
+    let frame;
+    let checboxType
+
+    let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
+    checkboxes.forEach((checkbox,index)=>{
+        if (checkbox.checked) {
+            checboxType = checkbox.value
+            console.log(checboxType);
+        }
+    })
+
+    for (let f of frames) {
+        if (f.classList.contains('active')) {
+            frame = f;
+        }
+    }
+
+    let request = {Pair: pair.value,Frame: frame.innerText};
     $.ajax({
         url: '/getChangeDelta',
         type: 'POST',
@@ -116,7 +173,7 @@ function chart_volume_update(pair,frame){
             let dataFull = response;
             let dataVolume = []; 
             for (let item of dataFull) {
-                dataVolume.push({time:item.Time,value:item.Volume})
+                dataVolume.push({time:item['Time'],value:item[checboxType]})
             }
 
             const chartOptions = {
@@ -157,35 +214,6 @@ function chart_volume_update(pair,frame){
 
 }
 
-function forming_page (pairs,changePrices,deltaFast) {
-
-    $("#list-ch-price").show();
-    $("#list-ch-volume").hide();
-    $("#btn-graph").hide();
-    $('#chart-price').show();
-
-    // Select pairs
-    let selectPairs = document.querySelector('#pairs'); 
-    let selectPairsList = document.querySelector('#pairslistOptions'); 
-    for (index in pairs) {
-        let option = new Option(pairs[index],pairs[index]);
-        selectPairsList.prepend(option)
-    } 
-    selectPairs.value="BTCUSDT";
-
-    selectPairs.addEventListener('change',(e)=>{
-        change_pair();
-    });
-
-    forming_tickers_list(changePrices);
-    forming_tickers_list_volume(deltaFast);
-
-}
-
-
-
-
-
 
 function forming_tickers_list(changePrices) {
 
@@ -222,23 +250,7 @@ function forming_tickers_list(changePrices) {
     for (let tr of rows) { 
         tr.addEventListener("click",() => {
             let pair = tr.querySelector('[name="pair"]').innerHTML;
-                 new TradingView.widget(
-                 {
-                    "height": "500",
-                    "symbol": "BINANCE:"+pair,
-                    "interval": "15",
-                    "timezone": "Europe/Moscow",
-                    "theme": "Light",
-                    "style": "1",
-                    "locale": "ru",
-                    "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false,
-                    "allow_symbol_change": true,
-                    "container_id": "tradingview_3418f"      
-                }
-                );
-
-
+            change_pair(pair);
     });
     };
   
@@ -307,6 +319,16 @@ function forming_tickers_list_volume(deltaFast,frame='5m') {
         cell.setAttribute("name",'trades');   
     };
 
+    // выбор определенной пары
+    let rows = tbody.rows;
+    for (let tr of rows) { 
+        tr.addEventListener("click",() => {
+            let pair = tr.querySelector('[name="pair"]').innerHTML;
+            change_pair(pair);
+    });
+    };
+
+
     // Сортировка таблицы
     const pair = document.querySelectorAll(".pair-delta");
     let sortDirection;
@@ -341,7 +363,6 @@ function forming_tickers_list_volume(deltaFast,frame='5m') {
 
 };
   
-
 
 
 function get_response_message (response,reload) {

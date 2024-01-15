@@ -8,8 +8,6 @@
 
   <div class="row mt-5">
     <div class="col-2">
-      <!-- <select name="pairs" id="pairs" class="form-select"></select> -->
-
       <input class="form-control" list="pairslistOptions" id="pairs" placeholder="Pair to search...">
       <datalist id="pairslistOptions">
       </datalist>
@@ -24,8 +22,10 @@
     <button type="button" class="btn btn-light" id = "btn-volume-update">Обновить </button>
   </div>
 
-  <div class="row mt-3">         
+  <div class="row mt-3">   
+
       <div class="col-4">
+
         <div class="collapse" id = "list-ch-price"> 
           <div class="tickers-list-price">
             <div class="scroll-table table-sm" style="overflow-x:auto;" >  
@@ -93,44 +93,6 @@
 
       <div class="col-8">
         
-        <div class="collapse" id = "btn-graph">
-
-          <div class="row">
-            <div class="col">
-              <div class="d-flex justify-content-start">
-
-                <input class="form-check-input" type="checkbox" value="" id="checkVolume" checked="">
-                <label class="form-check-label" for="checkVolume"> Volume</label>
-
-                <input class="form-check-input" type="checkbox" value="" id="checkVolumeB">
-                <label class="form-check-label" for="checkVolumeB"> VolumeB</label>
-
-                <input class="form-check-input" type="checkbox" value="" id="checkVolumeA">
-                <label class="form-check-label" for="checkVolumeA"> VolumeA</label>
-
-                <input class="form-check-input" type="checkbox" value="" id="checkTrades">
-                <label class="form-check-label" for="checkTrades"> Trades</label>
-
-                <input class="form-check-input" type="checkbox" value="" id="checkTradesB">
-                <label class="form-check-label" for="checkTradesB"> TradesB</label>
-
-                <input class="form-check-input" type="checkbox" value="" id="checkTradesA">
-                <label class="form-check-label" for="checkTradesA"> TradesA</label>
-
-              </div>
-
-            </div>
-            <div class="col">
-              <div class="d-flex justify-content-end">
-                <button type="button" class="btnGraph btn btn-primary active  btn-sm" id = "btn-chartPrice">Цена</button>
-                <button type="button" class="btnGraph btn btn-primary  btn-sm" id = "btn-chartVolume">Объем</button>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-
 
 
         <div class="collapse" id="chart-price">
@@ -164,8 +126,40 @@
 
         </div>
 
-        <div class="collapse" id ="chart-volume" >
+
+        <div class="collapse" id="panel-chart-volume">
+
+
+          <div class="d-flex justify-content-end">
+            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="Volume"checked >
+            <label class="form-check-label" for="checkVolume"> Volume</label>
+
+            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="VolumeBuy">
+            <label class="form-check-label" for="checkVolumeB"> VolumeB</label>
+
+            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="VolumeAsk">
+            <label class="form-check-label" for="checkVolumeA"> VolumeA</label>
+
+            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="Trades">
+            <label class="form-check-label" for="checkTrades"> Trades</label>
+
+            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="TradesBuy">
+            <label class="form-check-label" for="checkTradesB"> TradesB</label>
+
+            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="TradesAsk">
+            <label class="form-check-label" for="checkTradesA"> TradesA</label>
+
+          </div>
+
+          <div id ="chart-volume" >
+          </div>
+
+
         </div>
+
+
+
+
 
 
 
