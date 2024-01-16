@@ -51,7 +51,6 @@ $(function(){
             url: '/updateframe',
             type: 'POST',
             method: 'POST',
-            //data: JSON.stringify(e.target.innerHTML),
             cache: false,
             contentType: 'application/json; charset=utf-8',
             processData: false,
@@ -88,15 +87,13 @@ function forming_page (pairs,marketsStat,changePrices,deltaFast) {
         change_pair(pair.value);
     });
 
+    // Загаловки 24ch  Volume
     let ch24Top = document.querySelector('#ch24-top');
-    ch24Top.innerHTML = marketsStat[selectPairs.value].Ch24;
+    ch24Top.innerHTML = (marketsStat[selectPairs.value].Ch24).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact'})+ ' %';
     let VolumeTop = document.querySelector('#volume-top');
-    VolumeTop.innerHTML = marketsStat[selectPairs.value].Volume;
+    VolumeTop.innerHTML = (marketsStat[selectPairs.value].Volume).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact'});
 
-
-
-
-
+    // Выбор определенного типа графика
     let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
     checkboxes.forEach((checkbox,index)=>{
         checkbox.addEventListener('change',(e)=>{
@@ -108,7 +105,6 @@ function forming_page (pairs,marketsStat,changePrices,deltaFast) {
             chart_volume_update();
         }) 
     }) 
-
 
     forming_tickers_list(changePrices);
     forming_tickers_list_volume(deltaFast);
@@ -130,7 +126,33 @@ function change_pair(pair){
     if($('#list-ch-volume').css('display') == "block"){
         chart_volume_update();
     }
+
+    update_top_data(pair);
 }
+
+function update_top_data(pair){
+    $.ajax({
+        url: '/updateTop',
+        type: 'POST',
+        method: 'POST',
+        data:pair,
+        cache: false,
+        contentType: ' text/html; charset=utf-8',
+        processData: false,
+        success: function (response) {
+            // Загаловки 24ch  Volume
+            let ch24Top = document.querySelector('#ch24-top');
+            ch24Top.innerHTML = (response.Ch24).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact'})+ ' %';
+            let VolumeTop = document.querySelector('#volume-top');
+            VolumeTop.innerHTML = (response.Volume).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact'});;
+        },
+        error: function (response) {
+        },    
+    });
+}
+
+
+
 
 function chart_price_update(pair){
     new TradingView.widget(
@@ -226,10 +248,6 @@ function chart_volume_update(){
 }
 
 function forming_tickers_list(changePrices) {
-
-
-
-
 
     const heads = ['ch3m','ch15m','ch1h','ch4h'];
     const tbody = document.querySelector("#tbody-price");
@@ -388,3 +406,32 @@ function get_response_message (response,reload) {
     }
     return false
 }
+
+
+function show_price_panel(){
+
+    $("#list-ch-price").show();
+    $("#list-ch-volume").hide();
+
+    $("#chart-price").show();
+    $("#panel-chart-volume").hide();
+    $("#panel-trade").hide();
+
+}
+
+function show_volume_panel(){
+
+}
+
+function show_trade_panel(){
+
+    $("#list-ch-price").hide();
+    $("#list-ch-volume").show();
+   
+    $("#chart-price").hide();
+    $("#panel-chart-volume").show();  
+    $("#panel-chart-volume").show();
+   
+}
+
+

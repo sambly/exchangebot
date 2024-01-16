@@ -80,3 +80,15 @@ func (web *Web) getChangeDelta(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(web.App.AssetsPrices.ChangeDelta[data["Pair"]][data["Frame"]])
 
 }
+
+func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
+
+	bodyByte, err := io.ReadAll(r.Body)
+	if err != nil {
+		web.logError(err)
+	}
+	pair := string(bodyByte)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(web.App.AssetsPrices.MarketsStat[pair])
+
+}

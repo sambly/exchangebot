@@ -10,6 +10,7 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/updatefull", app.updateFull)
 	mux.HandleFunc("/updateframe", app.updateFrame)
 	mux.HandleFunc("/getChangeDelta", app.getChangeDelta)
+	mux.HandleFunc("/updateTop", app.updateTop)
 
 	fileServer := http.FileServer(http.Dir("web/static/"))
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
