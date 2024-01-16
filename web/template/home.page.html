@@ -6,15 +6,23 @@
 <div class="container">
 
 
-  <div class="row mt-5">
+  <div class="row mt-3">
+    <div class="col-2">
+      <div class="d-flex  gap-2 ">24часа:<div class="text-primary" id="ch24-top" style="font-weight: bold; "></div></div>
+    </div>
+    <div class="col-2">
+      <div class="d-flex  gap-2 ">Объем:<div class="text-primary" id="volume-top" style="font-weight: bold; "></div></div>
+    </div>
+  </div>
+
+  <div class="row mt-3">
     <div class="col-2">
       <input class="form-control" list="pairslistOptions" id="pairs" placeholder="Pair to search...">
       <datalist id="pairslistOptions">
       </datalist>
-
-
     </div>
   </div>
+
 
   <div class = "button-control mt-5">
     <button type="button" class="btn btn-light" id = "btn-price">Цена</button>
@@ -172,7 +180,7 @@
 </div>
 
 <script>
-  forming_page({{ .Pairs}},{{ .ChangePrices}},{{ .DeltaFast}}); 
+  forming_page({{ .Pairs}},{{ .MarketsStat}},{{ .ChangePrices}},{{ .DeltaFast}}); 
 </script>
 
 

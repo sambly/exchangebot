@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"main/model"
 	"main/prices"
 	"net/http"
 )
@@ -17,8 +18,8 @@ type Menu struct {
 type ViewData struct {
 	Menu         []Menu
 	Pairs        []string
+	MarketsStat  map[string]*model.MarketsStat
 	ChangePrices map[string]map[string]*prices.ChangeData
-	ChangeDelta  map[string]map[string][]prices.ChangeDelta
 	DeltaFast    map[string]map[string]*prices.DeltaFast
 }
 
@@ -32,8 +33,8 @@ func (web *Web) home(w http.ResponseWriter, r *http.Request) {
 	data := ViewData{
 		Menu:         []Menu{{Name: "Главная", Url: "/"}},
 		Pairs:        web.App.AssetsPrices.Pairs,
+		MarketsStat:  web.App.AssetsPrices.MarketsStat,
 		ChangePrices: web.App.AssetsPrices.ChangePrices,
-		ChangeDelta:  web.App.AssetsPrices.ChangeDelta,
 		DeltaFast:    web.App.AssetsPrices.DeltaFast,
 	}
 

@@ -66,12 +66,13 @@ $(function(){
 });
 
 
-function forming_page (pairs,changePrices,deltaFast) {
+function forming_page (pairs,marketsStat,changePrices,deltaFast) {
 
     $("#list-ch-price").show();
     $("#chart-price").show();
     $("#list-ch-volume").hide();
     $("#panel-chart-volume").hide(); 
+
 
     // Select pairs
     let selectPairs = document.querySelector('#pairs'); 
@@ -87,6 +88,15 @@ function forming_page (pairs,changePrices,deltaFast) {
         change_pair(pair.value);
     });
 
+    let ch24Top = document.querySelector('#ch24-top');
+    ch24Top.innerHTML = marketsStat[selectPairs.value].Ch24;
+    let VolumeTop = document.querySelector('#volume-top');
+    VolumeTop.innerHTML = marketsStat[selectPairs.value].Volume;
+
+
+
+
+
     let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
     checkboxes.forEach((checkbox,index)=>{
         checkbox.addEventListener('change',(e)=>{
@@ -98,6 +108,7 @@ function forming_page (pairs,changePrices,deltaFast) {
             chart_volume_update();
         }) 
     }) 
+
 
     forming_tickers_list(changePrices);
     forming_tickers_list_volume(deltaFast);
@@ -112,6 +123,7 @@ function change_pair(pair){
     let selectPairs = document.querySelector('#pairs');
     selectPairs.value=pair; 
 
+
     if($('#list-ch-price').css('display') == "block"){
         chart_price_update(pair);
     }
@@ -119,7 +131,6 @@ function change_pair(pair){
         chart_volume_update();
     }
 }
-
 
 function chart_price_update(pair){
     new TradingView.widget(
@@ -214,8 +225,11 @@ function chart_volume_update(){
 
 }
 
-
 function forming_tickers_list(changePrices) {
+
+
+
+
 
     const heads = ['ch3m','ch15m','ch1h','ch4h'];
     const tbody = document.querySelector("#tbody-price");
@@ -363,8 +377,6 @@ function forming_tickers_list_volume(deltaFast,frame='5m') {
 
 };
   
-
-
 function get_response_message (response,reload) {
     if (response['err']!="" && response['err']!=null ) {
         alert(response['err']);
