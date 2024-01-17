@@ -81,7 +81,7 @@ function forming_page (pairs,marketsStat,changePrices,deltaFast) {
 
     // Загаловки 24ch  Volume
     let ch24Top = document.querySelector('#ch24-top');
-    ch24Top.innerHTML = (marketsStat[selectPairs.value].Ch24).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact'})+ ' %';
+    ch24Top.innerHTML = (marketsStat[selectPairs.value].Ch24).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact',style: 'percent'});
     let VolumeTop = document.querySelector('#volume-top');
     VolumeTop.innerHTML = (marketsStat[selectPairs.value].Volume).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact'});
 
@@ -98,7 +98,7 @@ function forming_page (pairs,marketsStat,changePrices,deltaFast) {
         }) 
     }) 
 
-    forming_tickers_list(changePrices);
+    forming_tickers_list(changePrices,marketsStat);
     forming_tickers_list_volume(deltaFast);
 
 }
@@ -237,7 +237,7 @@ function chart_volume_update(){
 
 }
 
-function forming_tickers_list(changePrices) {
+function forming_tickers_list(changePrices,marketsStat) {
 
     const heads = ['ch3m','ch15m','ch1h','ch4h'];
     const tbody = document.querySelector("#tbody-price");
@@ -256,7 +256,11 @@ function forming_tickers_list(changePrices) {
         row.className = "pair-price";
         let cell = row.insertCell();
         cell.innerHTML = item; 
-        cell.setAttribute("name","pair"); 
+        cell.setAttribute("name","pair");
+        
+        cell = row.insertCell();
+        cell.innerHTML = (marketsStat[item].Volume).toLocaleString('en-US',{maximumFractionDigits:0,notation: 'compact'}); 
+        cell.setAttribute("name","ch24V"); 
 
         for (let j = 0; j < heads.length; j++) {
             let cell = row.insertCell();
@@ -266,44 +270,18 @@ function forming_tickers_list(changePrices) {
         }       
     };
 
-
     // выбор определенной пары
     let rows = tbody.rows;
-    for (let tr of rows) { 
-        tr.addEventListener("click",() => {
-            let pair = tr.querySelector('[name="pair"]').innerHTML;
+    for (let row of rows) { 
+        row.addEventListener("click",() => {
+            let pair = row.querySelector('[name="pair"]').innerHTML;
             change_pair(pair);
     });
     };
   
     // Сортировка таблицы
-    const pairs = document.querySelectorAll(".pair-price");
-    let sortDirection;
-    th.forEach((col, idx) => {
-        col.addEventListener("click", () => {
-            sortDirection = !sortDirection;
-
-            const rowsArrFromNodeList = Array.from(pairs);
-
-            const filteredRows = rowsArrFromNodeList.filter(
-            (item) => item.style.display != "none"
-            );
-
-            filteredRows
-            .sort((a, b) => {
-                return a.childNodes[idx].innerHTML.localeCompare(
-                b.childNodes[idx].innerHTML,
-                "en",
-                { numeric: true, sensitivity: "base" }
-                );
-            })
-            .forEach((row) => {
-                sortDirection
-                ? tbody.insertBefore(row, tbody.childNodes[tbody.length])
-                : tbody.insertBefore(row, tbody.childNodes[0]);
-            });
-        });
-    });
+    const tr = document.querySelectorAll(".pair-price");
+    sort_table(tbody,th,tr);
         
 }
 
@@ -312,6 +290,7 @@ function forming_tickers_list_volume(deltaFast,frame='5m') {
     const tbody = document.querySelector("#tbody-delta");
     tbody.innerHTML = '';
     const th = document.querySelectorAll("thead[name=thead-delta] th");
+    
 
     let colorSet = false
     for (var item in deltaFast) {
@@ -341,49 +320,55 @@ function forming_tickers_list_volume(deltaFast,frame='5m') {
 
     // выбор определенной пары
     let rows = tbody.rows;
-    for (let tr of rows) { 
-        tr.addEventListener("click",() => {
-            let pair = tr.querySelector('[name="pair"]').innerHTML;
-            change_pair(pair);
-    });
+    for (let row of rows) { 
+        row.addEventListener("click",() => {
+            change_pair(row.querySelector('[name="pair"]').innerHTML);
+        });
     };
 
+    const tr = document.querySelectorAll(".pair-delta");
     // Сортировка таблицы
-    const pairs = document.querySelectorAll(".pair-delta");
-    let sortDirection;
-
-    // удалить обработчики старые 
-    $(th).off();
-
-    th.forEach((col, idx) => {
-
-        $(col).on("click", () => {
-
-            sortDirection = !sortDirection;
-
-            const rowsArrFromNodeList = Array.from(pairs);
-            const filteredRows = rowsArrFromNodeList.filter(
-            (item) => item.style.display != "none"
-            );
-
-            filteredRows
-            .sort((a, b) => {
-                return a.childNodes[idx].innerHTML.localeCompare(
-                b.childNodes[idx].innerHTML,
-                "en",
-                { numeric: true, sensitivity: "base" }
-                );
-            })
-            .forEach((row) => {
-                sortDirection
-                ? tbody.insertBefore(row, tbody.childNodes[tbody.length])
-                : tbody.insertBefore(row, tbody.childNodes[0]);
-            });
-        });
-    });
+    sort_table(tbody,th,tr);
 };
 
+function sort_table(tbody,th,tr) {
+    
+    let sortDirection;
+    // удалить обработчики старые 
+    $(th).off();
+    th.forEach((col, idx) => {
+        $(col).on("click", () => {
+            console.log("Тык тыгыдык");
+            sortDirection = !sortDirection;
+            const rowsArrFromNodeList = Array.from(tr); 
+            // Первый столбец строки
+            if (idx>0) {
+                rowsArrFromNodeList.sort((a, b) => {
+                    return a.childNodes[idx].innerHTML-b.childNodes[idx].innerHTML
+                })
+                .forEach((row) => {
+                    sortDirection
+                    ? tbody.insertBefore(row, tbody.childNodes[tbody.length])
+                    : tbody.insertBefore(row, tbody.childNodes[0]);
+                });
 
+            } else {         
+                    rowsArrFromNodeList.sort((a, b) => {
+                    return a.childNodes[idx].innerHTML.localeCompare(
+                    b.childNodes[idx].innerHTML,
+                    "en",
+                    { numeric: true, sensitivity: "base" }
+                    );
+                    })
+                    .forEach((row) => {
+                        sortDirection
+                        ? tbody.insertBefore(row, tbody.childNodes[tbody.length])
+                        : tbody.insertBefore(row, tbody.childNodes[0]);
+                    });
+            }
+        });
+    });
+}
 
 function show_price_panel(){
 

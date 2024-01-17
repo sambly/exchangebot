@@ -2,6 +2,12 @@
   text-align: center;
 }
 
+
+
+/* #list-ch-price {
+  font-size: smaller;
+} */
+
 #table-price,#table-delta {
 table-layout: fixed;
 width:100%;
@@ -29,20 +35,27 @@ word-break: break-all;
 } 
 
 #table-price th:nth-child(1),#table-price  td:nth-child(1) {
-width: 40%;
+width: 34%;
 }   
 #table-price th:nth-child(2), #table-price td:nth-child(2) {
-width: 15%;
+width: 13%;
 }
 #table-price th:nth-child(3), #table-price td:nth-child(3) {
-width: 15%;
+width: 13%;
 }
 #table-price th:nth-child(4),#table-price  td:nth-child(4) {
-width: 15%;
+width: 13%;
 }
 #table-price th:nth-child(5),#table-price  td:nth-child(5) {
-width: 15%;
+width: 13%;
 }
+#table-price th:nth-child(6),#table-price  td:nth-child(6) {
+  width: 13%;
+  }
+
+
+
+
 
 #table-delta th:nth-child(1), #table-delta td:nth-child(1) {
 width: 40%;
