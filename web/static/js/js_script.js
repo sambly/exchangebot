@@ -1,21 +1,17 @@
 $(function(){
 
     $('#btn-price').click(function(e){   
-        $("#list-ch-price").show();
-        $("#chart-price").show();
-        $("#list-ch-volume").hide();
-        $("#panel-chart-volume").hide();
-        
+        show_price_panel();  
         let pair = document.querySelector('#pairs');        
         chart_price_update(pair.value); 
 	});
 
     $('#btn-volume').click(function(e){ 
-        $("#list-ch-volume").show();
-        $("#panel-chart-volume").show();  
-        $("#list-ch-price").hide();
-        $("#chart-price").hide();
+        show_volume_panel();
         chart_volume_update();
+     });
+     $('#btn-trade').click(function(e){ 
+        show_trade_panel();
      });
 
     $('#btn-volume-update').click(function(e){   
@@ -67,11 +63,7 @@ $(function(){
 
 function forming_page (pairs,marketsStat,changePrices,deltaFast) {
 
-    $("#list-ch-price").show();
-    $("#chart-price").show();
-    $("#list-ch-volume").hide();
-    $("#panel-chart-volume").hide(); 
-
+    show_price_panel();
 
     // Select pairs
     let selectPairs = document.querySelector('#pairs'); 
@@ -114,7 +106,6 @@ function forming_page (pairs,marketsStat,changePrices,deltaFast) {
 
 
 function change_pair(pair){
-    
 
     let selectPairs = document.querySelector('#pairs');
     selectPairs.value=pair; 
@@ -183,7 +174,6 @@ function chart_volume_update(){
     checkboxes.forEach((checkbox,index)=>{
         if (checkbox.checked) {
             checboxType = checkbox.value
-            console.log(checboxType);
         }
     })
 
@@ -287,15 +277,14 @@ function forming_tickers_list(changePrices) {
     };
   
     // Сортировка таблицы
-    const pair = document.querySelectorAll(".pair-price");
+    const pairs = document.querySelectorAll(".pair-price");
     let sortDirection;
     th.forEach((col, idx) => {
         col.addEventListener("click", () => {
             sortDirection = !sortDirection;
 
-            col.classList.add("thead-flash-once");
+            const rowsArrFromNodeList = Array.from(pairs);
 
-            const rowsArrFromNodeList = Array.from(pair);
             const filteredRows = rowsArrFromNodeList.filter(
             (item) => item.style.display != "none"
             );
@@ -323,7 +312,6 @@ function forming_tickers_list_volume(deltaFast,frame='5m') {
     const tbody = document.querySelector("#tbody-delta");
     tbody.innerHTML = '';
     const th = document.querySelectorAll("thead[name=thead-delta] th");
-   
 
     let colorSet = false
     for (var item in deltaFast) {
@@ -360,17 +348,20 @@ function forming_tickers_list_volume(deltaFast,frame='5m') {
     });
     };
 
-
     // Сортировка таблицы
-    const pair = document.querySelectorAll(".pair-delta");
+    const pairs = document.querySelectorAll(".pair-delta");
     let sortDirection;
+
+    // удалить обработчики старые 
+    $(th).off();
+
     th.forEach((col, idx) => {
-        col.addEventListener("click", () => {
+
+        $(col).on("click", () => {
+
             sortDirection = !sortDirection;
 
-            col.classList.add("thead-flash-once");
-
-            const rowsArrFromNodeList = Array.from(pair);
+            const rowsArrFromNodeList = Array.from(pairs);
             const filteredRows = rowsArrFromNodeList.filter(
             (item) => item.style.display != "none"
             );
@@ -390,22 +381,8 @@ function forming_tickers_list_volume(deltaFast,frame='5m') {
             });
         });
     });
-
-
-
 };
-  
-function get_response_message (response,reload) {
-    if (response['err']!="" && response['err']!=null ) {
-        alert(response['err']);
-        return true
-    } else if (response['message']!="" && response['message']!=null){
-        alert(response['message']);
-        if (reload) location.reload(); 
-        return true 
-    }
-    return false
-}
+
 
 
 function show_price_panel(){
@@ -420,18 +397,32 @@ function show_price_panel(){
 }
 
 function show_volume_panel(){
-
-}
-
-function show_trade_panel(){
-
     $("#list-ch-price").hide();
     $("#list-ch-volume").show();
    
     $("#chart-price").hide();
     $("#panel-chart-volume").show();  
-    $("#panel-chart-volume").show();
-   
+    $("#panel-trade").hide();
+}
+
+function show_trade_panel(){
+    $("#list-ch-price").show();
+    $("#list-ch-volume").hide();
+
+    $("#chart-price").hide();
+    $("#panel-chart-volume").hide();
+    $("#panel-trade").show();
 }
 
 
+function get_response_message (response,reload) {
+    if (response['err']!="" && response['err']!=null ) {
+        alert(response['err']);
+        return true
+    } else if (response['message']!="" && response['message']!=null){
+        alert(response['message']);
+        if (reload) location.reload(); 
+        return true 
+    }
+    return false
+}
