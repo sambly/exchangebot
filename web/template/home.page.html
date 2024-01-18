@@ -23,15 +23,15 @@
     </div>
   </div>
 
-
   <div class = "button-control mt-5">
-    <button type="button" class="btn btn-light" id = "btn-price">Цена</button>
-    <button type="button" class="btn btn-light" id = "btn-volume">Объем </button>
-    <button type="button" class="btn btn-light" id = "btn-trade">Торговля </button>
-    <button type="button" class="btn btn-light" id = "btn-volume-update">Обновить </button>
+    <button type="button" class="btnMenu btn btn-secondary active" id = "btn-price">Цена</button>
+    <button type="button" class="btnMenu btn btn-secondary" id = "btn-volume">Объем </button>
+    <button type="button" class="btnMenu btn btn-secondary" id = "btn-trade">Торговля </button>
+    <button type="button" class="btn btn-secondary" id = "btn-volume-update">Обновить </button>
   </div>
 
-  <div class="row mt-3">   
+  <div class="row mt-3"> 
+
 
       <div class="col-4">
 
@@ -94,8 +94,6 @@
         </div>
       </div>
 
-
-
       <div class="col-8">
    
         <div class="collapse" id="chart-price">
@@ -103,30 +101,28 @@
           <div id="tv_chart_container"></div>
 
             <div class="tradingview-widget-container tech_analysis">
+
               <div id="tradingview_3418f"></div>
-              <div class="tradingview-widget-copyright">
+              <div class="tradingview-widget-copyright"></div>
+
+              <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+              <script type="text/javascript">
+                new TradingView.widget(
+                {
+                  "height": "500",
+                  "symbol": "BINANCE:BTCUSDT",
+                  "interval": "15",
+                  "timezone": "Europe/Moscow",
+                  "theme": "Light",
+                  "style": "1",
+                  "locale": "ru",
+                  "toolbar_bg": "#f1f3f6",
+                  "enable_publishing": false,
+                  "allow_symbol_change": true,
+                  "container_id": "tradingview_3418f"
+                });
+                </script>
             </div>
-
-            <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-            <script type="text/javascript">
-              new TradingView.widget(
-              {
-                "height": "500",
-                "symbol": "BINANCE:BTCUSDT",
-                "interval": "15",
-                "timezone": "Europe/Moscow",
-                "theme": "Light",
-                "style": "1",
-                "locale": "ru",
-                "toolbar_bg": "#f1f3f6",
-                "enable_publishing": false,
-                "allow_symbol_change": true,
-                "container_id": "tradingview_3418f"
-              });
-                  </script>
-            </div>
-
-
         </div>
 
         <div class="collapse" id="panel-chart-volume">
@@ -154,12 +150,12 @@
 
           <div id ="chart-volume" class="border" >
           </div>
-
-
         </div>
 
         <div class="collapse" id="panel-trade">
+
           <div id = "panel-trade-top">
+
             <div class="d-flex gap-1 justify-content-start">
               <button type="button" class="btnTradeTop btn btn-primary active btn-sm">Покупка</button>
               <button type="button" class="btnTradeTop btn btn-primary  btn-sm">Активные</button>
@@ -184,31 +180,22 @@
                 <button type="button" class="btn btn-primary" id = "panel-trade-buy-button-buy">Покупка</button>
               </div>
 
-
             </div>
-
-            </div>
-
-            <div class="collapse" id="panel-trade-active">
-              
-            </div>
-
-            <div class="collapse" id="panel-trade-history">
-              
-            </div>
-
           </div>
 
+          <div class="collapse" id="panel-trade-active"></div>
+          <div class="collapse" id="panel-trade-history"></div>
 
         </div>
-
-        </div>
-
-
 
       </div>
-
   </div>
+
+
+
+      <!-- </div>
+
+  </div> -->
   
 
 </div>

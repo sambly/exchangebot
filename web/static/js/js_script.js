@@ -1,5 +1,18 @@
 $(function(){
 
+
+
+    $('.btnMenu').click(function(e){    
+        e.preventDefault();
+        let currentBtn = $(this);
+        let allButton = $('.btnMenu');
+        for (let but of allButton) {
+            but.classList.remove('active');
+        }
+        currentBtn.addClass('active');
+
+	});
+
     $('#btn-price').click(function(e){   
         show_price_panel();  
         let pair = document.querySelector('#pairs');        
