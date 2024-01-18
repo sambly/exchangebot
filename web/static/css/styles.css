@@ -2,39 +2,41 @@
   text-align: center;
 }
 
+ #table-price,#table-delta {
+  table-layout: fixed;
+  width:100%;
+}
 
-
-/* #list-ch-price {
-  font-size: smaller;
-} */
-
-#table-price,#table-delta {
-table-layout: fixed;
-width:100%;
+#table-price {
+  height: 500px;
+}
+#table-delta {
+  height: 469px;
 }
 
 thead, tbody tr {
-display: table;
-width: 100%;
+  display: table;
+  width: 100%;
 }
 
-
 tbody {
-display: block;
-width: 100%;
-overflow: auto;
-} 
+  display: block;
+  width: 100%;
+  overflow-y:auto;
+  height: 460px;
+ 
+}
 
 thead th {
-text-align: center;
+  text-align: center;
 } 
 
 tbody td {
-text-align: center;
-word-break: break-all;
+  text-align: center;
+  word-break: break-all;
 } 
 
-#table-price th:nth-child(1),#table-price  td:nth-child(1) {
+ #table-price th:nth-child(1),#table-price  td:nth-child(1) {
 width: 34%;
 }   
 #table-price th:nth-child(2), #table-price td:nth-child(2) {
@@ -52,11 +54,6 @@ width: 13%;
 #table-price th:nth-child(6),#table-price  td:nth-child(6) {
   width: 13%;
   }
-
-
-
-
-
 #table-delta th:nth-child(1), #table-delta td:nth-child(1) {
 width: 40%;
 }   
@@ -65,7 +62,7 @@ width: 30%;
 }
 #table-delta th:nth-child(3), #table-delta td:nth-child(3) {
 width: 30%;
-}
+} 
 
 
 
