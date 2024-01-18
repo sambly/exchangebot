@@ -65,10 +65,6 @@ function forming_page (pairs,marketsStat,changePrices,deltaFast) {
 
     show_price_panel();
 
-    localStorage.marketsStat=marketsStat; 
-    localStorage.marketsStat=changePrices;
-    localStorage.marketsStat=deltaFast;  
-
     // Select pairs
     let selectPairs = document.querySelector('#pairs'); 
     let selectPairsList = document.querySelector('#pairslistOptions'); 
@@ -85,7 +81,7 @@ function forming_page (pairs,marketsStat,changePrices,deltaFast) {
 
     // Загаловки 24ch  Volume
     let ch24Top = document.querySelector('#ch24-top');
-    ch24Top.innerHTML = (marketsStat[selectPairs.value].Ch24).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact',style: 'percent'});
+    ch24Top.innerHTML = (marketsStat[selectPairs.value].Ch24).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact'})+'%';
     let VolumeTop = document.querySelector('#volume-top');
     VolumeTop.innerHTML = (marketsStat[selectPairs.value].Volume).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact'});
 
