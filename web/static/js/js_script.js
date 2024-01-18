@@ -65,6 +65,10 @@ function forming_page (pairs,marketsStat,changePrices,deltaFast) {
 
     show_price_panel();
 
+    localStorage.marketsStat=marketsStat; 
+    localStorage.marketsStat=changePrices;
+    localStorage.marketsStat=deltaFast;  
+
     // Select pairs
     let selectPairs = document.querySelector('#pairs'); 
     let selectPairsList = document.querySelector('#pairslistOptions'); 
@@ -252,16 +256,18 @@ function forming_tickers_list(changePrices,marketsStat) {
             row.style.backgroundColor = 'rgb(' + 249 + ',' + 249 + ',' + 249 + ')';
         }
         colorSet = !colorSet
-
+        // Первый столбец
         row.className = "pair-price";
         let cell = row.insertCell();
         cell.innerHTML = item; 
         cell.setAttribute("name","pair");
-        
+        // Второй столбец
         cell = row.insertCell();
-        cell.innerHTML = (marketsStat[item].Volume).toLocaleString('en-US',{maximumFractionDigits:0,notation: 'compact'}); 
-        cell.setAttribute("name","ch24V"); 
-
+        cell.innerHTML = (marketsStat[item].Volume).toLocaleString('en-US',{maximumFractionDigits:0,notation: 'compact'});
+        cell.setAttribute("name","pair"); 
+        cell.setAttribute("value",marketsStat[item].Volume); 
+ 
+        // Остальные столбцы
         for (let j = 0; j < heads.length; j++) {
             let cell = row.insertCell();
             let value = changePrices[item][heads[j]]["СhangePercent"].toFixed(2);
@@ -338,12 +344,15 @@ function sort_table(tbody,th,tr) {
     $(th).off();
     th.forEach((col, idx) => {
         $(col).on("click", () => {
-            console.log("Тык тыгыдык");
             sortDirection = !sortDirection;
-            const rowsArrFromNodeList = Array.from(tr); 
+            const rowsArrFromNodeList = Array.from(tr);
+                   
             // Первый столбец строки
             if (idx>0) {
                 rowsArrFromNodeList.sort((a, b) => {
+                    if (a.childNodes[idx].hasAttribute("value")){
+                        return a.childNodes[idx].getAttribute("value")-b.childNodes[idx].getAttribute("value")
+                    }
                     return a.childNodes[idx].innerHTML-b.childNodes[idx].innerHTML
                 })
                 .forEach((row) => {
