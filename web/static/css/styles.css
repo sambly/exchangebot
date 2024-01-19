@@ -36,6 +36,15 @@ tbody td {
   word-break: break-all;
 } 
 
+.table-tr-not-active {
+  background-color:#f8f9fa;
+}
+.table-tr-active {
+  background-color:#6c757d;
+}
+
+
+
  #table-price th:nth-child(1),#table-price  td:nth-child(1) {
 width: 34%;
 }   
