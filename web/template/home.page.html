@@ -33,11 +33,20 @@
 
 
       <div class="col-3">
+        <div class="d-flex gap-1 justify-content-end">
+          <div class="btn-group" role="group">
+            <button type="button" class="btnPairs btn btn-secondary btn-sm active" id = "btnAllPairs">Все</button>
+            <button type="button" class="btnPairs btn-secondary btn-sm" id = "btnFavoritePairs">♥</button>
+          </div>
+        </div>
 
         <div class="collapse" id = "list-ch-price"style="height: 500px;"> 
           <table id = "table-price" class="table table-hover table-borderless ">
             <thead name="thead-price" style="background-color:#f8f9fa">
               <tr>
+                <th scope="col">
+                  ✓
+                </th>
                 <th scope="col">
                   Пара
                 </th>

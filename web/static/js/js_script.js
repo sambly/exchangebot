@@ -14,11 +14,19 @@ $(function(){
         currentBtn.addClass('active');
 	});
 
+    // Аткинвые кнопки выбора пар
+    $('.btnPairs').click(function(e){    
+        let allButton = $('.btnPairs');
+        let currentBtn = $(this);
+        check_button_state(allButton,currentBtn);
+    });
+
     // Меню цены
     $('#btn-price').click(function(e){   
         show_price_panel();  
         change_pair(document.querySelector('#pairs').value)      
 	});
+
     // Меню объема
     $('#btn-volume').click(function(e){ 
         show_volume_panel();
@@ -77,6 +85,25 @@ $(function(){
             },    
         });
      });
+
+
+    // Отображение пар все или избранное
+    $('.favorite-pair').click(function(){   
+
+        let pair = this.getAttribute('name');
+        let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
+
+        if (this.checked) {
+            favoritePairs.push(pair);
+            localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
+        } else {
+            favoritePairs = favoritePairs.filter((item) => item !== pair);
+            localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
+        }
+	});
+
+
+
 });
 
 
@@ -99,6 +126,7 @@ function forming_page (pairs,marketsStat,changePrices,deltaFast) {
     ch24Top.innerHTML = (marketsStat[selectPairs.value].Ch24).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact'})+'%';
     let VolumeTop = document.querySelector('#volume-top');
     VolumeTop.innerHTML = (marketsStat[selectPairs.value].Volume).toLocaleString('ru',{maximumFractionDigits:2,notation: 'compact'});
+
 
     forming_tickers_list(changePrices,marketsStat);
     forming_tickers_list_volume(deltaFast);
@@ -287,17 +315,42 @@ function forming_tickers_list(changePrices,marketsStat) {
     const heads = ['ch3m','ch15m','ch1h','ch4h'];
     const tbody = document.querySelector("#tbody-price");
     const th =  document.querySelectorAll("thead[name=thead-price] th");
+    const btnPairs =  document.querySelector("#btnAllPairs");
 
 
-    for (var item in changePrices) {
+    let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
+
+    let iterator
+    // Все пары или только избранные отображать 
+    if (btnPairs.classList.contains("active")) {
+         iterator = changePrices;
+    } else {
+         iterator = favoritePairs;
+    }
+
+    for (var item in iterator) {
         let row = tbody.insertRow(-1); 
         row.className = "pair-price";
-       
-        // Первый столбец ПАРА
+
+        // Favorite checkbox
         let cell = row.insertCell();
+
+        let chk = document.createElement('input');
+        chk.setAttribute('type', 'checkbox');
+        chk.setAttribute("name",item);
+        chk.setAttribute('class', 'form-check-input favorite-pair');
+
+        if (favoritePairs.includes(item)){
+            chk.checked = true;
+        }
+
+        cell.appendChild(chk);
+
+        // Второй столбец ПАРА
+        cell = row.insertCell();
         cell.innerHTML = item; 
         cell.setAttribute("name","pair");
-        // Второй столбец Volume
+        // Третий столбец Volume
         cell = row.insertCell();
         cell.innerHTML = (marketsStat[item].Volume).toLocaleString('en-US',{maximumFractionDigits:0,notation: 'compact'});
         cell.setAttribute("name","volume"); 
@@ -439,6 +492,14 @@ function show_favorite_panel(){
 }
 
 
+
+
+function check_button_state(allButton,currentBtn){
+    for (let but of allButton) {
+        but.classList.remove('active');
+    }
+    currentBtn.addClass('active');
+}
 
 
 function get_response_message (response,reload) {
