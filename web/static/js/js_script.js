@@ -24,8 +24,11 @@ $(function(){
         show_volume_panel();
         change_pair(document.querySelector('#pairs').value)     
      });
-     $('#btn-trade').click(function(e){ 
-        show_trade_panel();
+     $('#btn-deal').click(function(e){ 
+        show_deal_panel();
+     });
+     $('#btn-favorite').click(function(e){ 
+        show_favorite_panel();
      });
 
     $('#btn-volume-update').click(function(e){   
@@ -80,6 +83,7 @@ $(function(){
 function forming_page (pairs,marketsStat,changePrices,deltaFast) {
 
     show_price_panel();
+    show_deal_panel();
 
     // Select pairs
     let selectPairs = document.querySelector('#pairs'); 
@@ -288,7 +292,6 @@ function forming_tickers_list(changePrices,marketsStat) {
     for (var item in changePrices) {
         let row = tbody.insertRow(-1); 
         row.className = "pair-price";
-        // row.classList.add('table-tr-not-active');
        
         // Первый столбец ПАРА
         let cell = row.insertCell();
@@ -412,8 +415,6 @@ function show_price_panel(){
 
     $("#chart-price").show();
     $("#panel-chart-volume").hide();
-    $("#panel-trade").hide();
-
 }
 
 function show_volume_panel(){
@@ -422,17 +423,22 @@ function show_volume_panel(){
    
     $("#chart-price").hide();
     $("#panel-chart-volume").show();  
-    $("#panel-trade").hide();
 }
 
-function show_trade_panel(){
-    $("#list-ch-price").show();
-    $("#list-ch-volume").hide();
+function show_deal_panel(){
 
-    $("#chart-price").hide();
-    $("#panel-chart-volume").hide();
-    $("#panel-trade").show();
+    $("#smart-trade-deal").show();
+    $("#smart-trade-favorite").hide();
 }
+
+
+function show_favorite_panel(){
+
+    $("#smart-trade-deal").hide();
+    $("#smart-trade-favorite").show();
+}
+
+
 
 
 function get_response_message (response,reload) {

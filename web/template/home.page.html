@@ -26,14 +26,13 @@
   <div class = "button-control mt-5">
     <button type="button" class="btnMenu btn btn-secondary active" id = "btn-price">Цена</button>
     <button type="button" class="btnMenu btn btn-secondary" id = "btn-volume">Объем </button>
-    <button type="button" class="btnMenu btn btn-secondary" id = "btn-trade">Торговля </button>
     <button type="button" class="btn btn-secondary" id = "btn-volume-update">Обновить </button>
   </div>
 
   <div class="row mt-3"> 
 
 
-      <div class="col-4">
+      <div class="col-3">
 
         <div class="collapse" id = "list-ch-price"style="height: 500px;"> 
           <table id = "table-price" class="table table-hover table-borderless ">
@@ -94,7 +93,7 @@
         </div>
       </div>
 
-      <div class="col-8">
+      <div class="col-6">
    
         <div class="collapse" id="chart-price">
 
@@ -152,51 +151,86 @@
           </div>
         </div>
 
-        <div class="collapse" id="panel-trade">
+      </div>
 
-          <div id = "panel-trade-top">
+      <div class="col-3">
+        
+        <div id ="smart-trade" class="border" style="height: 500px;" >
 
-            <div class="d-flex gap-1 justify-content-start">
-              <button type="button" class="btnTradeTop btn btn-primary active btn-sm">Покупка</button>
-              <button type="button" class="btnTradeTop btn btn-primary  btn-sm">Активные</button>
-              <button type="button" class="btnTradeTop btn btn-primary  btn-sm">История</button>
-            </div>
 
-            <div class="collapse" id="panel-trade-buy">
-
-              <div class="mb-3">
-                <label for="panel-trade-buy-strategy" class="form-label">Стратегия:</label>  
-                <select name="panel-trade-buy-strategy" id="panel-trade-buy-strategy" class="form-select">
-                  <option value="Simple">Simple</option> 
-                </select>
-              </div>
-
-              <div class="mb-3">
-                <label for="panel-trade-buy-comment" class="form-label">Коментарий:</label>
-                <textarea class="form-control" id="panel-trade-buy-comment" rows="3" name="text_comment"></textarea>
-              </div>
-
-              <div class="mb-3">
-                <button type="button" class="btn btn-primary" id = "panel-trade-buy-button-buy">Покупка</button>
-              </div>
-
-            </div>
+          <div class="d-flex gap-1 justify-content-start">
+            <button type="button" class="btnSmartTrade btn btn-secondary active btn-sm" id = "btn-deal">Сделки</button>
+            <button type="button" class="btnSmartTrade btn btn-secondary  btn-sm" id = "btn-favorite">Избранное</button>
           </div>
 
-          <div class="collapse" id="panel-trade-active"></div>
-          <div class="collapse" id="panel-trade-history"></div>
+          <div class="collapse" id="smart-trade-deal">
 
+            <div class="mb-3">
+              <label for="panel-trade-buy-strategy" class="form-label">Стратегия:</label>  
+              <select name="panel-trade-buy-strategy" id="panel-trade-buy-strategy" class="form-select">
+                <option value="Simple">Simple</option> 
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label for="panel-trade-buy-comment" class="form-label">Коментарий:</label>
+              <textarea class="form-control" id="panel-trade-buy-comment" rows="3" name="text_comment"></textarea>
+            </div>
+
+            <div class="mb-3">
+              <button type="button" class="btn btn-secondary btn-sm" id = "panel-trade-buy-button-buy">Покупка</button>
+            </div>
+
+
+          </div>
+
+          <div class="collapse mb-3" id="smart-trade-favorite">
+
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" value="" id="addFavorite">
+              <label class="form-check-label" for="addFavorite">
+                Добавить в избранное
+              </label>
+            </div>
+
+            <!-- <div id = "list-favorite"style="height: 500px;"> 
+              <table id = "table-price" class="table table-hover table-borderless ">
+                <thead name="thead-price" style="background-color:#f8f9fa">
+                  <tr>
+                    <th scope="col">
+                      Пара
+                    </th>
+                    <th scope="col">
+                      сh24V
+                    </th>
+                    <th scope="col">
+                      ch3m
+                    </th>
+                    <th scope="col">
+                      ch15m
+                    </th>
+                    <th scope="col">
+                      ch1
+                    </th>
+                    <th scope="col">
+                      ch4
+                    </th>
+                  </tr>
+                </thead>    
+                <tbody id = "tbody-price"></tbody>
+              </table>
+            </div> -->
+    
+
+            
+        
         </div>
+      </div> 
 
-      </div>
   </div>
 
 
 
-      <!-- </div>
-
-  </div> -->
-  
 
   <div class="toast align-items-center bg-light" role="alert" aria-live="assertive" aria-atomic="true" id="toast">
     <div class="d-flex">
