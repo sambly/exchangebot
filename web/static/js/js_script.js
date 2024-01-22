@@ -4,27 +4,25 @@ $(function(){
     $('.toast').toast({animation:true, autohide: true, delay:3000});
     $("#toastMessage").text("");
 
-
+    // Аткинвые кнопки меню
     $('.btnMenu').click(function(e){    
-        e.preventDefault();
-        let currentBtn = $(this);
         let allButton = $('.btnMenu');
+        let currentBtn = $(this);
         for (let but of allButton) {
             but.classList.remove('active');
         }
         currentBtn.addClass('active');
 	});
 
+    // Меню цены
     $('#btn-price').click(function(e){   
         show_price_panel();  
         change_pair(document.querySelector('#pairs').value)      
-        chart_price_update(document.querySelector('#pairs').value); 
 	});
-
+    // Меню объема
     $('#btn-volume').click(function(e){ 
         show_volume_panel();
         change_pair(document.querySelector('#pairs').value)     
-        chart_volume_update();
      });
      $('#btn-trade').click(function(e){ 
         show_trade_panel();
@@ -70,7 +68,7 @@ $(function(){
             processData: false,
             success: function (response) {
                 forming_tickers_list_volume(response,frame);
-                chart_volume_update();
+                change_pair(document.querySelector('#pairs').value);     
             },
             error: function (response) {
             },    
