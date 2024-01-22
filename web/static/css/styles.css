@@ -43,7 +43,16 @@ tbody td {
   background-color:#6c757d;
 }
 
-
+.toast {
+  position: fixed;
+  right: 20px;
+  top: 20px;
+  z-index: 99;
+  }
+  
+  .toast:not(.showing):not(.show) {
+  display: none !important;
+  }
 
  #table-price th:nth-child(1),#table-price  td:nth-child(1) {
 width: 34%;

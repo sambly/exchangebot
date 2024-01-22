@@ -1,5 +1,8 @@
 $(function(){
 
+    // Сплывающее уведомление
+    $('.toast').toast({animation:true, autohide: true, delay:3000});
+    $("#toastMessage").text("");
 
 
     $('.btnMenu').click(function(e){    
@@ -38,6 +41,8 @@ $(function(){
             processData: false,
             success: function (response) {
                 forming_tickers_list_volume(response);
+                $("#toastMessage").text("Данные загружены");
+                $(".toast").toast("show");
             },
             error: function (response) {
             },
