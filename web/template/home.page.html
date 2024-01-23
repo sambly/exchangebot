@@ -8,10 +8,12 @@
 
   <div class="row mt-3">
     <div class="col-2">
-      <div class="d-flex  gap-2 ">24часа:<div class="text-primary" id="ch24-top" style="font-weight: bold; "></div></div>
+      <div class="d-flex  gap-2 ">24часа:<div class="text-primary" id="ch24-top" style="font-weight: bold; "></div>
+      </div>
     </div>
     <div class="col-2">
-      <div class="d-flex  gap-2 ">Объем:<div class="text-primary" id="volume-top" style="font-weight: bold; "></div></div>
+      <div class="d-flex  gap-2 ">Объем:<div class="text-primary" id="volume-top" style="font-weight: bold; "></div>
+      </div>
     </div>
   </div>
 
@@ -23,241 +25,196 @@
     </div>
   </div>
 
-  <div class = "button-control mt-5">
-    <button type="button" class="btnMenu btn btn-secondary active" id = "btn-price">Цена</button>
-    <button type="button" class="btnMenu btn btn-secondary" id = "btn-volume">Объем </button>
-    <button type="button" class="btn btn-secondary" id = "btn-volume-update">Обновить </button>
+  <div class="button-control mt-5">
+    <button type="button" class="btnMenu btn btn-secondary active" id="btn-price">Цена</button>
+    <button type="button" class="btnMenu btn btn-secondary" id="btn-volume">Объем </button>
+    <button type="button" class="btn btn-secondary" id="btn-volume-update">Обновить </button>
   </div>
 
-  <div class="row mt-3"> 
+  <div class="row mt-3">
 
 
-      <div class="col-3">
-        <div class="d-flex gap-1 justify-content-end">
-          <div class="btn-group" role="group">
-            <button type="button" class="btnPairs btn btn-secondary btn-sm active" id = "btnAllPairs">Все</button>
-            <button type="button" class="btnPairs btn-secondary btn-sm" id = "btnFavoritePairs">♥</button>
-          </div>
-        </div>
-
-        <div class="collapse" id = "list-ch-price"style="height: 500px;"> 
-          <table id = "table-price" class="table table-hover table-borderless ">
-            <thead name="thead-price" style="background-color:#f8f9fa">
-              <tr>
-                <th scope="col">
-                  ✓
-                </th>
-                <th scope="col">
-                  Пара
-                </th>
-                <th scope="col">
-                  сh24V
-                </th>
-                <th scope="col">
-                  ch3m
-                </th>
-                <th scope="col">
-                  ch15m
-                </th>
-                <th scope="col">
-                  ch1
-                </th>
-                <th scope="col">
-                  ch4
-                </th>
-              </tr>
-            </thead>    
-            <tbody id = "tbody-price"></tbody>
-          </table>
-        </div>
-
-        <div class="collapse" id = "list-ch-volume" style="height: 500px;"> 
-          <div class = "buttons-frame">
-            <div class="d-flex gap-1 justify-content-end">
-              <button type="button" class="btnFrame btn btn-secondary active  btn-sm" >5m</button>
-              <button type="button" class="btnFrame btn btn-secondary  btn-sm">30m </button>
-              <button type="button" class="btnFrame btn btn-secondary  btn-sm">1h </button>
-              <button type="button" class="btnFrame btn btn-secondary  btn-sm">4h </button>
-              <button type="button" class="btnFrame btn btn-secondary  btn-sm">1d </button>
-            </div>
-          </div>
-
-          <table id = "table-delta" class="table table-hover table-borderless mt-1">
-            <thead name="thead-delta" style="background-color:#f8f9fa">
-              <tr>
-                <th scope="col">
-                  ✓
-                </th>
-                <th scope="col">
-                  Пара
-                </th>
-                <th scope="col">
-                  Объем
-                </th>
-                <th scope="col">
-                  Сделки
-                </th>
-              </tr>
-            </thead>    
-            <tbody id = "tbody-delta"></tbody>
-          </table>
-
+    <div class="col-3">
+      <div class="d-flex gap-1 justify-content-end">
+        <div class="btn-group" role="group">
+          <button type="button" class="btnPairs btn btn-secondary btn-sm active" id="btnAllPairs">Все</button>
+          <button type="button" class="btnPairs btn-secondary btn-sm" id="btnFavoritePairs">♥</button>
         </div>
       </div>
 
-      <div class="col-6">
-   
-        <div class="collapse" id="chart-price">
+      <div class="collapse" id="list-ch-price" style="height: 500px;">
+        <table id="table-price" class="table table-hover table-borderless ">
+          <thead name="thead-price" style="background-color:#f8f9fa">
+            <tr>
+              <th scope="col">
+                ✓
+              </th>
+              <th scope="col">
+                Пара
+              </th>
+              <th scope="col">
+                сh24V
+              </th>
+              <th scope="col">
+                ch3m
+              </th>
+              <th scope="col">
+                ch15m
+              </th>
+              <th scope="col">
+                ch1
+              </th>
+              <th scope="col">
+                ch4
+              </th>
+            </tr>
+          </thead>
+          <tbody id="tbody-price"></tbody>
+        </table>
+      </div>
 
-          <div id="tv_chart_container"></div>
-
-            <div class="tradingview-widget-container tech_analysis">
-
-              <div id="tradingview_3418f"></div>
-              <div class="tradingview-widget-copyright"></div>
-
-              <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-              <script type="text/javascript">
-                new TradingView.widget(
-                {
-                  "height": "500",
-                  "symbol": "BINANCE:BTCUSDT",
-                  "interval": "15",
-                  "timezone": "Europe/Moscow",
-                  "theme": "Light",
-                  "style": "1",
-                  "locale": "ru",
-                  "toolbar_bg": "#f1f3f6",
-                  "enable_publishing": false,
-                  "allow_symbol_change": true,
-                  "container_id": "tradingview_3418f"
-                });
-                </script>
-            </div>
-        </div>
-
-        <div class="collapse" id="panel-chart-volume">
-
+      <div class="collapse" id="list-ch-volume" style="height: 500px;">
+        <div class="buttons-frame">
           <div class="d-flex gap-1 justify-content-end">
-            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="Volume"checked >
-            <label class="form-check-label" for="checkVolume"> Volume</label>
-
-            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="VolumeBuy">
-            <label class="form-check-label" for="checkVolumeB"> VolumeB</label>
-
-            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="VolumeAsk">
-            <label class="form-check-label" for="checkVolumeA"> VolumeA</label>
-
-            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="Trades">
-            <label class="form-check-label" for="checkTrades"> Trades</label>
-
-            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="TradesBuy">
-            <label class="form-check-label" for="checkTradesB"> TradesB</label>
-
-            <input class="form-check-input" type="checkbox" name = "change-delta-check" value="TradesAsk">
-            <label class="form-check-label" for="checkTradesA"> TradesA</label>
-
-          </div>
-
-          <div id ="chart-volume" class="border" >
+            <button type="button" class="btnFrame btn btn-secondary active  btn-sm">5m</button>
+            <button type="button" class="btnFrame btn btn-secondary  btn-sm">30m </button>
+            <button type="button" class="btnFrame btn btn-secondary  btn-sm">1h </button>
+            <button type="button" class="btnFrame btn btn-secondary  btn-sm">4h </button>
+            <button type="button" class="btnFrame btn btn-secondary  btn-sm">1d </button>
           </div>
         </div>
+
+        <table id="table-delta" class="table table-hover table-borderless mt-1">
+          <thead name="thead-delta" style="background-color:#f8f9fa">
+            <tr>
+              <th scope="col">
+                ✓
+              </th>
+              <th scope="col">
+                Пара
+              </th>
+              <th scope="col">
+                Объем
+              </th>
+              <th scope="col">
+                Сделки
+              </th>
+            </tr>
+          </thead>
+          <tbody id="tbody-delta"></tbody>
+        </table>
 
       </div>
-
-      <div class="col-3">
-        
-        <div id ="smart-trade" class="border" style="height: 500px;" >
-
-
-          <div class="d-flex gap-1 justify-content-start">
-            <button type="button" class="btnSmartTrade btn btn-secondary active btn-sm" id = "btn-deal">Сделки</button>
-            <button type="button" class="btnSmartTrade btn btn-secondary  btn-sm" id = "btn-favorite">Избранное</button>
-          </div>
-
-          <div class="collapse" id="smart-trade-deal">
-
-            <div class="mb-3">
-              <label for="panel-trade-buy-strategy" class="form-label">Стратегия:</label>  
-              <select name="panel-trade-buy-strategy" id="panel-trade-buy-strategy" class="form-select">
-                <option value="Simple">Simple</option> 
-              </select>
-            </div>
-
-            <div class="mb-3">
-              <label for="panel-trade-buy-comment" class="form-label">Коментарий:</label>
-              <textarea class="form-control" id="panel-trade-buy-comment" rows="3" name="text_comment"></textarea>
-            </div>
-
-            <div class="mb-3">
-              <button type="button" class="btn btn-secondary btn-sm" id = "panel-trade-buy-button-buy">Покупка</button>
-            </div>
-
-
-          </div>
-
-          <div class="collapse mb-3" id="smart-trade-favorite">
-
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="" id="addFavorite">
-              <label class="form-check-label" for="addFavorite">
-                Добавить в избранное
-              </label>
-            </div>
-
-            <!-- <div id = "list-favorite"style="height: 500px;"> 
-              <table id = "table-price" class="table table-hover table-borderless ">
-                <thead name="thead-price" style="background-color:#f8f9fa">
-                  <tr>
-                    <th scope="col">
-                      Пара
-                    </th>
-                    <th scope="col">
-                      сh24V
-                    </th>
-                    <th scope="col">
-                      ch3m
-                    </th>
-                    <th scope="col">
-                      ch15m
-                    </th>
-                    <th scope="col">
-                      ch1
-                    </th>
-                    <th scope="col">
-                      ch4
-                    </th>
-                  </tr>
-                </thead>    
-                <tbody id = "tbody-price"></tbody>
-              </table>
-            </div> -->
-    
-
-            
-        
-        </div>
-      </div> 
-
-  </div>
-
-
-
-
-  <div class="toast align-items-center bg-light" role="alert" aria-live="assertive" aria-atomic="true" id="toast">
-    <div class="d-flex">
-      <div class="toast-body" id="toastMessage"></div>
-      <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Закрыть"></button>
     </div>
+
+    <div class="col-6">
+
+      <div class="collapse" id="chart-price">
+
+        <div id="tv_chart_container"></div>
+
+        <div class="tradingview-widget-container tech_analysis">
+
+          <div id="tradingview_3418f"></div>
+          <div class="tradingview-widget-copyright"></div>
+
+          <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+          <script type="text/javascript">
+            new TradingView.widget(
+              {
+                "height": "500",
+                "symbol": "BINANCE:BTCUSDT",
+                "interval": "15",
+                "timezone": "Europe/Moscow",
+                "theme": "Light",
+                "style": "1",
+                "locale": "ru",
+                "toolbar_bg": "#f1f3f6",
+                "enable_publishing": false,
+                "allow_symbol_change": true,
+                "container_id": "tradingview_3418f"
+              });
+          </script>
+        </div>
+      </div>
+
+      <div class="collapse" id="panel-chart-volume">
+
+        <div class="d-flex gap-1 justify-content-end">
+          <input class="form-check-input" type="checkbox" name="change-delta-check" value="Volume" checked>
+          <label class="form-check-label" for="checkVolume"> Volume</label>
+
+          <input class="form-check-input" type="checkbox" name="change-delta-check" value="VolumeBuy">
+          <label class="form-check-label" for="checkVolumeB"> VolumeB</label>
+
+          <input class="form-check-input" type="checkbox" name="change-delta-check" value="VolumeAsk">
+          <label class="form-check-label" for="checkVolumeA"> VolumeA</label>
+
+          <input class="form-check-input" type="checkbox" name="change-delta-check" value="Trades">
+          <label class="form-check-label" for="checkTrades"> Trades</label>
+
+          <input class="form-check-input" type="checkbox" name="change-delta-check" value="TradesBuy">
+          <label class="form-check-label" for="checkTradesB"> TradesB</label>
+
+          <input class="form-check-input" type="checkbox" name="change-delta-check" value="TradesAsk">
+          <label class="form-check-label" for="checkTradesA"> TradesA</label>
+
+        </div>
+
+        <div id="chart-volume" class="border">
+        </div>
+      </div>
+
+    </div>
+
+    <div class="col-3">
+
+      <div id="smart-trade" class="bg-light border rounded-3" style="height: 500px;">
+
+        <div class="mb-3">
+          <label for="panel-trade-buy-strategy" class="form-label">Стратегия:</label>
+          <select name="panel-trade-buy-strategy" id="panel-trade-buy-strategy" class="form-select">
+            <option value="Simple">Simple</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="panel-trade-buy-comment" class="form-label">Коментарий:</label>
+          <textarea class="form-control" id="panel-trade-buy-comment" rows="3" name="text_comment"></textarea>
+        </div>
+
+        <div class="mb-3">
+          <button type="button" class="btn btn-secondary btn-sm" id="panel-trade-buy-button-buy">Покупка</button>
+        </div>
+      </div>
+    </div>
+
+
+
+    <div class="row mt-3">
+      <div class="col-9">
+        <div class="bg-light border rounded-3" style="height: 300px;">
+
+        </div>
+      </div>
+
+    </div>
+
+
+
+    <div class="toast align-items-center bg-light" role="alert" aria-live="assertive" aria-atomic="true" id="toast">
+      <div class="d-flex">
+        <div class="toast-body" id="toastMessage"></div>
+        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Закрыть"></button>
+      </div>
+    </div>
+
+
   </div>
 
-
-</div>
-
-<script>
-  forming_page({{ .Pairs}},{{ .MarketsStat}},{{ .ChangePrices}},{{ .DeltaFast}}); 
-</script>
+  <script>
+    forming_page({{ .Pairs }}, {{ .MarketsStat }}, {{ .ChangePrices }}, {{ .DeltaFast }}); 
+  </script>
 
 
-{{end}}
-
+  {{end}}
