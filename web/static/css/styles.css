@@ -80,15 +80,17 @@ tbody td {
 }
 
 
-
 #table-delta th:nth-child(1), #table-delta td:nth-child(1) {
-width: 40%;
-}   
+  width: 5%;
+} 
 #table-delta th:nth-child(2), #table-delta td:nth-child(2) {
-width: 30%;
-}
+  width: 35%;
+}   
 #table-delta th:nth-child(3), #table-delta td:nth-child(3) {
-width: 30%;
+  width: 30%;
+}
+#table-delta th:nth-child(4), #table-delta td:nth-child(4) {
+  width: 30%;
 } 
 
 
