@@ -11,63 +11,19 @@ $(function () {
     });
 
     // Меню цены
-    $('#btn-price').click(function (e) {
+    $('#btn-price').click(function () {
         show_price_panel();
         change_pair(document.querySelector('#pairs').value)
     });
 
     // Меню объема
-    $('#btn-volume').click(function (e) {
+    $('#btn-volume').click(function () {
         show_volume_panel();
         change_pair(document.querySelector('#pairs').value)
     });
 
-    $('#btn-volume-update').click(function (e) {
-        e.preventDefault();
-        $.ajax({
-            url: '/updatefull',
-            type: 'POST',
-            method: 'POST',
-            cache: false,
-            contentType: 'application/json; charset=utf-8',
-            processData: false,
-            success: function (response) {
-                forming_tickers_list_volume();
-                $("#toastMessage").text("Данные загружены");
-                $(".toast").toast("show");
-            },
-            error: function (response) {
-            },
-
-        });
-    });
-
-    $('.btnFrame').click(function (e) {
-        e.preventDefault();
-
-        $('.btnFrame').removeClass('active');
-        $(this).addClass('active');
-
-        let frame = e.target.innerText;
-        $.ajax({
-            url: '/updateframe',
-            type: 'POST',
-            method: 'POST',
-            cache: false,
-            contentType: 'application/json; charset=utf-8',
-            processData: false,
-            success: function (response) {
-                forming_tickers_list_volume(frame);
-                change_pair(document.querySelector('#pairs').value);
-            },
-            error: function (response) {
-            },
-        });
-    });
-
-
     // Аткинвые кнопки выбора пар
-    $('.btnPairs').click(function (e) {
+    $('.btnPairs').click(function () {
 
         $('.btnPairs').removeClass('active');
         $(this).addClass('active');
@@ -84,6 +40,40 @@ $(function () {
 
     });
 
+    // Изменение фрейма для tickers volume
+    $('.btnFrame').click(function (e) {
+
+        $('.btnFrame').removeClass('active');
+        $(this).addClass('active');
+
+        let frame = e.target.innerText;
+        forming_tickers_list_volume(frame);
+        change_pair(document.querySelector('#pairs').value);
+    });
+
+    $('#btn-update-data').click(function (e) {
+        e.preventDefault();
+        $.ajax({
+            url: '/updatefull',
+            type: 'POST',
+            method: 'POST',
+            cache: false,
+            contentType: 'application/json; charset=utf-8',
+            processData: false,
+            success: function (response) {
+                update_main_data(
+                    response.MarketsStat,
+                    response.ChangePrices,
+                    response.DeltaFast,
+                );
+                $("#toastMessage").text("Данные загружены");
+                $(".toast").toast("show");
+            },
+            error: function (response) {
+            },
+
+        });
+    });
 
 });
 
@@ -105,6 +95,27 @@ function forming_page(pairs, marketsStat, changePrices, deltaFast) {
         change_pair(e.target.value);
     });
 
+    update_main_data(marketsStat, changePrices, deltaFast);
+
+    // Выбор определенного типа графика
+    let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
+    checkboxes.forEach((checkbox, index) => {
+        checkbox.addEventListener('change', (e) => {
+            // Сбросить все галочки 
+            checkboxes.forEach((checkboxClear, index) => {
+                checkboxClear.checked = false;
+            });
+            checkbox.checked = true;
+            chart_volume_update();
+        })
+    })
+
+}
+
+function update_main_data(marketsStat, changePrices, deltaFast) {
+
+
+    let selectPairs = document.querySelector('#pairs');
     // Загаловки 24ch  Volume
     let ch24Top = document.querySelector('#ch24-top');
     ch24Top.innerHTML = (marketsStat[selectPairs.value].Ch24).toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' }) + '%';
@@ -127,28 +138,16 @@ function forming_page(pairs, marketsStat, changePrices, deltaFast) {
     change_pair(selectPairs.value);
 
 
-    // Выбор определенного типа графика
-    let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
-    checkboxes.forEach((checkbox, index) => {
-        checkbox.addEventListener('change', (e) => {
-            // Сбросить все галочки 
-            checkboxes.forEach((checkboxClear, index) => {
-                checkboxClear.checked = false;
-            });
-            checkbox.checked = true;
-            chart_volume_update();
-        })
-    })
-
 }
+
 
 function change_pair(pair) {
 
-     let update_chart = false
-     if (pair!==document.querySelector('#pairs').value){
+    let update_chart = false
+    if (pair !== document.querySelector('#pairs').value) {
         document.querySelector('#pairs').value = pair;
-        update_chart= true;
-     }
+        update_chart = true;
+    }
 
 
     if ($('#list-ch-price').css('display') == "block") {
@@ -183,7 +182,7 @@ function change_pair(pair) {
                 });
             }
         }
-            chart_volume_update();
+        chart_volume_update();
     }
 
     update_top_data(pair);

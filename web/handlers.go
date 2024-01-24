@@ -57,15 +57,21 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 		web.logError(err)
 	}
 
+	maps := map[string]interface{}{
+		"MarketsStat":  web.App.AssetsPrices.MarketsStat,
+		"ChangePrices": web.App.AssetsPrices.ChangePrices,
+		"DeltaFast":    web.App.AssetsPrices.DeltaFast,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(web.App.AssetsPrices.DeltaFast)
+	json.NewEncoder(w).Encode(maps)
 }
 
-func (web *Web) updateFrame(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(web.App.AssetsPrices.DeltaFast)
+// func (web *Web) updateFrame(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json")
+// 	json.NewEncoder(w).Encode(web.App.AssetsPrices.DeltaFast)
 
-}
+// }
 
 func (web *Web) getChangeDelta(w http.ResponseWriter, r *http.Request) {
 
