@@ -89,7 +89,6 @@ $(function () {
 function forming_page(pairs, marketsStat, changePrices, deltaFast) {
 
     show_price_panel();
-    show_deal_panel();
 
     // Select pairs
     let selectPairs = document.querySelector('#pairs');
