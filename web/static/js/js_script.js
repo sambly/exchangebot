@@ -447,6 +447,26 @@ function forming_tickers_list_volume(frame = '5m') {
         cell.setAttribute("name", 'trades');
     };
 
+    // Отображение пар все или избранное
+    let checkboxAll = document.querySelectorAll('.favorite-pair');
+    checkboxAll.forEach((checkbox, index) => {
+        checkbox.addEventListener('change', (e) => {
+
+            let pair = checkbox.getAttribute('name');
+            let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
+
+            if (checkbox.checked) {
+                favoritePairs.push(pair);
+                localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
+            } else {
+                favoritePairs = favoritePairs.filter((item) => item !== pair);
+                localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
+            }
+
+        });
+    });
+
+
     // выбор определенной пары
     let rows = tbody.rows;
     for (let row of rows) {
