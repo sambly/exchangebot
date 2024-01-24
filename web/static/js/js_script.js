@@ -10,7 +10,6 @@ $(function () {
         $(this).addClass('active'); // Добавляем класс 'active' текущей кнопке
     });
 
-
     // Меню цены
     $('#btn-price').click(function (e) {
         show_price_panel();
@@ -79,9 +78,9 @@ $(function () {
 
     // Аткинвые кнопки выбора пар
     $('.btnPairs').click(function (e) {
-        let allButton = $('.btnPairs');
-        let currentBtn = $(this);
-        check_button_state(allButton, currentBtn);
+
+        $('.btnPairs').removeClass('active'); // Удаляем класс 'active' у всех кнопок
+        $(this).addClass('active'); // Добавляем класс 'active' текущей кнопке
 
         if ($('#list-ch-price').css('display') == "block") {
             forming_tickers_list();
@@ -216,7 +215,6 @@ function update_top_data(pair) {
         },
     });
 }
-
 
 function chart_price_update(pair) {
     new TradingView.widget(
