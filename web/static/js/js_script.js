@@ -80,6 +80,8 @@ $(function () {
             forming_tickers_list_volume();
         }
 
+        change_pair(document.querySelector('#pairs').value);
+
     });
 
 
@@ -99,12 +101,15 @@ function forming_page(pairs, marketsStat, changePrices, deltaFast) {
     }
     selectPairs.value = "BTCUSDT";
 
+    selectPairs.addEventListener('change', (e) => {
+        change_pair(e.target.value);
+    });
+
     // Загаловки 24ch  Volume
     let ch24Top = document.querySelector('#ch24-top');
     ch24Top.innerHTML = (marketsStat[selectPairs.value].Ch24).toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' }) + '%';
     let VolumeTop = document.querySelector('#volume-top');
     VolumeTop.innerHTML = (marketsStat[selectPairs.value].Volume).toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
-
 
     //localStorage.clear();
 
@@ -115,17 +120,8 @@ function forming_page(pairs, marketsStat, changePrices, deltaFast) {
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
     localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
 
-
-
-
     forming_tickers_list();
     forming_tickers_list_volume();
-
-
-    selectPairs.addEventListener('change', (e) => {
-        let pair = document.querySelector('#pairs');
-        change_pair(pair.value);
-    });
 
     // Один раз при инициализации запускаем 
     change_pair(selectPairs.value);
@@ -148,7 +144,12 @@ function forming_page(pairs, marketsStat, changePrices, deltaFast) {
 
 function change_pair(pair) {
 
-    document.querySelector('#pairs').value = pair;
+     let update_chart = false
+     if (pair!==document.querySelector('#pairs').value){
+        document.querySelector('#pairs').value = pair;
+        update_chart= true;
+     }
+
 
     if ($('#list-ch-price').css('display') == "block") {
         var rowsPrice = document.querySelector("#tbody-price").rows;
@@ -163,7 +164,11 @@ function change_pair(pair) {
                 });
             }
         }
-        chart_price_update(pair);
+
+        if (update_chart) {
+            chart_price_update(pair);
+        }
+
     }
     if ($('#list-ch-volume').css('display') == "block") {
         var rowsVolume = document.querySelector("#tbody-delta").rows;
@@ -178,7 +183,7 @@ function change_pair(pair) {
                 });
             }
         }
-        chart_volume_update();
+            chart_volume_update();
     }
 
     update_top_data(pair);
