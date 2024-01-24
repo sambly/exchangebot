@@ -21,12 +21,6 @@ $(function () {
         show_volume_panel();
         change_pair(document.querySelector('#pairs').value)
     });
-    $('#btn-deal').click(function (e) {
-        show_deal_panel();
-    });
-    $('#btn-favorite').click(function (e) {
-        show_favorite_panel();
-    });
 
     $('#btn-volume-update').click(function (e) {
         e.preventDefault();
@@ -51,9 +45,9 @@ $(function () {
     $('.btnFrame').click(function (e) {
         e.preventDefault();
 
-        $('.btnFrame').removeClass('active'); 
+        $('.btnFrame').removeClass('active');
         $(this).addClass('active');
-        
+
         let frame = e.target.innerText;
         $.ajax({
             url: '/updateframe',
@@ -75,7 +69,7 @@ $(function () {
     // Аткинвые кнопки выбора пар
     $('.btnPairs').click(function (e) {
 
-        $('.btnPairs').removeClass('active'); 
+        $('.btnPairs').removeClass('active');
         $(this).addClass('active');
 
         if ($('#list-ch-price').css('display') == "block") {
@@ -85,7 +79,7 @@ $(function () {
         if ($('#list-ch-volume').css('display') == "block") {
             forming_tickers_list_volume();
         }
-    
+
     });
 
 
@@ -318,10 +312,10 @@ function forming_tickers_list() {
 
     for (let item in changePrices) {
 
-        if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {								   
-            continue;	 
+        if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {
+            continue;
         }
-    
+
         let row = tbody.insertRow(-1);
         row.className = "pair-price";
 
@@ -406,8 +400,8 @@ function forming_tickers_list_volume(frame = '5m') {
 
     for (let item in deltaFast) {
 
-        if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {								   
-            continue;	 
+        if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {
+            continue;
         }
 
         let row = tbody.insertRow(-1);
@@ -534,30 +528,6 @@ function show_volume_panel() {
     $("#chart-price").hide();
     $("#panel-chart-volume").show();
 }
-
-function show_deal_panel() {
-
-    $("#smart-trade-deal").show();
-    $("#smart-trade-favorite").hide();
-}
-
-
-function show_favorite_panel() {
-
-    $("#smart-trade-deal").hide();
-    $("#smart-trade-favorite").show();
-}
-
-
-
-
-function check_button_state(allButton, currentBtn) {
-    for (let but of allButton) {
-        but.classList.remove('active');
-    }
-    currentBtn.addClass('active');
-}
-
 
 function get_response_message(response, reload) {
     if (response['err'] != "" && response['err'] != null) {
