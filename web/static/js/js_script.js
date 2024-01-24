@@ -50,14 +50,10 @@ $(function () {
 
     $('.btnFrame').click(function (e) {
         e.preventDefault();
-        let currentBtn = $(this);
-        let allButton = $('.btnFrame');
-        for (let but of allButton) {
-            but.classList.remove('active');
-        }
-        currentBtn.addClass('active');
 
-
+        $('.btnFrame').removeClass('active'); 
+        $(this).addClass('active');
+        
         let frame = e.target.innerText;
         $.ajax({
             url: '/updateframe',
@@ -79,8 +75,8 @@ $(function () {
     // Аткинвые кнопки выбора пар
     $('.btnPairs').click(function (e) {
 
-        $('.btnPairs').removeClass('active'); // Удаляем класс 'active' у всех кнопок
-        $(this).addClass('active'); // Добавляем класс 'active' текущей кнопке
+        $('.btnPairs').removeClass('active'); 
+        $(this).addClass('active');
 
         if ($('#list-ch-price').css('display') == "block") {
             forming_tickers_list();
