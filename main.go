@@ -71,9 +71,15 @@ func main() {
 	}
 	defer db.Close()
 
+	err = database.CreateOrdersTable(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	notification := &notification.Notification{Message: make(chan string)}
 
 	app, err := application.NewApp(
+		ctx,
 		binance,
 		settings,
 		db,

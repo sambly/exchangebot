@@ -1,12 +1,14 @@
 package application
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"main/account"
 	"main/exchange"
 	"main/model"
 	"main/notification"
+	"main/order"
 	"main/prices"
 	"main/service"
 	"time"
@@ -20,14 +22,21 @@ type Application struct {
 
 	AssetsPrices    *prices.AsetsPrices
 	Account         *account.Account
+	OrderController *order.Controller
+	PaperWallet     *exchange.PaperWallet
+
 	BaseAmountAsset float64
 }
 
-func NewApp(exch service.Exchange, settings model.Settings, db *sql.DB, notification *notification.Notification) (*Application, error) {
+func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings, db *sql.DB, notification *notification.Notification) (*Application, error) {
 
 	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.WeightProcents, settings.LengthOfTime, db, notification)
-
 	account, err := account.NewAccount(exch, assetsPrices, notification)
+	if err != nil {
+		return nil, err
+	}
+	paperWallet := exchange.NewPaperWallet(ctx)
+	orderController, err := order.NewController(ctx, paperWallet, db)
 	if err != nil {
 		return nil, err
 	}
@@ -38,10 +47,14 @@ func NewApp(exch service.Exchange, settings model.Settings, db *sql.DB, notifica
 		dataFeed: exchange.NewDataFeed(exch, settings.Pairs),
 		database: db,
 
-		Account:         account,
 		AssetsPrices:    assetsPrices,
+		Account:         account,
+		OrderController: orderController,
+		PaperWallet:     paperWallet,
 		BaseAmountAsset: 1,
 	}
+
+	app.PaperWallet.MarketsStat = assetsPrices.MarketsStat
 
 	return app, nil
 }

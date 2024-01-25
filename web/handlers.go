@@ -23,6 +23,13 @@ type ViewData struct {
 	DeltaFast    map[string]map[string]*prices.DeltaFast
 }
 
+type Deal struct {
+	Pair     string
+	SideType string
+	Strategy string
+	Comment  string
+}
+
 func (web *Web) home(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path != "/" {
@@ -97,4 +104,35 @@ func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(web.App.AssetsPrices.MarketsStat[pair])
 
+}
+
+func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
+
+	bodyByte, _ := io.ReadAll(r.Body)
+
+	deal := Deal{}
+
+	if err := json.Unmarshal(bodyByte, &deal); err != nil {
+		web.logError(err)
+		return
+	}
+
+	size := 1.0
+
+	var sideType model.SideType
+	if deal.SideType == "buy" {
+		sideType = model.SideTypeBuy
+	}
+	if deal.SideType == "sell" {
+		sideType = model.SideTypeSell
+	}
+
+	_, err := web.App.OrderController.CreateOrderMarket(sideType, deal.Pair, size)
+	if err != nil {
+		web.logError(err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Данные записаны"))
 }

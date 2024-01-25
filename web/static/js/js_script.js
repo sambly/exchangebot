@@ -74,6 +74,45 @@ $(function () {
 
         });
     });
+    // Открыть long/short позицию
+    $('.btn-trade-deal').click(function (e) {
+        e.preventDefault();
+
+        let sideType
+
+        if (e.target.id=="panel-trdae-open-deal"){
+            sideType = "buy";
+        }
+        if (e.target.id=="panel-trdae-close-deal"){
+            sideType = "sell";
+        }
+
+        let form = {
+            pair : document.querySelector('#pairs').value,
+            sideType : sideType,
+            strategy: document.querySelector('#panel-trade-strategy').value,
+            comment : document.querySelector('#panel-trade-comment').value
+        };
+
+
+        $.ajax({
+            url: '/openDeal',
+            type: 'POST',
+            method: 'POST',
+            cache: false,
+            contentType: 'application/json; charset=utf-8',
+            processData: false,
+            data : JSON.stringify(form),
+            success: function (response) {
+                console.log(response);
+            },
+            error: function (response) {
+                console.log(response);
+            },
+
+        });
+    });
+
 
 });
 

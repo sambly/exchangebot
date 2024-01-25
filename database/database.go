@@ -136,3 +136,147 @@ func SelectCandlesTable(db *sql.DB) ([]model.Candle, error) {
 	}
 	return candles, nil
 }
+
+func CreateOrdersTable(db *sql.DB) error {
+
+	query := `CREATE TABLE IF NOT EXISTS orders(
+		ID int primary key auto_increment,
+		TimeCreated datetime,
+		Time datetime,
+		Pair text,
+		Side text,
+		Type text,
+		Status text,
+		PriceCreated float,
+		Price float,
+		Quantity float,
+		Profit float
+		)`
+
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelfunc()
+	res, err := db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("error %s when creating orders", err)
+	}
+	_, err = res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error %s when getting rows affected", err)
+	}
+	return nil
+}
+
+func Orders(db *sql.DB) ([]*model.Order, error) {
+
+	orders := []*model.Order{}
+
+	query := "select * from orders;"
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelfunc()
+	stmt, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		return orders, fmt.Errorf("error %s when preparing SQL statement", err)
+	}
+	defer stmt.Close()
+	rows, err := stmt.QueryContext(ctx)
+	if err != nil {
+		return orders, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var order model.Order
+		if err := rows.Scan(
+			&order.ID,
+			&order.TimeCreated,
+			&order.Time,
+			&order.Pair,
+			&order.Side,
+			&order.Type,
+			&order.Status,
+			&order.PriceCreated,
+			&order.Price,
+			&order.Quantity,
+			&order.Profit); err != nil {
+			return orders, err
+		}
+		orders = append(orders, &order)
+	}
+	if err := rows.Err(); err != nil {
+		return orders, err
+	}
+
+	return orders, nil
+
+}
+
+func CreateOrder(db *sql.DB, order *model.Order) (int64, error) {
+
+	query := "INSERT INTO orders (TimeCreated,Time,Pair,Side,Type,Status,PriceCreated,Price,Quantity,Profit) VALUES (?,?,?,?,?,?,?,?,?,?)"
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelfunc()
+	stmtLicense, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		return 0, fmt.Errorf("error %s when preparing SQL statement", err)
+	}
+	defer stmtLicense.Close()
+
+	res, err := stmtLicense.ExecContext(
+		ctx,
+		order.TimeCreated.Format("2006-01-02 15:04:05"),
+		order.Time.Format("2006-01-02 15:04:05"),
+		order.Pair,
+		order.Side,
+		order.Type,
+		order.Status,
+		order.PriceCreated,
+		order.Price,
+		order.Quantity,
+		order.Profit,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("error %s when inserting row into orders table", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("error %s get last id", err)
+	}
+	_, err = res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("error %s when finding rows affected", err)
+	}
+
+	return id, nil
+
+}
+
+func ClosePosition(db *sql.DB, order *model.Order, id int64) error {
+
+	query := "UPDATE orders SET Time=?,Status=?,Price=?,Profit=? WHERE ID=?"
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelfunc()
+	updateOrder, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("error %s when preparing SQL statement", err)
+	}
+	defer updateOrder.Close()
+
+	res, err := updateOrder.ExecContext(
+		ctx,
+		order.Time,
+		order.Status,
+		order.Price,
+		order.Profit,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("error %s when updating row into orders table", err)
+	}
+	_, err = res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
