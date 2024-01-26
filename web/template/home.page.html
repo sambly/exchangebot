@@ -179,14 +179,14 @@
       <div id="smart-trade" class="bg-light border rounded-3" style="height: 500px;">
 
         <div class="mb-3">
-          <label for="panel-trade-buy-strategy" class="form-label">Стратегия:</label>
-          <select name="panel-trade-buy-strategy" id="panel-trade-strategy" class="form-select">
+          <label for="panel-trade-strategy" class="form-label">Стратегия:</label>
+          <select name="panel-trade-strategy" id="panel-trade-strategy" class="form-select">
             <option value="Simple">Simple</option>
           </select>
         </div>
 
         <div class="mb-3">
-          <label for="panel-trade-buy-comment" class="form-label">Коментарий:</label>
+          <label for="panel-trade-comment" class="form-label">Коментарий:</label>
           <textarea class="form-control" id="panel-trade-comment" rows="3" name="text_comment"></textarea>
         </div>
 
@@ -201,8 +201,65 @@
 
     <div class="row mt-3">
       <div class="col-9">
-        <div class="bg-light border rounded-3" style="height: 300px;">
+        <div class="bg-light border rounded-3" style="height: 500px;">
+          
+          <div class="button-control mt-2">
+            <button type="button" class="btnTradeHistory btn btn-secondary active" id="btn-trade-active">Активные</button>
+            <button type="button" class="btnTradeHistory btn btn-secondary" id="btn-trade-history">История </button>
+          </div>
 
+          <div class="panel-trade mt-3">
+
+            <div class="collapse" id="panel-trade-active">
+              <table id="table-trade-active" class="table table-hover table-borderless ">
+                <thead name="thead-trade-active" style="background-color:#f8f9fa">
+                  <tr>
+                    <th scope="col">
+                      Тип
+                    </th>
+                    <th scope="col">
+                      Пара
+                    </th>
+                    <th scope="col">
+                      -
+                    </th>
+                    <th scope="col">
+                      Дата
+                    </th>
+                    <th scope="col">
+                      -
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-trade-active"></tbody>
+              </table>
+            </div>
+
+            <div class="collapse" id="panel-trade-history">
+              <table id="table-trade-history" class="table table-hover table-borderless ">
+                <thead name="thead-trade-history" style="background-color:#f8f9fa">
+                  <tr>
+                    <th scope="col">
+                      Тип
+                    </th>
+                    <th scope="col">
+                      Пара
+                    </th>
+                    <th scope="col">
+                      -
+                    </th>
+                    <th scope="col">
+                      Дата
+                    </th>
+                    <th scope="col">
+                      Профит
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-trade-history"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -221,7 +278,7 @@
   </div>
 
   <script>
-    forming_page({{ .Pairs }}, {{ .MarketsStat }}, {{ .ChangePrices }}, {{ .DeltaFast }}); 
+    forming_page({{ .Pairs }}, {{ .MarketsStat }}, {{ .ChangePrices }}, {{ .DeltaFast }},{{ .OrdersActive }},{{ .OrdersHistory }}); 
   </script>
 
 

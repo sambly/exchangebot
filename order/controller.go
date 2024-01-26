@@ -85,6 +85,13 @@ func (c *Controller) ClosePosition(id int64) error {
 		return err
 	}
 
+	orders, err := database.Orders(c.database)
+	if err != nil {
+		return err
+	}
+
+	c.exchange.Orders = orders
+
 	return nil
 }
 

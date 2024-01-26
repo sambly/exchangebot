@@ -8,6 +8,7 @@ import (
 	"main/model"
 	"main/prices"
 	"net/http"
+	"strconv"
 )
 
 type Menu struct {
@@ -16,11 +17,13 @@ type Menu struct {
 }
 
 type ViewData struct {
-	Menu         []Menu
-	Pairs        []string
-	MarketsStat  map[string]*model.MarketsStat
-	ChangePrices map[string]map[string]*prices.ChangeData
-	DeltaFast    map[string]map[string]*prices.DeltaFast
+	Menu          []Menu
+	Pairs         []string
+	MarketsStat   map[string]*model.MarketsStat
+	ChangePrices  map[string]map[string]*prices.ChangeData
+	DeltaFast     map[string]map[string]*prices.DeltaFast
+	OrdersActive  []*model.Order
+	OrdersHistory []*model.Order
 }
 
 type Deal struct {
@@ -38,11 +41,13 @@ func (web *Web) home(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := ViewData{
-		Menu:         []Menu{{Name: "Главная", Url: "/"}},
-		Pairs:        web.App.AssetsPrices.Pairs,
-		MarketsStat:  web.App.AssetsPrices.MarketsStat,
-		ChangePrices: web.App.AssetsPrices.ChangePrices,
-		DeltaFast:    web.App.AssetsPrices.DeltaFast,
+		Menu:          []Menu{{Name: "Главная", Url: "/"}},
+		Pairs:         web.App.AssetsPrices.Pairs,
+		MarketsStat:   web.App.AssetsPrices.MarketsStat,
+		ChangePrices:  web.App.AssetsPrices.ChangePrices,
+		DeltaFast:     web.App.AssetsPrices.DeltaFast,
+		OrdersActive:  web.App.PaperWallet.OrdersActive(),
+		OrdersHistory: web.App.PaperWallet.OrdersHistory(),
 	}
 
 	ts, err := template.ParseFiles(web.Files...)
@@ -131,8 +136,27 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		web.logError(err)
 	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(web.App.PaperWallet.OrdersActive())
+
+}
+
+func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
+	bodyByte, err := io.ReadAll(r.Body)
+	if err != nil {
+		web.logError(err)
+	}
+
+	id, _ := strconv.ParseInt(string(bodyByte), 10, 64)
+
+	err = web.App.OrderController.ClosePosition(id)
+	if err != nil {
+		web.logError(err)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Данные записаны"))
+
+	orders := map[string]interface{}{"OrdersActive": web.App.PaperWallet.OrdersActive(), "OrdersHistory": web.App.PaperWallet.OrdersHistory()}
+	json.NewEncoder(w).Encode(orders)
+
 }

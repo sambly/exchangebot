@@ -22,6 +22,18 @@ $(function () {
         change_pair(document.querySelector('#pairs').value)
     });
 
+    // Аткинвые кнопки ордеров
+    $('.btnTradeHistory').click(function () {
+        $('.btnTradeHistory').removeClass('active');
+        $(this).addClass('active');
+    });
+
+    $('#btn-trade-active').click(function () {
+        show_panel_trade_active();
+    });
+    $('#btn-trade-history').click(function () {
+        show_panel_trade_history();
+    });
     // Аткинвые кнопки выбора пар
     $('.btnPairs').click(function () {
 
@@ -80,18 +92,18 @@ $(function () {
 
         let sideType
 
-        if (e.target.id=="panel-trdae-open-deal"){
+        if (e.target.id == "panel-trdae-open-deal") {
             sideType = "buy";
         }
-        if (e.target.id=="panel-trdae-close-deal"){
+        if (e.target.id == "panel-trdae-close-deal") {
             sideType = "sell";
         }
 
         let form = {
-            pair : document.querySelector('#pairs').value,
-            sideType : sideType,
+            pair: document.querySelector('#pairs').value,
+            sideType: sideType,
             strategy: document.querySelector('#panel-trade-strategy').value,
-            comment : document.querySelector('#panel-trade-comment').value
+            comment: document.querySelector('#panel-trade-comment').value
         };
 
 
@@ -102,9 +114,9 @@ $(function () {
             cache: false,
             contentType: 'application/json; charset=utf-8',
             processData: false,
-            data : JSON.stringify(form),
-            success: function (response) {
-                console.log(response);
+            data: JSON.stringify(form),
+            success: function (orders) {
+                forming_orders_active(orders);
             },
             error: function (response) {
                 console.log(response);
@@ -113,13 +125,13 @@ $(function () {
         });
     });
 
-
 });
 
 
-function forming_page(pairs, marketsStat, changePrices, deltaFast) {
+function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive, ordersHistory) {
 
     show_price_panel();
+    show_panel_trade_active();
 
     // Select pairs
     let selectPairs = document.querySelector('#pairs');
@@ -149,7 +161,128 @@ function forming_page(pairs, marketsStat, changePrices, deltaFast) {
         })
     })
 
+    // Формирование panel-trade
+    forming_orders_active(ordersActive);
+    forming_orders_history(ordersHistory);
 }
+
+
+
+
+
+function forming_orders_active(orders) {
+
+    const tbody = document.querySelector("#tbody-trade-active");
+    tbody.innerHTML = '';
+    const th = document.querySelectorAll("thead[name=trade-active] th");
+
+    if (orders == null) {
+        orders = [];
+    }
+
+    for (let order of orders) {
+
+        let row = tbody.insertRow(-1);
+        row.className = "order-active";
+
+        // 1 Col Side
+        let cell = row.insertCell();
+        cell.innerHTML = order.Side;
+        cell.setAttribute("name", "order-a-side");
+        // 2 Col Pair
+        cell = row.insertCell();
+        cell.innerHTML = order.Pair;
+        cell.setAttribute("name", "order-a-pair");
+        // 3 Col -
+        cell = row.insertCell();
+        cell.innerHTML = "";
+        // 4 Col TimeCreated
+        cell = row.insertCell();
+        cell.innerHTML = new Date(order.TimeCreated).toLocaleString("en-GB");
+        cell.setAttribute("name", "order-a-timeCreat");
+        // 5 Col - закрыть позицию 
+        cell = row.insertCell();
+        let btnCl = document.createElement('button');
+        btnCl.setAttribute("type", 'button');
+        btnCl.setAttribute('class', 'btn-close');
+        btnCl.setAttribute('name', 'btn-close-position');
+        btnCl.setAttribute('value', order.ID);
+        cell.appendChild(btnCl);
+    };
+
+    // Закрытие позиции
+    let btnsClose = document.querySelectorAll('.btn-close');
+    btnsClose.forEach((btn, index) => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            $.ajax({
+                url: '/closeDeal',
+                type: 'POST',
+                method: 'POST',
+                cache: false,
+                contentType: ' text/html; charset=utf-8',
+                processData: false,
+                data: e.target.value,
+                success: function (orders) {
+                    forming_orders_active(orders.OrdersActive);
+                    forming_orders_history(orders.OrdersHistory);
+                },
+                error: function (response) {
+                    console.log(response);
+                },
+
+            });
+
+
+        });
+    });
+
+
+
+
+}
+
+function forming_orders_history(orders) {
+
+    const tbody = document.querySelector("#tbody-trade-history");
+    tbody.innerHTML = '';
+    const th = document.querySelectorAll("thead[name=trade-history] th");
+
+    if (orders == null) {
+        orders = [];
+    }
+
+    for (let order of orders) {
+
+        let row = tbody.insertRow(-1);
+        row.className = "order-history";
+
+        // 1 Col Side
+        let cell = row.insertCell();
+        cell.innerHTML = order.Side;
+        cell.setAttribute("name", "order-h-side");
+        // 2 Col Pair
+        cell = row.insertCell();
+        cell.innerHTML = order.Pair;
+        cell.setAttribute("name", "order-h-pair");
+        // 3 Col -
+        cell = row.insertCell();
+        cell.innerHTML = "";
+        // 4 Col TimeCreated
+        cell = row.insertCell();
+        cell.innerHTML = new Date(order.Time).toLocaleString("en-GB");
+        cell.setAttribute("name", "order-h-timeCreat");
+        // 5 Col - профит 
+        cell = row.insertCell();
+        cell.innerHTML = order.Profit;
+    };
+
+
+}
+
+
+
 
 function update_main_data(marketsStat, changePrices, deltaFast) {
 
@@ -569,6 +702,15 @@ function show_volume_panel() {
 
     $("#chart-price").hide();
     $("#panel-chart-volume").show();
+}
+
+function show_panel_trade_active() {
+    $("#panel-trade-active").show();
+    $("#panel-trade-history").hide();
+}
+function show_panel_trade_history() {
+    $("#panel-trade-active").hide();
+    $("#panel-trade-history").show();
 }
 
 function get_response_message(response, reload) {

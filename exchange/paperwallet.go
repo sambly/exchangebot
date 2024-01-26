@@ -23,6 +23,26 @@ func NewPaperWallet(ctx context.Context) *PaperWallet {
 	}
 }
 
+func (p *PaperWallet) OrdersActive() (orders []*model.Order) {
+
+	for _, order := range p.Orders {
+		if order.Status == model.OrderStatusTypeActive {
+			orders = append(orders, order)
+		}
+	}
+	return orders
+}
+
+func (p *PaperWallet) OrdersHistory() (orders []*model.Order) {
+
+	for _, order := range p.Orders {
+		if order.Status == model.OrderStatusTypeClose {
+			orders = append(orders, order)
+		}
+	}
+	return orders
+}
+
 func (p *PaperWallet) CreateOrderMarket(side model.SideType, pair string, size float64) (*model.Order, error) {
 	p.Lock()
 	defer p.Unlock()
