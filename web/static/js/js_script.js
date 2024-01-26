@@ -687,6 +687,9 @@ function sort_table(tbody, th, tr) {
 
 function show_price_panel() {
 
+    $("#list-top-price").show();
+    $("#list-top-volume").hide();
+
     $("#list-ch-price").show();
     $("#list-ch-volume").hide();
 
@@ -695,6 +698,10 @@ function show_price_panel() {
 }
 
 function show_volume_panel() {
+
+    $("#list-top-price").hide();
+    $("#list-top-volume").show();
+
     $("#list-ch-price").hide();
     $("#list-ch-volume").show();
 

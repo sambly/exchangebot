@@ -28,7 +28,7 @@
   <div class="button-control mt-5">
     <button type="button" class="btnMenu btn btn-secondary active" id="btn-price">Цена</button>
     <button type="button" class="btnMenu btn btn-secondary" id="btn-volume">Объем </button>
-    <button type="button" class="btn btn-secondary" id="btn-update-data">Обновить </button>
+    <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" id="btn-update-data">Обновить </button>
   </div>
 
   <div class="row mt-3">
@@ -36,14 +36,40 @@
 
     <div class="col-3">
 
-      <div id="list">
+      <div class="list">
 
+        <div class="list-top">
 
-        <div class="d-flex gap-1 justify-content-end">
-          <div class="btn-group" role="group">
-            <button type="button" class="btnPairs btn btn-secondary btn-sm active" id="btnAllPairs">Все</button>
-            <button type="button" class="btnPairs btn-secondary btn-sm" id="btnFavoritePairs">♥</button>
+          <div class="collapse" id="list-top-price">
+            <div class="d-flex gap-2 justify-content-end">
+              <div class="btn-group" role="group">
+                <button type="button" class="btnPairs btn btn-secondary btn-sm active" id="btnAllPairs">Все</button>
+                <button type="button" class="btnPairs btn-secondary btn-sm" id="btnFavoritePairs">♥</button>
+              </div>
+            </div>
           </div>
+
+
+          <div class="collapse" id="list-top-volume">
+            <div class="buttons-frame">
+
+              <div class="d-flex gap-1 justify-content-end">
+                <div class="btn-group" role="group">
+                  <button type="button" class="btnPairs btn btn-secondary btn-sm active" id="btnAllPairs">Все</button>
+                  <button type="button" class="btnPairs btn-secondary btn-sm" id="btnFavoritePairs">♥</button>
+                </div>
+
+                <button type="button" class="btnFrame btn btn-secondary active  btn-sm">5m</button>
+                <button type="button" class="btnFrame btn btn-secondary  btn-sm">30m </button>
+                <button type="button" class="btnFrame btn btn-secondary  btn-sm">1h </button>
+                <button type="button" class="btnFrame btn btn-secondary  btn-sm">4h </button>
+                <button type="button" class="btnFrame btn btn-secondary  btn-sm">1d </button>
+              </div>
+            </div>
+          </div>
+
+
+
         </div>
 
         <div class="collapse" id="list-ch-price">
@@ -78,16 +104,7 @@
         </div>
 
         <div class="collapse" id="list-ch-volume" style="height: 500px;">
-          <div class="buttons-frame">
-            <div class="d-flex gap-1 justify-content-end">
-              <button type="button" class="btnFrame btn btn-secondary active  btn-sm">5m</button>
-              <button type="button" class="btnFrame btn btn-secondary  btn-sm">30m </button>
-              <button type="button" class="btnFrame btn btn-secondary  btn-sm">1h </button>
-              <button type="button" class="btnFrame btn btn-secondary  btn-sm">4h </button>
-              <button type="button" class="btnFrame btn btn-secondary  btn-sm">1d </button>
-            </div>
-          </div>
-
+ 
           <table id="table-delta" class="table table-hover table-borderless mt-1">
             <thead name="thead-delta" style="background-color:#f8f9fa">
               <tr>
@@ -191,7 +208,8 @@
         </div>
 
         <div class="mb-3">
-          <button type="button" class="btn-trade-deal btn btn-secondary btn-sm" id="panel-trdae-open-deal">Покупка</button>
+          <button type="button" class="btn-trade-deal btn btn-secondary btn-sm"
+            id="panel-trdae-open-deal">Покупка</button>
           <button type="button" class="btn-trade-deal btn-sm" id="panel-trdae-close-deal">Продажа</button>
         </div>
       </div>
@@ -202,9 +220,10 @@
     <div class="row mt-3">
       <div class="col-9">
         <div class="bg-light border rounded-3" style="height: 500px;">
-          
+
           <div class="button-control mt-2">
-            <button type="button" class="btnTradeHistory btn btn-secondary active" id="btn-trade-active">Активные</button>
+            <button type="button" class="btnTradeHistory btn btn-secondary active"
+              id="btn-trade-active">Активные</button>
             <button type="button" class="btnTradeHistory btn btn-secondary" id="btn-trade-history">История </button>
           </div>
 
@@ -278,7 +297,7 @@
   </div>
 
   <script>
-    forming_page({{ .Pairs }}, {{ .MarketsStat }}, {{ .ChangePrices }}, {{ .DeltaFast }},{{ .OrdersActive }},{{ .OrdersHistory }}); 
+    forming_page({{ .Pairs }}, {{ .MarketsStat }}, {{ .ChangePrices }}, {{ .DeltaFast }}, {{ .OrdersActive }}, {{ .OrdersHistory }}); 
   </script>
 
 
