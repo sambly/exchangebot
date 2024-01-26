@@ -2,8 +2,6 @@
   text-align: center;
 }
 
-
-
 #list {
   height: 500px;
 }
@@ -153,7 +151,6 @@ tbody td {
 #table-trade-active td:nth-child(5) {
   width: 20%;
 }
-
 
 #table-trade-hisory th:nth-child(1),
 #table-trade-hisory td:nth-child(1) {

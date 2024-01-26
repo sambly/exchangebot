@@ -275,13 +275,11 @@ function forming_orders_history(orders) {
         cell.setAttribute("name", "order-h-timeCreat");
         // 5 Col - профит 
         cell = row.insertCell();
-        cell.innerHTML = order.Profit;
+        cell.innerHTML = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
     };
 
 
 }
-
-
 
 
 function update_main_data(marketsStat, changePrices, deltaFast) {
