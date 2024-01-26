@@ -34,156 +34,158 @@
   <div class="row mt-3">
 
     <div class="col-3">
+      <div class="bg-light border rounded-3">
 
-      <div class="list">
+        <div class="list">
 
-        <div class="list-top">
+          <div class="list-top px-2 pt-2">
 
-          <div class="collapse" id="list-top-price">
-            <div class="d-flex gap-2 justify-content-end">
-              <div class="btn-group" role="group">
-                <button type="button" class="btnPairs btn btn-secondary btn-sm active" id="btnAllPairs">Все</button>
-                <button type="button" class="btnPairs btn-secondary btn-sm" id="btnFavoritePairs">♥</button>
-              </div>
-            </div>
-          </div>
-
-
-          <div class="collapse" id="list-top-volume">
-            <div class="buttons-frame">
-
-              <div class="d-flex gap-1 justify-content-end">
+            <div class="collapse" id="list-top-price">
+              <div class="d-flex gap-2 justify-content-end">
                 <div class="btn-group" role="group">
                   <button type="button" class="btnPairs btn btn-secondary btn-sm active" id="btnAllPairs">Все</button>
                   <button type="button" class="btnPairs btn-secondary btn-sm" id="btnFavoritePairs">♥</button>
                 </div>
+              </div>
+            </div>
 
-                <div class="btn-group" role="group">
-                  <button type="button" class="btnFrame btn btn-secondary active  btn-sm">5m</button>
-                  <button type="button" class="btnFrame btn btn-secondary  btn-sm">30m </button>
-                  <button type="button" class="btnFrame btn btn-secondary  btn-sm">1h </button>
-                  <button type="button" class="btnFrame btn btn-secondary  btn-sm">4h </button>
-                  <button type="button" class="btnFrame btn btn-secondary  btn-sm">1d </button>
+
+            <div class="collapse" id="list-top-volume">
+              <div class="buttons-frame">
+
+                <div class="d-flex gap-1 justify-content-end">
+                  <div class="btn-group" role="group">
+                    <button type="button" class="btnPairs btn btn-secondary btn-sm active" id="btnAllPairs">Все</button>
+                    <button type="button" class="btnPairs btn-secondary btn-sm" id="btnFavoritePairs">♥</button>
+                  </div>
+
+                  <div class="btn-group" role="group">
+                    <button type="button" class="btnFrame btn btn-secondary active  btn-sm">5m</button>
+                    <button type="button" class="btnFrame btn btn-secondary  btn-sm">30m </button>
+                    <button type="button" class="btnFrame btn btn-secondary  btn-sm">1h </button>
+                    <button type="button" class="btnFrame btn btn-secondary  btn-sm">4h </button>
+                    <button type="button" class="btnFrame btn btn-secondary  btn-sm">1d </button>
+                  </div>
                 </div>
               </div>
             </div>
+
+          </div>
+
+          <div class="collapse" id="list-ch-price">
+            <table id="table-price" class="table table-hover table-borderless ">
+              <thead name="thead-price" style="background-color:#f8f9fa">
+                <tr>
+                  <th scope="col">
+                    ✓
+                  </th>
+                  <th scope="col">
+                    Пара
+                  </th>
+                  <th scope="col">
+                    сh24V
+                  </th>
+                  <th scope="col">
+                    ch3m
+                  </th>
+                  <th scope="col">
+                    ch15m
+                  </th>
+                  <th scope="col">
+                    ch1
+                  </th>
+                  <th scope="col">
+                    ch4
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="tbody-price"></tbody>
+            </table>
+          </div>
+
+          <div class="collapse" id="list-ch-volume">
+
+            <table id="table-delta" class="table table-hover table-borderless mt-1">
+              <thead name="thead-delta" style="background-color:#f8f9fa">
+                <tr>
+                  <th scope="col">
+                    ✓
+                  </th>
+                  <th scope="col">
+                    Пара
+                  </th>
+                  <th scope="col">
+                    Объем
+                  </th>
+                  <th scope="col">
+                    Сделки
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="tbody-delta"></tbody>
+            </table>
+
           </div>
 
         </div>
-
-        <div class="collapse" id="list-ch-price">
-          <table id="table-price" class="table table-hover table-borderless ">
-            <thead name="thead-price" style="background-color:#f8f9fa">
-              <tr>
-                <th scope="col">
-                  ✓
-                </th>
-                <th scope="col">
-                  Пара
-                </th>
-                <th scope="col">
-                  сh24V
-                </th>
-                <th scope="col">
-                  ch3m
-                </th>
-                <th scope="col">
-                  ch15m
-                </th>
-                <th scope="col">
-                  ch1
-                </th>
-                <th scope="col">
-                  ch4
-                </th>
-              </tr>
-            </thead>
-            <tbody id="tbody-price"></tbody>
-          </table>
-        </div>
-
-        <div class="collapse" id="list-ch-volume">
-
-          <table id="table-delta" class="table table-hover table-borderless mt-1">
-            <thead name="thead-delta" style="background-color:#f8f9fa">
-              <tr>
-                <th scope="col">
-                  ✓
-                </th>
-                <th scope="col">
-                  Пара
-                </th>
-                <th scope="col">
-                  Объем
-                </th>
-                <th scope="col">
-                  Сделки
-                </th>
-              </tr>
-            </thead>
-            <tbody id="tbody-delta"></tbody>
-          </table>
-
-        </div>
-
       </div>
     </div>
 
     <div class="col-6">
+      <div class="bg-light border rounded-3">
+        <div class="collapse chart" id="chart-price">
 
-      <div class="collapse" id="chart-price">
+          <div class="tradingview-widget-container tech_analysis">
 
-        <div id="tv_chart_container"></div>
+            <div id="tradingview_3418f" ></div>
+            <div class="tradingview-widget-copyright"></div>
 
-        <div class="tradingview-widget-container tech_analysis">
-
-          <div id="tradingview_3418f"></div>
-          <div class="tradingview-widget-copyright"></div>
-
-          <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-          <script type="text/javascript">
-            new TradingView.widget(
-              {
-                "height": "500",
-                "symbol": "BINANCE:BTCUSDT",
-                "interval": "15",
-                "timezone": "Europe/Moscow",
-                "theme": "Light",
-                "style": "1",
-                "locale": "ru",
-                "toolbar_bg": "#f1f3f6",
-                "enable_publishing": false,
-                "allow_symbol_change": true,
-                "container_id": "tradingview_3418f"
-              });
-          </script>
-        </div>
-      </div>
-
-      <div class="collapse" id="panel-chart-volume">
-
-        <div class="d-flex gap-1 justify-content-end">
-          <input class="form-check-input" type="checkbox" name="change-delta-check" value="Volume" checked>
-          <label class="form-check-label" for="checkVolume"> Volume</label>
-
-          <input class="form-check-input" type="checkbox" name="change-delta-check" value="VolumeBuy">
-          <label class="form-check-label" for="checkVolumeB"> VolumeB</label>
-
-          <input class="form-check-input" type="checkbox" name="change-delta-check" value="VolumeAsk">
-          <label class="form-check-label" for="checkVolumeA"> VolumeA</label>
-
-          <input class="form-check-input" type="checkbox" name="change-delta-check" value="Trades">
-          <label class="form-check-label" for="checkTrades"> Trades</label>
-
-          <input class="form-check-input" type="checkbox" name="change-delta-check" value="TradesBuy">
-          <label class="form-check-label" for="checkTradesB"> TradesB</label>
-
-          <input class="form-check-input" type="checkbox" name="change-delta-check" value="TradesAsk">
-          <label class="form-check-label" for="checkTradesA"> TradesA</label>
-
+            <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+            <script type="text/javascript">
+              new TradingView.widget(
+                {
+                  "height": "532",
+                  "width": "925",
+                  "symbol": "BINANCE:BTCUSDT",
+                  "interval": "15",
+                  "timezone": "Europe/Moscow",
+                  "theme": "Light",
+                  "style": "1",
+                  "locale": "ru",
+                  "toolbar_bg": "#f1f3f6",
+                  "enable_publishing": false,
+                  "allow_symbol_change": true,
+                  "container_id": "tradingview_3418f"
+                });
+            </script>
+          </div>
         </div>
 
-        <div id="chart-volume" class="border">
+        <div class="collapse chart" id="panel-chart-volume">
+
+          <div class="d-flex gap-1 justify-content-end px-5 pt-2">
+            <input class="form-check-input" type="checkbox" name="change-delta-check" value="Volume" checked>
+            <label class="form-check-label" for="checkVolume"> Volume</label>
+
+            <input class="form-check-input" type="checkbox" name="change-delta-check" value="VolumeBuy">
+            <label class="form-check-label" for="checkVolumeB"> VolumeB</label>
+
+            <input class="form-check-input" type="checkbox" name="change-delta-check" value="VolumeAsk">
+            <label class="form-check-label" for="checkVolumeA"> VolumeA</label>
+
+            <input class="form-check-input" type="checkbox" name="change-delta-check" value="Trades">
+            <label class="form-check-label" for="checkTrades"> Trades</label>
+
+            <input class="form-check-input" type="checkbox" name="change-delta-check" value="TradesBuy">
+            <label class="form-check-label" for="checkTradesB"> TradesB</label>
+
+            <input class="form-check-input" type="checkbox" name="change-delta-check" value="TradesAsk">
+            <label class="form-check-label" for="checkTradesA"> TradesA</label>
+
+          </div>
+
+          <div id="chart-volume">
+          </div>
         </div>
       </div>
 
@@ -191,112 +193,114 @@
 
     <div class="col-3">
 
-      <div id="smart-trade" class="bg-light border rounded-3" style="height: 500px;">
+      <div class="bg-light border rounded-3">
+        <div id="smart-trade" style="height: 500px;">
 
-        <div class="mb-3">
-          <label for="panel-trade-strategy" class="form-label">Стратегия:</label>
-          <select name="panel-trade-strategy" id="panel-trade-strategy" class="form-select">
-            <option value="Simple">Simple</option>
-          </select>
-        </div>
+          <div class="mb-3">
+            <label for="panel-trade-strategy" class="form-label">Стратегия:</label>
+            <select name="panel-trade-strategy" id="panel-trade-strategy" class="form-select">
+              <option value="Simple">Simple</option>
+            </select>
+          </div>
 
-        <div class="mb-3">
-          <label for="panel-trade-comment" class="form-label">Коментарий:</label>
-          <textarea class="form-control" id="panel-trade-comment" rows="3" name="text_comment"></textarea>
-        </div>
+          <div class="mb-3">
+            <label for="panel-trade-comment" class="form-label">Коментарий:</label>
+            <textarea class="form-control" id="panel-trade-comment" rows="3" name="text_comment"></textarea>
+          </div>
 
-        <div class="mb-3">
-          <button type="button" class="btn-trade-deal btn btn-secondary btn-sm"
-            id="panel-trdae-open-deal">Покупка</button>
-          <button type="button" class="btn-trade-deal btn-sm" id="panel-trdae-close-deal">Продажа</button>
+          <div class="mb-3">
+            <button type="button" class="btn-trade-deal btn btn-secondary btn-sm"
+              id="panel-trdae-open-deal">Покупка</button>
+            <button type="button" class="btn-trade-deal btn-sm" id="panel-trdae-close-deal">Продажа</button>
+          </div>
         </div>
       </div>
     </div>
+  </div>
 
-
-
-    <div class="row mt-3">
+  <div class="row mt-3">
+    
+    <div class="bg-light border rounded-3" style="height: 400px;">
+      
       <div class="col-9">
-        <div class="bg-light border rounded-3" style="height: 500px;">
+        <div class="button-control mt-2">
+          <button type="button" class="btnTradeHistory btn btn-secondary active" id="btn-trade-active">Активные</button>
+          <button type="button" class="btnTradeHistory btn btn-secondary" id="btn-trade-history">История </button>
+        </div>
 
-          <div class="button-control mt-2">
-            <button type="button" class="btnTradeHistory btn btn-secondary active"
-              id="btn-trade-active">Активные</button>
-            <button type="button" class="btnTradeHistory btn btn-secondary" id="btn-trade-history">История </button>
+        <div class="panel-trade mt-3">
+
+          <div class="collapse" id="panel-trade-active">
+            <table id="table-trade-active" class="table table-hover table-borderless ">
+              <thead name="thead-trade-active" style="background-color:#f8f9fa">
+                <tr>
+                  <th scope="col">
+                    Тип
+                  </th>
+                  <th scope="col">
+                    Пара
+                  </th>
+                  <th scope="col">
+                    -
+                  </th>
+                  <th scope="col">
+                    Дата
+                  </th>
+                  <th scope="col">
+                    -
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="tbody-trade-active"></tbody>
+            </table>
           </div>
 
-          <div class="panel-trade mt-3">
-
-            <div class="collapse" id="panel-trade-active">
-              <table id="table-trade-active" class="table table-hover table-borderless ">
-                <thead name="thead-trade-active" style="background-color:#f8f9fa">
-                  <tr>
-                    <th scope="col">
-                      Тип
-                    </th>
-                    <th scope="col">
-                      Пара
-                    </th>
-                    <th scope="col">
-                      -
-                    </th>
-                    <th scope="col">
-                      Дата
-                    </th>
-                    <th scope="col">
-                      -
-                    </th>
-                  </tr>
-                </thead>
-                <tbody id="tbody-trade-active"></tbody>
-              </table>
-            </div>
-
-            <div class="collapse" id="panel-trade-history">
-              <table id="table-trade-history" class="table table-hover table-borderless ">
-                <thead name="thead-trade-history" style="background-color:#f8f9fa">
-                  <tr>
-                    <th scope="col">
-                      Тип
-                    </th>
-                    <th scope="col">
-                      Пара
-                    </th>
-                    <th scope="col">
-                      -
-                    </th>
-                    <th scope="col">
-                      Дата
-                    </th>
-                    <th scope="col">
-                      Профит
-                    </th>
-                  </tr>
-                </thead>
-                <tbody id="tbody-trade-history"></tbody>
-              </table>
-            </div>
+          <div class="collapse" id="panel-trade-history">
+            <table id="table-trade-history" class="table table-hover table-borderless ">
+              <thead name="thead-trade-history" style="background-color:#f8f9fa">
+                <tr>
+                  <th scope="col">
+                    Тип
+                  </th>
+                  <th scope="col">
+                    Пара
+                  </th>
+                  <th scope="col">
+                    -
+                  </th>
+                  <th scope="col">
+                    Дата
+                  </th>
+                  <th scope="col">
+                    Профит
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="tbody-trade-history"></tbody>
+            </table>
           </div>
         </div>
       </div>
-
     </div>
-
-
-
-    <div class="toast align-items-center bg-light" role="alert" aria-live="assertive" aria-atomic="true" id="toast">
-      <div class="d-flex">
-        <div class="toast-body" id="toastMessage"></div>
-        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Закрыть"></button>
-      </div>
-    </div>
-
 
   </div>
 
-  <script>
-    forming_page({{ .Pairs }}, {{ .MarketsStat }}, {{ .ChangePrices }}, {{ .DeltaFast }}, {{ .OrdersActive }}, {{ .OrdersHistory }}); 
-  </script>
 
 
-  {{end}}
+
+  <div class="toast align-items-center bg-light" role="alert" aria-live="assertive" aria-atomic="true" id="toast">
+    <div class="d-flex">
+      <div class="toast-body" id="toastMessage"></div>
+      <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Закрыть"></button>
+    </div>
+  </div>
+
+
+</div>
+
+<script>
+  forming_page({{ .Pairs }}, {{ .MarketsStat }}, {{ .ChangePrices }}, {{ .DeltaFast }}, {{ .OrdersActive }}, {{ .OrdersHistory }}); 
+</script>
+
+
+{{end}}

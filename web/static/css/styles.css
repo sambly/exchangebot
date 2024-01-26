@@ -11,6 +11,10 @@
   height: 100%;
 }
 
+.chart {
+  height: 500px;
+}
+
 
 #table-price,
 #table-delta,
@@ -35,8 +39,14 @@ tbody tr {
 
 #table-price tbody,
 #table-delta tbody {
-  max-height: 427px;
+  max-height: 418px;
 }
+
+#table-trade-active tbody,
+#table-trade-history tbody {
+  max-height: 300px;
+}
+
 
 tbody {
   display: block;
@@ -71,7 +81,6 @@ tbody td {
 .toast:not(.showing):not(.show) {
   display: none !important;
 }
-
 
 
 

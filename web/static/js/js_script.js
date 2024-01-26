@@ -382,7 +382,8 @@ function update_top_data(pair) {
 function chart_price_update(pair) {
     new TradingView.widget(
         {
-            "height": "500",
+            "height": "532",
+            "width":"925",
             "symbol": "BINANCE:" + pair,
             "interval": "15",
             "timezone": "Europe/Moscow",
@@ -438,7 +439,7 @@ function chart_volume_update() {
                     textColor: 'black',
                     background: { type: 'solid', color: 'white' },
                 },
-                height: 500,
+                height: 468,
             };
 
             let chart_div = document.getElementById('chart-volume');
