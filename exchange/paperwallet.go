@@ -79,7 +79,13 @@ func (p *PaperWallet) ClosePosition(id int64) (*model.Order, error) {
 			order.Time = p.MarketsStat[order.Pair].Time
 			order.Status = model.OrderStatusTypeClose
 			order.Price = p.MarketsStat[order.Pair].Price
-			order.Profit = (order.Price / order.PriceCreated * 100) - 100
+			if order.Side == model.SideTypeBuy {
+				order.Profit = (order.Price / order.PriceCreated * 100) - 100
+			}
+			if order.Side == model.SideTypeSell {
+				order.Profit = (order.PriceCreated / order.Price * 100) - 100
+			}
+
 			return order, nil
 		}
 	}
