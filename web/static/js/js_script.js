@@ -1,5 +1,16 @@
 $(function () {
 
+
+    var socket = new WebSocket("ws://localhost:80/ws");
+    socket.onopen = function () {
+        console.log("connected ws");
+    };
+
+    socket.onmessage = function (e) {
+        console.log(e.data);
+    };
+
+
     // Сплывающее уведомление
     $('.toast').toast({ animation: true, autohide: true, delay: 3000 });
     $("#toastMessage").text("");

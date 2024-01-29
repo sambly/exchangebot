@@ -9,6 +9,8 @@ import (
 	"main/prices"
 	"net/http"
 	"strconv"
+
+	"github.com/gorilla/websocket"
 )
 
 type Menu struct {
@@ -31,6 +33,12 @@ type Deal struct {
 	SideType string
 	Strategy string
 	Comment  string
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Пропускаем любой запрос
+	},
 }
 
 func (web *Web) home(w http.ResponseWriter, r *http.Request) {
@@ -78,12 +86,6 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(maps)
 }
-
-// func (web *Web) updateFrame(w http.ResponseWriter, r *http.Request) {
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(web.App.AssetsPrices.DeltaFast)
-
-// }
 
 func (web *Web) getChangeDelta(w http.ResponseWriter, r *http.Request) {
 
@@ -159,4 +161,24 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 	orders := map[string]interface{}{"OrdersActive": web.App.PaperWallet.OrdersActive(), "OrdersHistory": web.App.PaperWallet.OrdersHistory()}
 	json.NewEncoder(w).Encode(orders)
 
+}
+
+func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
+	conn, _ := upgrader.Upgrade(w, r, nil) // error ignored for sake of simplicity
+	_ = conn
+	// for {
+	// 	// Read message from browser
+	// 	msgType, msg, err := conn.ReadMessage()
+	// 	if err != nil {
+	// 		return
+	// 	}
+
+	// 	// Print the message to the console
+	// 	fmt.Printf("%s sent: %s\n", conn.RemoteAddr(), string(msg))
+
+	// 	// Write message back to browser
+	// 	if err = conn.WriteMessage(msgType, msg); err != nil {
+	// 		return
+	// 	}
+	// }
 }

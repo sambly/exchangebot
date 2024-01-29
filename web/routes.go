@@ -13,6 +13,7 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/updateTop", app.updateTop)
 	mux.HandleFunc("/openDeal", app.openDeal)
 	mux.HandleFunc("/closeDeal", app.closeDeal)
+	mux.HandleFunc("/ws", app.echo)
 
 	fileServer := http.FileServer(http.Dir("web/static/"))
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
