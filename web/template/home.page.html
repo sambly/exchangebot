@@ -25,7 +25,7 @@
     </div>
   </div>
 
-  <div class="button-control mt-5">
+  <div class="button-control mt-3">
     <button type="button" class="btnMenu btn btn-secondary active" id="btn-price">Цена</button>
     <button type="button" class="btnMenu btn btn-secondary" id="btn-volume">Объем </button>
     <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" id="btn-update-data">Обновить </button>
@@ -195,24 +195,37 @@
 
       <div class="bg-light border rounded-3">
         <div id="smart-trade" style="height: 500px;">
+          <div class="d-flex gap-1 px-2 pt-2 justify-content-end">
+            <div class="btn-group " role="group">
+              <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">5m</button>
+              <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">30m </button>
+              <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">1h </button>
+              <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">4h </button>
+              <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">1d </button>
+            </div>
+          </div>
 
-          <div class="mb-3">
+
+          <div class="mb-3 px-2">
             <label for="panel-trade-strategy" class="form-label">Стратегия:</label>
             <select name="panel-trade-strategy" id="panel-trade-strategy" class="form-select">
               <option value="Simple">Simple</option>
             </select>
           </div>
 
-          <div class="mb-3">
+          
+          <div class="mb-3 px-2">
             <label for="panel-trade-comment" class="form-label">Коментарий:</label>
             <textarea class="form-control" id="panel-trade-comment" rows="3" name="text_comment"></textarea>
           </div>
 
-          <div class="mb-3">
-            <button type="button" class="btn-trade-deal btn btn-secondary btn-sm"
-              id="panel-trdae-open-deal">Покупка</button>
-            <button type="button" class="btn-trade-deal btn-sm" id="panel-trdae-close-deal">Продажа</button>
+          <div class="d-flex gap-2 justify-content-center">
+            <div class="mb-3">
+              <button type="button" class="btn-trade-deal btn btn-secondary" id="panel-trdae-open-deal">Покупка</button>
+              <button type="button" class="btn-trade-deal btn btn-secondary" id="panel-trdae-close-deal">Продажа</button>
+            </div>
           </div>
+
         </div>
       </div>
     </div>
