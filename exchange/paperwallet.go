@@ -59,7 +59,9 @@ func (p *PaperWallet) CreateOrderMarket(side model.SideType, pair string, size f
 		Type:         model.OrderTypeMarket,
 		Status:       model.OrderStatusTypeActive,
 		PriceCreated: p.MarketsStat[pair].Price,
+		Price:        p.MarketsStat[pair].Price,
 		Quantity:     size,
+		Profit:       0,
 	}
 
 	p.Orders = append(p.Orders, &order)

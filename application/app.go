@@ -28,7 +28,7 @@ type Application struct {
 	BaseAmountAsset float64
 }
 
-func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings, db *sql.DB, notification *notification.Notification) (*Application, error) {
+func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings, db *sql.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage) (*Application, error) {
 
 	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.WeightProcents, settings.LengthOfTime, db, notification)
 	account, err := account.NewAccount(exch, assetsPrices, notification)
@@ -36,7 +36,7 @@ func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings,
 		return nil, err
 	}
 	paperWallet := exchange.NewPaperWallet(ctx)
-	orderController, err := order.NewController(ctx, paperWallet, db)
+	orderController, err := order.NewController(ctx, paperWallet, db, socketsMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -63,8 +63,12 @@ func (app *Application) Run() error {
 
 	for _, pair := range app.settings.Pairs {
 		app.dataFeed.Subscribe(pair, app.AssetsPrices.OnMarket)
+		app.dataFeed.Subscribe(pair, app.OrderController.OnMarket)
 	}
 	go app.dataFeed.Start(true)
+
+	// app.OrderController.Start()
+	// defer app.OrderController.Stop()
 
 	//Для предварительного заполения цен всех пар, может сделать меньше время, просто добавляет погрешность для 10m
 	var tickerInterval_Init time.Duration = time.Second * 10 // Здесь выставить 40
@@ -86,27 +90,13 @@ func (app *Application) Run() error {
 		select {
 		case <-ticker_Init.C:
 			app.AssetsPrices.UpdateChanges("")
-			//err := app.Account.UpdateAssets()
-			// if err != nil {
-			// 	fmt.Printf("%v", err)
-			// 	return err
-			// }
 			ticker_Init.Stop()
 
 		case <-ticker_3m.C:
 			app.AssetsPrices.UpdateChanges("ch3m")
-			// err := app.Account.UpdateAssets()
-			// if err != nil {
-			// 	fmt.Printf("%v", err)
-			// 	return err
-			// }
+
 		case <-ticker_15m.C:
 			app.AssetsPrices.UpdateChanges("ch15m")
-			// err := app.Account.UpdateAssets()
-			// if err != nil {
-			// 	fmt.Printf("%v", err)
-			// 	return err
-			// }
 
 		case <-ticker_1h.C:
 			app.AssetsPrices.UpdateChanges("ch1h")

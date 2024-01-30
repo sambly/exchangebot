@@ -104,7 +104,6 @@ func (ap *AsetsPrices) OnMarket(ms model.MarketsStat) {
 	ap.MarketsStat[ms.Pair].Pair = ms.Pair
 	ap.MarketsStat[ms.Pair].Price = ms.Price
 	ap.MarketsStat[ms.Pair].Time = ms.Time
-	ap.MarketsStat[ms.Pair].Price = ms.Price
 	ap.MarketsStat[ms.Pair].Ch24 = ms.Ch24
 	ap.MarketsStat[ms.Pair].Volume = ms.Volume
 

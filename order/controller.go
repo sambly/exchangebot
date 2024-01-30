@@ -3,9 +3,11 @@ package order
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"main/database"
 	"main/exchange"
 	"main/model"
+	"main/notification"
 	"sync"
 	"time"
 )
@@ -26,14 +28,17 @@ type Controller struct {
 	tickerInterval time.Duration
 	finish         chan bool
 	status         Status
+	socketsMessage *notification.SocketsMessage
 }
 
-func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB) (*Controller, error) {
+func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, socketsMessage *notification.SocketsMessage) (*Controller, error) {
 
 	ctrl := &Controller{
-		ctx:      ctx,
-		exchange: ex,
-		database: db,
+		ctx:            ctx,
+		exchange:       ex,
+		database:       db,
+		tickerInterval: time.Second,
+		socketsMessage: socketsMessage,
 	}
 
 	orders, err := database.Orders(db)
@@ -47,15 +52,23 @@ func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB) (*
 
 }
 
-func (c *Controller) updateOrders() {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
+// func (c *Controller) updateOrders() {
+// 	c.mtx.Lock()
+// 	defer c.mtx.Unlock()
 
-}
+// 	for _, order := range c.exchange.Orders {
+// 		if order.Status == model.OrderStatusTypeActive {
+// 			messageOrder, _ := json.Marshal(order)
+// 			c.socketsMessage.SendData(messageOrder)
+// 		}
+
+// 	}
+
+// }
 
 func (c *Controller) CreateOrderMarket(side model.SideType, pair string, size float64) (*model.Order, error) {
-	// c.mtx.Lock()
-	// defer c.mtx.Unlock()
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
 
 	order, err := c.exchange.CreateOrderMarket(side, pair, size)
 	if err != nil {
@@ -95,27 +108,49 @@ func (c *Controller) ClosePosition(id int64) error {
 	return nil
 }
 
-func (c *Controller) Start() {
-	if c.status != StatusRunning {
-		c.status = StatusRunning
-		go func() {
-			ticker := time.NewTicker(c.tickerInterval)
-			for {
-				select {
-				case <-ticker.C:
-					c.updateOrders()
-				case <-c.finish:
-					ticker.Stop()
-					return
-				}
+//	func (c *Controller) Start() {
+//		if c.status != StatusRunning {
+//			c.status = StatusRunning
+//			go func() {
+//				ticker := time.NewTicker(c.tickerInterval)
+//				for {
+//					select {
+//					case <-ticker.C:
+//						c.updateOrders()
+//					case <-c.finish:
+//						ticker.Stop()
+//						return
+//					}
+//				}
+//			}()
+//		}
+//	}
+//
+//	func (c *Controller) Stop() {
+//		if c.status == StatusRunning {
+//			c.status = StatusStopped
+//			c.updateOrders()
+//			c.finish <- true
+//		}
+//	}
+func (c *Controller) OnMarket(ms model.MarketsStat) {
+
+	// Обновление ордеров
+	for index, order := range c.exchange.Orders {
+		if order.Status == model.OrderStatusTypeActive && order.Pair == ms.Pair {
+			c.exchange.Orders[index].Price = ms.Price
+
+			if order.Side == model.SideTypeBuy {
+				c.exchange.Orders[index].Profit = (ms.Price / order.PriceCreated * 100) - 100
 			}
-		}()
+			if order.Side == model.SideTypeSell {
+				c.exchange.Orders[index].Profit = (order.PriceCreated / ms.Price * 100) - 100
+			}
+
+			// Обновления цены webSocket
+			messageOrder, _ := json.Marshal(order)
+			c.socketsMessage.SendData(messageOrder)
+		}
 	}
-}
-func (c *Controller) Stop() {
-	if c.status == StatusRunning {
-		c.status = StatusStopped
-		c.updateOrders()
-		c.finish <- true
-	}
+
 }

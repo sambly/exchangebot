@@ -165,20 +165,19 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 
 func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 	conn, _ := upgrader.Upgrade(w, r, nil) // error ignored for sake of simplicity
-	_ = conn
-	// for {
-	// 	// Read message from browser
-	// 	msgType, msg, err := conn.ReadMessage()
-	// 	if err != nil {
-	// 		return
-	// 	}
+	defer conn.Close()
+	web.Sockets.clients[conn] = true        //Сохраняем соединение, используя его как ключ
+	defer delete(web.Sockets.clients, conn) // Удаляем соединение
+	for {
+		mt, _, err := conn.ReadMessage()
+		if err != nil || mt == websocket.CloseMessage {
+			break // Выходим из цикла, если клиент пытается закрыть соединение или связь с клиентом прервана
+		}
 
-	// 	// Print the message to the console
-	// 	fmt.Printf("%s sent: %s\n", conn.RemoteAddr(), string(msg))
+		for conn := range web.Sockets.clients {
+			conn.WriteMessage(websocket.TextMessage, []byte("Hello"))
+		}
 
-	// 	// Write message back to browser
-	// 	if err = conn.WriteMessage(msgType, msg); err != nil {
-	// 		return
-	// 	}
-	// }
+	}
+
 }

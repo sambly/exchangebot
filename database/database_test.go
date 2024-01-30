@@ -1,7 +1,6 @@
 package database
 
 import (
-	"fmt"
 	"main/model"
 	"testing"
 	"time"
@@ -45,7 +44,6 @@ func TestCreateOrder(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Println(id)
 
 	err = ClosePosition(db, order, id)
 	if err != nil {

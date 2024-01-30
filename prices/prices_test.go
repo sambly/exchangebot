@@ -31,6 +31,4 @@ func TestUpdateDelta(t *testing.T) {
 
 	asetsPrices.UpdateDelta()
 
-	//fmt.Println(asetsPrices.ChangeDelta["BTCUSDT"]["1d"])
-
 }

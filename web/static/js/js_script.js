@@ -4,10 +4,31 @@ $(function () {
     var socket = new WebSocket("ws://localhost:80/ws");
     socket.onopen = function () {
         console.log("connected ws");
+        socket.send("Hello METANIT.COM");
     };
 
     socket.onmessage = function (e) {
-        console.log(e.data);
+
+
+
+        // Здесь сделать проверку что это вообще за данные, пока что есть данные только для ордеров
+        let order = JSON.parse(e.data);
+        let orderRow = document.querySelector('tr.order-active[value="' + order.ID + '"]');
+        let profitElement = orderRow.querySelector('td[name="order-a-profit"]');
+        profitElement.textContent = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
+
+
+    };
+
+
+    // если возникла ошибка
+    socket.onerror = (error) => {
+        console.log(`WebSocket Error: ${error}`);
+    };
+
+    // если соединение закрыто
+    socket.onclose = (event) => {
+        console.log("Connection closed");
     };
 
 
@@ -195,6 +216,8 @@ function forming_orders_active(orders) {
 
         let row = tbody.insertRow(-1);
         row.className = "order-active";
+        row.setAttribute("value", order.ID);
+
 
         // 1 Col Side
         let cell = row.insertCell();
@@ -206,7 +229,8 @@ function forming_orders_active(orders) {
         cell.setAttribute("name", "order-a-pair");
         // 3 Col -
         cell = row.insertCell();
-        cell.innerHTML = "";
+        cell.innerHTML = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
+        cell.setAttribute("name", "order-a-profit");
         // 4 Col TimeCreated
         cell = row.insertCell();
         cell.innerHTML = new Date(order.TimeCreated).toLocaleString("en-GB");

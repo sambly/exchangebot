@@ -76,26 +76,28 @@ func main() {
 		log.Fatal(err)
 	}
 
-	notification := &notification.Notification{Message: make(chan string)}
+	notify := &notification.Notification{Message: make(chan string)}
+	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
 	app, err := application.NewApp(
 		ctx,
 		binance,
 		settings,
 		db,
-		notification,
+		notify,
+		socketsMessage,
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	appTelegram, err := telegram.NewTelegram(app, tlgToken, tlgUser, notification)
+	appTelegram, err := telegram.NewTelegram(app, tlgToken, tlgUser, notify)
 	if err != nil {
 		log.Fatal(err)
 	}
 	appTelegram.Start()
 
-	web := web.NewWeb(app)
+	web := web.NewWeb(app, socketsMessage)
 	web.Run()
 
 	app.Run()
