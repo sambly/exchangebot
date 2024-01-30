@@ -15,8 +15,9 @@ $(function () {
         let order = JSON.parse(e.data);
         let orderRow = document.querySelector('tr.order-active[value="' + order.ID + '"]');
         let profitElement = orderRow.querySelector('td[name="order-a-profit"]');
+    
         profitElement.textContent = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
-
+        profitElement.style.color = color_text_profit(order.Profit)
 
     };
 
@@ -230,6 +231,7 @@ function forming_orders_active(orders) {
         // 3 Col -
         cell = row.insertCell();
         cell.innerHTML = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
+        cell.style.color = color_text_profit(order.Profit)
         cell.setAttribute("name", "order-a-profit");
         // 4 Col TimeCreated
         cell = row.insertCell();
@@ -752,6 +754,16 @@ function show_panel_trade_active() {
 function show_panel_trade_history() {
     $("#panel-trade-active").hide();
     $("#panel-trade-history").show();
+}
+
+
+
+function color_text_profit(number){
+    if (Number(number>=0)){
+       return  'green';
+    } else {
+        return  'red';
+    }
 }
 
 function get_response_message(response, reload) {
