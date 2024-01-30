@@ -175,7 +175,7 @@ function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive,
     selectPairs.value = "BTCUSDT";
 
     selectPairs.addEventListener('change', (e) => {
-        change_pair(e.target.value);
+        change_pair(e.target.value,true);
     });
 
     update_main_data(marketsStat, changePrices, deltaFast);
@@ -346,14 +346,14 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
 }
 
 
-function change_pair(pair) {
+function change_pair(pair,fromeSelectPairs = false) {
 
     let update_chart = false
     if (pair !== document.querySelector('#pairs').value) {
         document.querySelector('#pairs').value = pair;
         update_chart = true;
     }
-
+    update_chart = update_chart || fromeSelectPairs; 
 
     if ($('#list-ch-price').css('display') == "block") {
         var rowsPrice = document.querySelector("#tbody-price").rows;
