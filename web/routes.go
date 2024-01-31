@@ -8,7 +8,6 @@ func (app *Web) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", app.home)
 	mux.HandleFunc("/updatefull", app.updateFull)
-	//mux.HandleFunc("/updateframe", app.updateFrame)
 	mux.HandleFunc("/getChangeDelta", app.getChangeDelta)
 	mux.HandleFunc("/updateTop", app.updateTop)
 	mux.HandleFunc("/openDeal", app.openDeal)

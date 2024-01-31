@@ -285,6 +285,7 @@ function forming_orders_history(orders) {
 
         let row = tbody.insertRow(-1);
         row.className = "order-history";
+        row.setAttribute("value", order.ID);
 
         // 1 Col Side
         let cell = row.insertCell();

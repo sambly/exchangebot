@@ -6,16 +6,13 @@
 <div class="container-fluid">
 
 
-  <div class="row mt-3">
-    <div class="col-2">
-      <div class="d-flex  gap-2 ">24часа:<div class="text-primary" id="ch24-top" style="font-weight: bold; "></div>
-      </div>
-    </div>
-    <div class="col-2">
-      <div class="d-flex  gap-2 ">Объем:<div class="text-primary" id="volume-top" style="font-weight: bold; "></div>
-      </div>
-    </div>
+
+  <div class=" d-flex gap-3 mt-3">
+    <div class="d-flex gap-1">24часа:<div class="text-primary" id="ch24-top" style="font-weight: bold; "></div></div>
+    <div class="d-flex gap-1">Объем:<div class="text-primary" id="volume-top" style="font-weight: bold; "></div></div>
   </div>
+
+
 
   <div class="row mt-3">
     <div class="col-2">
@@ -205,12 +202,9 @@
             <textarea class="form-control" id="panel-trade-comment" rows="3" name="text_comment"></textarea>
           </div>
 
-          <div class="d-flex gap-2 justify-content-center">
-            <div class="mb-3">
-              <button type="button" class="btn-trade-deal btn btn-secondary" id="panel-trdae-open-deal">Покупка</button>
-              <button type="button" class="btn-trade-deal btn btn-secondary"
-                id="panel-trdae-close-deal">Продажа</button>
-            </div>
+          <div class="d-flex gap-3 justify-content-center mb-3">
+            <button type="button" class="btn-trade-deal btn btn-secondary" id="panel-trdae-open-deal">Покупка</button>
+            <button type="button" class="btn-trade-deal btn btn-secondary" id="panel-trdae-close-deal">Продажа</button>
           </div>
 
         </div>
@@ -218,16 +212,20 @@
     </div>
   </div>
 
+
   <div class="row mt-3">
+    <div class="button-control">
+      <button type="button" class="btnTradeHistory btn btn-secondary active" id="btn-trade-active">Активные</button>
+      <button type="button" class="btnTradeHistory btn btn-secondary" id="btn-trade-history">История </button>
+    </div>
 
-    <div class="bg-light border rounded-3" style="height: 400px;">
+  </div>
 
-      <div class="col-9">
-        <div class="button-control mt-2">
-          <button type="button" class="btnTradeHistory btn btn-secondary active" id="btn-trade-active">Активные</button>
-          <button type="button" class="btnTradeHistory btn btn-secondary" id="btn-trade-history">История </button>
-        </div>
 
+  <div class="row mt-1">
+
+    <div class="col-9">
+      <div class="bg-light border rounded-3" style="height: 400px;">
         <div class="panel-trade mt-3">
 
           <div class="collapse" id="panel-trade-active">
