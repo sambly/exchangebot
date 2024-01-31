@@ -37,6 +37,12 @@ type ChangeDelta struct {
 	TradesBuy   int64
 	TradesAsk   int64
 	MinuteCount int32
+
+	// For Candles
+	Open  float64
+	High  float64
+	Low   float64
+	Close float64
 }
 
 func (cd *ChangeDelta) Clear() {
@@ -178,7 +184,24 @@ func (ap *AsetsPrices) UpdateDelta() error {
 				frameCope.TradesAsk += candle.AmountTradeAsk
 				frameCope.MinuteCount += 1
 				frameCope.Time = candle.Time.Unix()
+
+				// for candles
+				if frameCope.Open == 0 {
+					frameCope.Open = candle.Open
+				}
+				if frameCope.High < candle.High {
+					frameCope.High = candle.High
+				}
+				if frameCope.Low == 0 {
+					frameCope.Low = candle.Low
+				}
+				if frameCope.Low > candle.Low {
+					frameCope.Low = candle.Low
+				}
+				frameCope.Close = candle.Low
+
 				frame[pair][key] = frameCope
+
 			}
 
 			if frame[pair]["5m"].MinuteCount == 5 {
