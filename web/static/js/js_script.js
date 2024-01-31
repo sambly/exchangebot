@@ -1,15 +1,15 @@
 $(function () {
 
 
+    //#############################################################################  webSocket #############################################################################
+
     var socket = new WebSocket("ws://localhost:80/ws");
     socket.onopen = function () {
         console.log("connected ws");
-        socket.send("Hello METANIT.COM");
+        // socket.send("Hello METANIT.COM");
     };
 
     socket.onmessage = function (e) {
-
-
 
         // Здесь сделать проверку что это вообще за данные, пока что есть данные только для ордеров
         let order = JSON.parse(e.data);
@@ -32,7 +32,8 @@ $(function () {
         console.log("Connection closed");
     };
 
-
+    //#############################################################################  webSocket #############################################################################
+  
     // Сплывающее уведомление
     $('.toast').toast({ animation: true, autohide: true, delay: 3000 });
     $("#toastMessage").text("");
