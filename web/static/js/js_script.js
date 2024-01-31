@@ -238,6 +238,17 @@ function forming_orders_active(orders) {
         cell.appendChild(btnCl);
     };
 
+
+
+    // выбор определенной пары
+    let rows = tbody.rows;
+    for (let row of rows) {
+        row.addEventListener("click", () => {
+            let pair = row.querySelector('[name="order-a-pair"]').innerHTML;
+            change_pair(pair,false,true);
+        });
+    };
+
     // Закрытие позиции
     let btnsClose = document.querySelectorAll('.btn-close');
     btnsClose.forEach((btn, index) => {
@@ -338,7 +349,7 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
 
 }
 
-function change_pair(pair,fromeSelectPairs = false) {
+function change_pair(pair,fromeSelectPairs = false,fromOrders = false) {
 
     let update_chart = false
     if (pair !== document.querySelector('#pairs').value) {
@@ -380,6 +391,12 @@ function change_pair(pair,fromeSelectPairs = false) {
             }
         }
         chart_volume_update();
+    }
+
+    if (fromOrders) {
+        show_chart_orders();
+        chart_frome_orders_update();
+
     }
 
     update_top_data(pair);
@@ -498,6 +515,91 @@ function chart_volume_update() {
 
 
 }
+
+function chart_frome_orders_update() {
+
+    let pair = document.querySelector('#pairs');
+    let frames = document.querySelectorAll('.btnFrame');
+    let frame;
+    let checboxType
+
+    let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
+    checkboxes.forEach((checkbox, index) => {
+        if (checkbox.checked) {
+            checboxType = checkbox.value
+        }
+    })
+
+    for (let f of frames) {
+        if (f.classList.contains('active')) {
+            frame = f;
+        }
+    }
+
+    let request = { Pair: pair.value, Frame: frame.innerText };
+    $.ajax({
+        url: '/getChangeDelta',
+        type: 'POST',
+        method: 'POST',
+        data: JSON.stringify(request),
+        cache: false,
+        contentType: 'application/json; charset=utf-8',
+        processData: false,
+        success: function (response) {
+
+
+            let dataFull = response;
+            let candles = [];
+            for (let item of dataFull) {
+                candles.push({ time: item['Time'], open: item['Open'],high: item['High'],low: item['Low'],close: item['Close'] })
+            }
+
+           
+            let chart_div = document.getElementById('chart-orders');
+            chart_div.innerHTML = '';
+
+
+            const chartOptions = {
+                height: 468,
+                autosize:true,
+                layout: {
+                backgroundColor: '#ffffff',
+                textColor: 'rgba(33, 56, 77, 1)',
+                },
+                grid: {
+                vertLines: {
+                color: 'rgba(197, 203, 206, 0.7)',
+                },
+                horzLines: {
+                color: 'rgba(197, 203, 206, 0.7)',
+                },
+                },
+                timeScale: {
+                timeVisible: true,
+                secondsVisible: false
+                },
+                };
+                const chart = LightweightCharts.createChart(chart_div,chartOptions);
+                const lineSeries = chart.addLineSeries({priceFormat: {type: 'price',precision: 3,minMove: 0.001}});
+                lineSeries.setData(candles);
+
+
+
+
+        },
+        error: function (response) {
+        },
+    });
+
+
+
+
+
+
+}
+
+
+
 
 function forming_tickers_list() {
 
@@ -723,6 +825,9 @@ function show_price_panel() {
     $("#chart-price").show();
     $("#panel-chart-volume").hide();
 
+    $("#panel-chart-orders").hide();
+
+    
 }
 
 function show_volume_panel() {
@@ -734,7 +839,19 @@ function show_volume_panel() {
 
     $("#chart-price").hide();
     $("#panel-chart-volume").show();
+
+    $("#panel-chart-orders").hide();
 }
+
+function show_chart_orders() {
+
+    $("#chart-price").hide();
+    $("#panel-chart-volume").hide();
+
+    $("#panel-chart-orders").show();
+}
+
+
 
 function show_panel_trade_active() {
     $("#panel-trade-active").show();
