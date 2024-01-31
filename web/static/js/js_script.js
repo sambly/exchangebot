@@ -74,13 +74,8 @@ $(function () {
         $('.btnPairs').removeClass('active');
         $(this).addClass('active');
 
-        if ($('#list-ch-price').css('display') == "block") {
-            forming_tickers_list();
-        }
-
-        if ($('#list-ch-volume').css('display') == "block") {
-            forming_tickers_list_volume();
-        }
+        forming_tickers_list();
+        forming_tickers_list_volume();
 
         change_pair(document.querySelector('#pairs').value);
 
@@ -199,11 +194,6 @@ function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive,
     forming_orders_active(ordersActive);
     forming_orders_history(ordersHistory);
 }
-
-
-
-
-
 function forming_orders_active(orders) {
 
     const tbody = document.querySelector("#tbody-trade-active");
@@ -319,7 +309,6 @@ function forming_orders_history(orders) {
 
 }
 
-
 function update_main_data(marketsStat, changePrices, deltaFast) {
 
 
@@ -347,7 +336,6 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
 
 
 }
-
 
 function change_pair(pair,fromeSelectPairs = false) {
 
@@ -726,20 +714,19 @@ function sort_table(tbody, th, tr) {
 
 function show_price_panel() {
 
-    $("#list-top-price").show();
-    $("#list-top-volume").hide();
+    $("#group-btn-frame").hide();
 
     $("#list-ch-price").show();
     $("#list-ch-volume").hide();
 
     $("#chart-price").show();
     $("#panel-chart-volume").hide();
+
 }
 
 function show_volume_panel() {
 
-    $("#list-top-price").hide();
-    $("#list-top-volume").show();
+    $("#group-btn-frame").show();
 
     $("#list-ch-price").hide();
     $("#list-ch-volume").show();

@@ -40,37 +40,22 @@
 
           <div class="list-top px-2 pt-2">
 
-            <div class="collapse" id="list-top-price">
-              <div class="d-flex gap-2 justify-content-end">
+            <div class="d-flex gap-1 justify-content-end">
+              <div class="btn-group" role="group">
+                <button type="button" class="btnPairs btn btn-secondary btn-sm active" id="btnAllPairs">Все</button>
+                <button type="button" class="btnPairs btn-secondary btn-sm" id="btnFavoritePairs">♥</button>
+              </div>
+
+              <div class="collapse" id="group-btn-frame">
                 <div class="btn-group" role="group">
-                  <button type="button" class="btnPairs btn btn-secondary btn-sm active" id="btnAllPairs">Все</button>
-                  <button type="button" class="btnPairs btn-secondary btn-sm" id="btnFavoritePairs">♥</button>
+                  <button type="button" class="btnFrame btn btn-secondary active  btn-sm">5m</button>
+                  <button type="button" class="btnFrame btn btn-secondary  btn-sm">30m </button>
+                  <button type="button" class="btnFrame btn btn-secondary  btn-sm">1h </button>
+                  <button type="button" class="btnFrame btn btn-secondary  btn-sm">4h </button>
+                  <button type="button" class="btnFrame btn btn-secondary  btn-sm">1d </button>
                 </div>
               </div>
             </div>
-
-
-            <div class="collapse" id="list-top-volume">
-
-              <div class="buttons-frame">
-
-                <div class="d-flex gap-1 justify-content-end">
-                  <div class="btn-group" role="group">
-                    <button type="button" class="btnPairs btn btn-secondary btn-sm" id="btnAllPairs">Все</button>
-                    <button type="button" class="btnPairs btn-secondary btn-sm" id="btnFavoritePairs">♥</button>
-                  </div>
-
-                  <div class="btn-group" role="group">
-                    <button type="button" class="btnFrame btn btn-secondary active  btn-sm">5m</button>
-                    <button type="button" class="btnFrame btn btn-secondary  btn-sm">30m </button>
-                    <button type="button" class="btnFrame btn btn-secondary  btn-sm">1h </button>
-                    <button type="button" class="btnFrame btn btn-secondary  btn-sm">4h </button>
-                    <button type="button" class="btnFrame btn btn-secondary  btn-sm">1d </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
           </div>
 
           <div class="collapse" id="list-ch-price">
@@ -138,7 +123,7 @@
 
           <div class="tradingview-widget-container tech_analysis">
 
-            <div id="tradingview_3418f" ></div>
+            <div id="tradingview_3418f"></div>
             <div class="tradingview-widget-copyright"></div>
 
             <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
@@ -214,7 +199,7 @@
             </select>
           </div>
 
-          
+
           <div class="mb-3 px-2">
             <label for="panel-trade-comment" class="form-label">Коментарий:</label>
             <textarea class="form-control" id="panel-trade-comment" rows="3" name="text_comment"></textarea>
@@ -223,7 +208,8 @@
           <div class="d-flex gap-2 justify-content-center">
             <div class="mb-3">
               <button type="button" class="btn-trade-deal btn btn-secondary" id="panel-trdae-open-deal">Покупка</button>
-              <button type="button" class="btn-trade-deal btn btn-secondary" id="panel-trdae-close-deal">Продажа</button>
+              <button type="button" class="btn-trade-deal btn btn-secondary"
+                id="panel-trdae-close-deal">Продажа</button>
             </div>
           </div>
 
@@ -233,9 +219,9 @@
   </div>
 
   <div class="row mt-3">
-    
+
     <div class="bg-light border rounded-3" style="height: 400px;">
-      
+
       <div class="col-9">
         <div class="button-control mt-2">
           <button type="button" class="btnTradeHistory btn btn-secondary active" id="btn-trade-active">Активные</button>
