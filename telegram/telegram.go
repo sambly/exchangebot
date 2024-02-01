@@ -14,11 +14,12 @@ import (
 )
 
 type Telegram struct {
-	defaultMenu *tele.ReplyMarkup
-	client      *tele.Bot
-	app         *application.Application
-	tlgUser     int64
-	Messages    *notification.Notification
+	defaultMenu        *tele.ReplyMarkup
+	client             *tele.Bot
+	app                *application.Application
+	tlgUser            int64
+	Messages           *notification.Notification
+	notificationEnable bool
 }
 
 func NewTelegram(app *application.Application, tlgToken, tlgUser string, notification *notification.Notification) (*Telegram, error) {
@@ -104,6 +105,12 @@ func (t Telegram) Start() error {
 
 	go func(message chan string) {
 		for mes := range message {
+			if t.notificationEnable {
+				_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, t.defaultMenu)
+				if err != nil {
+					log.MyLogger.ErrorOut(fmt.Errorf("Error send message tlg: %v", err))
+				}
+			}
 			_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, t.defaultMenu)
 			if err != nil {
 				log.MyLogger.ErrorOut(fmt.Errorf("Error send message tlg: %v", err))
