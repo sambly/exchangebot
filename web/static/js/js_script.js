@@ -196,6 +196,8 @@ function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive,
 }
 function forming_orders_active(orders) {
 
+    localStorage.setItem('ordersActive', JSON.stringify(orders));
+
     const tbody = document.querySelector("#tbody-trade-active");
     tbody.innerHTML = '';
     const th = document.querySelectorAll("thead[name=trade-active] th");
@@ -283,6 +285,9 @@ function forming_orders_active(orders) {
 }
 
 function forming_orders_history(orders) {
+
+
+    localStorage.setItem('ordersHistory', JSON.stringify(orders));
 
     const tbody = document.querySelector("#tbody-trade-history");
     tbody.innerHTML = '';
@@ -547,17 +552,14 @@ function chart_frome_orders_update() {
         processData: false,
         success: function (response) {
 
-
             let dataFull = response;
             let candles = [];
             for (let item of dataFull) {
                 candles.push({ time: item['Time'], open: item['Open'],high: item['High'],low: item['Low'],close: item['Close'] })
             }
-
            
-            let chart_div = document.getElementById('chart-orders');
-            chart_div.innerHTML = '';
-
+            let container_chart = document.getElementById('chart-orders');
+            container_chart.innerHTML = '';
 
             const chartOptions = {
                 height: 468,
@@ -579,9 +581,60 @@ function chart_frome_orders_update() {
                 secondsVisible: false
                 },
                 };
-                const chart = LightweightCharts.createChart(chart_div,chartOptions);
-                const lineSeries = chart.addLineSeries({priceFormat: {type: 'price',precision: 3,minMove: 0.001}});
-                lineSeries.setData(candles);
+
+            const chart = LightweightCharts.createChart(container_chart,chartOptions);
+            const candleSeries = chart.addCandlestickSeries();
+            candleSeries.setData(candles);
+
+            // Отображение легенды
+            var toolTipMargin = 10;
+            var priceScaleWidth = 50;
+            var toolTip = document.createElement('div');
+            toolTip.className = 'three-line-legend';
+            container_chart.appendChild(toolTip);
+            toolTip.style.display = 'block';
+            toolTip.style.left = 3 + 'px';
+            toolTip.style.top = 3 + 'px';
+
+
+            
+            function setLastBarText() {
+                if (candles !=undefined && candles != ''){
+                    console.log("Мы сюда зашли");
+                    var dateStr = new Date(candles[candles.length - 1].time*1000).getFullYear() + ' - ' + (new Date(candles[candles.length - 1].time*1000).getMonth()+1) + ' - ' + 	new Date(candles[candles.length - 1].time*1000).getDate();
+                    toolTip.innerHTML =	'<div style="font-size: 24px; margin: 4px 0px; color: #20262E">' + pair.value + '</div>';
+                }
+
+            }
+            setLastBarText();
+
+
+
+            // Отображение ордеров на графике
+            let markers_chart = []; 
+            let ordersActive = JSON.parse(localStorage.getItem('ordersActive')) || [];
+
+            for (let order of ordersActive) {
+
+                if (order.Pair === pair.value) {
+                    if (order.Side=='BUY'){
+                        markers_chart.push({ time:order.TimeCreated , position: 'belowBar', color: '#00ff00', shape: 'arrowUp', text: 'Buy @ '});
+                    }
+                    if (order.Side=='SELL'){
+                        markers_chart.push({ time: order.Time, position: 'aboveBar', color: '#e91e63', shape: 'arrowDown', text: 'Sell @ '}); 
+                    }    
+                } 
+            }
+            candleSeries.setMarkers(markers_chart);
+
+
+
+            //console.log(ordersActive);
+
+
+
+
+
 
 
 
@@ -597,8 +650,6 @@ function chart_frome_orders_update() {
 
 
 }
-
-
 
 
 function forming_tickers_list() {
