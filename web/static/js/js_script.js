@@ -1,15 +1,16 @@
 
-// import {sayHi} from './charts.js';
+import {sayHi} from './charts.js';
 
 
 
 $(function () {
 
 
+
+
     console.log("$(function () {");
 
-    // alert(sayHi); // function...
-    // sayHi('John'); // Hello, John!
+
     //#############################################################################  webSocket #############################################################################
 
     var socket = new WebSocket("ws://localhost:80/ws");
@@ -166,10 +167,7 @@ $(function () {
 });
 
 
-function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive, ordersHistory) {
-
-
-    console.log("forming_page");
+export function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive, ordersHistory) {
 
     show_price_panel();
     show_panel_trade_active();
@@ -177,7 +175,7 @@ function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive,
     // Select pairs
     let selectPairs = document.querySelector('#pairs');
     let selectPairsList = document.querySelector('#pairslistOptions');
-    for (index in pairs) {
+    for (let index in pairs) {
         let option = new Option(pairs[index], pairs[index]);
         selectPairsList.prepend(option)
     }
