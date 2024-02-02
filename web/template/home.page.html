@@ -45,7 +45,8 @@
 
               <div class="collapse" id="group-btn-frame">
                 <div class="btn-group" role="group">
-                  <button type="button" class="btnFrame btn btn-secondary active  btn-sm">5m</button>
+                  <button type="button" class="btnFrame btn btn-secondary active  btn-sm">1m</button>
+                  <button type="button" class="btnFrame btn btn-secondary  btn-sm">5m</button>
                   <button type="button" class="btnFrame btn btn-secondary  btn-sm">30m </button>
                   <button type="button" class="btnFrame btn btn-secondary  btn-sm">1h </button>
                   <button type="button" class="btnFrame btn btn-secondary  btn-sm">4h </button>
@@ -186,6 +187,7 @@
         <div id="smart-trade" style="height: 500px;">
           <div class="d-flex gap-1 px-2 pt-2 justify-content-end">
             <div class="btn-group " role="group">
+              <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">1m</button>
               <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">5m</button>
               <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">30m </button>
               <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">1h </button>
@@ -301,6 +303,16 @@
 
 
 </div>
+
+
+<!-- <script type = "module" src="/static/js/js_script.js">
+    forming_page({{ .Pairs }}, {{ .MarketsStat }}, {{ .ChangePrices }}, {{ .DeltaFast }}, {{ .OrdersActive }}, {{ .OrdersHistory }}); 
+</script> -->
+
+
+
+<!-- <script type = "module" src="/static/js/charts.js"></script>
+<script type = "module" src="/static/js/js_script.js"></script> -->
 
 <script>
   forming_page({{ .Pairs }}, {{ .MarketsStat }}, {{ .ChangePrices }}, {{ .DeltaFast }}, {{ .OrdersActive }}, {{ .OrdersHistory }}); 

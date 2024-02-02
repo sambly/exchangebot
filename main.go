@@ -57,6 +57,8 @@ func main() {
 
 	//pairs := []string{"MBOXUSDT", "AUDIOUSDT", "PROMUSDT", "AIUSDT", "LDOUSDT", "ETCUSDT", "QNTUSDT"}
 
+	// TODO добавить сюда еще периоды PeriodsDelta:   []string{"1m", "5m", "30m", "1h", "4h", "1d"},
+
 	settings := model.Settings{
 		Pairs:          pairs,
 		Timeframe:      "1m",

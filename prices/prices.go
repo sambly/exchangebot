@@ -6,6 +6,7 @@ import (
 	"main/model"
 	"main/notification"
 	"slices"
+	"time"
 )
 
 type AsetsPrices struct {
@@ -29,7 +30,8 @@ type ChangeData struct {
 	ChangePercentVolume float64
 }
 type ChangeDelta struct {
-	Time        int64
+	//Time        int64
+	Time        time.Time
 	Volume      float64
 	VolumeBuy   float64
 	VolumeAsk   float64
@@ -69,7 +71,7 @@ func NewAssetsPrices(pairs, periods []string, weightProcents map[string]float64,
 	asetsPrices := &AsetsPrices{
 		Pairs:          pairs,
 		Periods:        periods,
-		PeriodsDelta:   []string{"5m", "30m", "1h", "4h", "1d"},
+		PeriodsDelta:   []string{"1m", "5m", "30m", "1h", "4h", "1d"},
 		WeightProcents: weightProcents,
 		MarketsStat:    make(map[string]*model.MarketsStat),
 		ChangePrices:   make(map[string]map[string]*ChangeData),
@@ -183,7 +185,8 @@ func (ap *AsetsPrices) UpdateDelta() error {
 				frameCope.TradesBuy += candle.AmountTradeBuy
 				frameCope.TradesAsk += candle.AmountTradeAsk
 				frameCope.MinuteCount += 1
-				frameCope.Time = candle.Time.Unix()
+				//frameCope.Time = candle.Time.Unix()
+				frameCope.Time = candle.Time
 
 				// for candles
 				if frameCope.Open == 0 {
@@ -202,6 +205,10 @@ func (ap *AsetsPrices) UpdateDelta() error {
 
 				frame[pair][key] = frameCope
 
+			}
+			if frame[pair]["1m"].MinuteCount == 1 {
+				ap.ChangeDelta[pair]["1m"] = append(ap.ChangeDelta[pair]["1m"], frame[pair]["1m"])
+				frame[pair]["1m"] = ChangeDelta{}
 			}
 
 			if frame[pair]["5m"].MinuteCount == 5 {

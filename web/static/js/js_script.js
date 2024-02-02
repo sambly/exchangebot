@@ -1,6 +1,15 @@
+
+// import {sayHi} from './charts.js';
+
+
+
 $(function () {
 
 
+    console.log("$(function () {");
+
+    // alert(sayHi); // function...
+    // sayHi('John'); // Hello, John!
     //#############################################################################  webSocket #############################################################################
 
     var socket = new WebSocket("ws://localhost:80/ws");
@@ -158,6 +167,9 @@ $(function () {
 
 
 function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive, ordersHistory) {
+
+
+    console.log("forming_page");
 
     show_price_panel();
     show_panel_trade_active();
@@ -480,7 +492,7 @@ function chart_volume_update() {
             let dataFull = response;
             let dataVolume = [];
             for (let item of dataFull) {
-                dataVolume.push({ time: item['Time'], value: item[checboxType] })
+                dataVolume.push({ time: +new Date(item['Time']) / 1000, value: item[checboxType] })
             }
 
             const chartOptions = {
@@ -526,14 +538,6 @@ function chart_frome_orders_update() {
     let pair = document.querySelector('#pairs');
     let frames = document.querySelectorAll('.btnFrame');
     let frame;
-    let checboxType
-
-    let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
-    checkboxes.forEach((checkbox, index) => {
-        if (checkbox.checked) {
-            checboxType = checkbox.value
-        }
-    })
 
     for (let f of frames) {
         if (f.classList.contains('active')) {
@@ -554,15 +558,22 @@ function chart_frome_orders_update() {
 
             let dataFull = response;
             let candles = [];
+
             for (let item of dataFull) {
-                candles.push({ time: item['Time'], open: item['Open'],high: item['High'],low: item['Low'],close: item['Close'] })
+                candles.push({ time: +new Date(item['Time']) / 1000, open: item['Open'],high: item['High'],low: item['Low'],close: item['Close'] })
             }
-           
+
             let container_chart = document.getElementById('chart-orders');
             container_chart.innerHTML = '';
 
+            container_chart.style.position = 'relative';
+
+            var chartWidth = container_chart.clientWidth;
+            var chartHeight = 468;
+
             const chartOptions = {
-                height: 468,
+                height: chartHeight,
+
                 autosize:true,
                 layout: {
                 backgroundColor: '#ffffff',
@@ -587,27 +598,13 @@ function chart_frome_orders_update() {
             candleSeries.setData(candles);
 
             // Отображение легенды
-            var toolTipMargin = 10;
-            var priceScaleWidth = 50;
             var toolTip = document.createElement('div');
             toolTip.className = 'three-line-legend';
             container_chart.appendChild(toolTip);
             toolTip.style.display = 'block';
             toolTip.style.left = 3 + 'px';
             toolTip.style.top = 3 + 'px';
-
-
-            
-            function setLastBarText() {
-                if (candles !=undefined && candles != ''){
-                    console.log("Мы сюда зашли");
-                    var dateStr = new Date(candles[candles.length - 1].time*1000).getFullYear() + ' - ' + (new Date(candles[candles.length - 1].time*1000).getMonth()+1) + ' - ' + 	new Date(candles[candles.length - 1].time*1000).getDate();
-                    toolTip.innerHTML =	'<div style="font-size: 24px; margin: 4px 0px; color: #20262E">' + pair.value + '</div>';
-                }
-
-            }
-            setLastBarText();
-
+            toolTip.innerHTML = '<div style="font-size: 24px; margin: 4px 0px; color: #20262E">' + pair.value + '</div>';
 
 
             // Отображение ордеров на графике
@@ -617,27 +614,19 @@ function chart_frome_orders_update() {
             for (let order of ordersActive) {
 
                 if (order.Pair === pair.value) {
+                    let timeCreated = +new Date(order.TimeCreated) / 1000 ;
+                    let timeFinished = +new Date(order.Time) / 1000 ;
+
                     if (order.Side=='BUY'){
-                        markers_chart.push({ time:order.TimeCreated , position: 'belowBar', color: '#00ff00', shape: 'arrowUp', text: 'Buy @ '});
+                        markers_chart.push({ time:timeCreated , position: 'belowBar', color: '#00ff00', shape: 'arrowUp', text: 'Buy @ '});
                     }
                     if (order.Side=='SELL'){
-                        markers_chart.push({ time: order.Time, position: 'aboveBar', color: '#e91e63', shape: 'arrowDown', text: 'Sell @ '}); 
+                        markers_chart.push({ time: timeFinished, position: 'aboveBar', color: '#e91e63', shape: 'arrowDown', text: 'Sell @ '}); 
                     }    
                 } 
             }
+
             candleSeries.setMarkers(markers_chart);
-
-
-
-            //console.log(ordersActive);
-
-
-
-
-
-
-
-
 
         },
         error: function (response) {
@@ -742,7 +731,7 @@ function forming_tickers_list() {
 
 }
 
-function forming_tickers_list_volume(frame = '5m') {
+function forming_tickers_list_volume(frame = '1m') {
 
     const tbody = document.querySelector("#tbody-delta");
     tbody.innerHTML = '';
