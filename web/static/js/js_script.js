@@ -515,71 +515,79 @@ function chart_volume_update() {
 function chart_frome_orders_update(chartType) {
 
     let pair = document.querySelector('#pairs');
-    let frames = document.querySelectorAll('.btnFrame');
-    let frame;
+    //let frames = document.querySelectorAll('.btnFrame');
+    // let frame;
+    // for (let f of frames) {
+    //     if (f.classList.contains('active')) {
+    //         frame = f;
+    //     }
+    // }
+  
 
-    for (let f of frames) {
-        if (f.classList.contains('active')) {
-            frame = f;
-        }
+    let container_chart = document.getElementById('chart-orders');
+    let chartWidth = container_chart.clientWidth;
+    let chartHeight = 468;
+    const chartOptions = {
+        height: chartHeight,
+        width : chartWidth,
+        autosize:true,
+        layout: {
+        backgroundColor: '#ffffff',
+        textColor: 'rgba(33, 56, 77, 1)',
+        },
+        grid: {
+        vertLines: {
+        color: 'rgba(197, 203, 206, 0.7)',
+        },
+        horzLines: {
+        color: 'rgba(197, 203, 206, 0.7)',
+        },
+        },
+        timeScale: {
+        timeVisible: true,
+        secondsVisible: false
+        },
+    };
+    let orders;
+    if (chartType==='Active'){
+        orders = JSON.parse(localStorage.getItem('ordersActive')) || [];
+    }
+    if (chartType==='History'){
+        orders = JSON.parse(localStorage.getItem('ordersHistory')) || [];
+    }
+    
+    
+
+    function update_cadles(pair,frame){
+        // console.log("INs");
+        //let request = { Pair: pair.value, Frame: frame.innerText };
+        let request = { Pair: pair, Frame: frame };
+        // console.log(request);
+        let candles = [];
+        $.ajax({
+            url: '/getChangeDelta',
+            type: 'POST',
+            method: 'POST',
+            data: JSON.stringify(request),
+            cache: false,
+            contentType: 'application/json; charset=utf-8',
+            processData: false,
+            success: function (data) {
+                // console.log(data);
+                for (let item of data) {
+                    candles.push({ time: +new Date(item['Time']) / 1000, open: item['Open'],high: item['High'],low: item['Low'],close: item['Close'] })
+                }
+            },
+            error: function (response) {
+            },
+        });
+        return candles
+
     }
 
-    let request = { Pair: pair.value, Frame: frame.innerText };
-    $.ajax({
-        url: '/getChangeDelta',
-        type: 'POST',
-        method: 'POST',
-        data: JSON.stringify(request),
-        cache: false,
-        contentType: 'application/json; charset=utf-8',
-        processData: false,
-        success: function (dataFull) {
 
-            let candles = [];
-            for (let item of dataFull) {
-                candles.push({ time: +new Date(item['Time']) / 1000, open: item['Open'],high: item['High'],low: item['Low'],close: item['Close'] })
-            }
-
-            let container_chart = document.getElementById('chart-orders');
-            let chartWidth = container_chart.clientWidth;
-            let chartHeight = 468;
-            const chartOptions = {
-                height: chartHeight,
-                width : chartWidth,
-                autosize:true,
-                layout: {
-                backgroundColor: '#ffffff',
-                textColor: 'rgba(33, 56, 77, 1)',
-                },
-                grid: {
-                vertLines: {
-                color: 'rgba(197, 203, 206, 0.7)',
-                },
-                horzLines: {
-                color: 'rgba(197, 203, 206, 0.7)',
-                },
-                },
-                timeScale: {
-                timeVisible: true,
-                secondsVisible: false
-                },
-            };
-            let orders;
-            if (chartType==='Active'){
-                orders = JSON.parse(localStorage.getItem('ordersActive')) || [];
-            }
-            if (chartType==='History'){
-                console.log("HISSSSSS");
-                orders = JSON.parse(localStorage.getItem('ordersHistory')) || [];
-            }
-            console.log(orders);
-            lw_charts(container_chart,chartOptions,candles,pair,orders)
-
-        },
-        error: function (response) {
-        },
-    });
-
+    // let fcandles = update_cadles;
+    lw_charts(container_chart,chartOptions,pair,orders,update_cadles);     
 
 
 

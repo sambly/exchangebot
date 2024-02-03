@@ -1,26 +1,57 @@
 
 
-  export function lw_charts(container_chart,chartOptions,data,pair,orders){
-
+  export function lw_charts(container_chart,chartOptions,pair,orders,update_cadles){
 
     container_chart.innerHTML = '';
-    container_chart.style.position = 'relative';
+    //container_chart.style.position = 'relative';
 
+
+    var intervals = ['1m', '5m', '15m', '30m','1h','4h','1d'];
+   // var switcherElement = createSimpleSwitcher(intervals, intervals[0], syncToInterval);
 
     const chart = LightweightCharts.createChart(container_chart,chartOptions);
-    const candleSeries = chart.addCandlestickSeries();
-    candleSeries.setData(data);
+   // container_chart.appendChild(switcherElement);
+    
+
+   var candleSeries = chart.addCandlestickSeries();
+
+   var candles = update_cadles(pair.value,'1m');
+   console.log(candles);
+   candleSeries.setData(candles);
+
+
+    // var candleSeries = null;
+
+    // function syncToInterval(interval) {
+
+
+    //   if (candleSeries) {
+    //     chart.removeSeries(candleSeries);
+    //     candleSeries = null;
+    //   }
+
+
+    //   candleSeries = chart.addCandlestickSeries();
+
+    //   var candles = update_cadles(pair.value,interval);
+    //   console.log(candles);
+    //   candleSeries.setData(candles);
+
+    // }
+
+  
+    // syncToInterval(intervals[0]);
+
 
 
     // Отображение легенды
-    var toolTip = document.createElement('div');
-    toolTip.className = 'three-line-legend';
-    container_chart.appendChild(toolTip);
-    toolTip.style.display = 'block';
-    toolTip.style.left = 3 + 'px';
-    toolTip.style.top = 3 + 'px';
-    toolTip.innerHTML = '<div style="font-size: 24px; margin: 4px 0px; color: #20262E">' + pair.value + '</div>';
-
+    // var toolTip = document.createElement('div');
+    // toolTip.className = 'three-line-legend';
+    // container_chart.appendChild(toolTip);
+    // toolTip.style.display = 'block';
+    // toolTip.style.left = 3 + 'px';
+    // toolTip.style.top = 3 + 'px';
+    // toolTip.innerHTML = '<div style="font-size: 24px; margin: 4px 0px; color: #20262E">' + pair.value + '</div>';
 
 
     // Отображение ордеров на графике
@@ -42,6 +73,10 @@
   }
 
   candleSeries.setMarkers(markers_chart);
+
+
+
+
 
   }
 
@@ -67,4 +102,39 @@
           "container_id": "tradingview_3418f"
       }
   );
+  }
+
+
+
+  function createSimpleSwitcher(items, activeItem, activeItemChangedCallback) {
+    var switcherElement = document.createElement('div');
+    switcherElement.classList.add('switcher');
+  
+    var intervalElements = items.map(function(item) {
+      var itemEl = document.createElement('button');
+      itemEl.innerText = item;
+      itemEl.classList.add('switcher-item');
+      itemEl.classList.toggle('switcher-active-item', item === activeItem);
+      itemEl.addEventListener('click', function() {
+        onItemClicked(item);
+      });
+      switcherElement.appendChild(itemEl);
+      return itemEl;
+    });
+  
+    function onItemClicked(item) {
+      if (item === activeItem) {
+        return;
+      }
+  
+      intervalElements.forEach(function(element, index) {
+        element.classList.toggle('switcher-active-item', items[index] === item);
+      });
+  
+      activeItem = item;
+  
+      activeItemChangedCallback(item);
+    }
+  
+    return switcherElement;
   }
