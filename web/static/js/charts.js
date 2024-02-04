@@ -3,81 +3,60 @@
   export function lw_charts(container_chart,chartOptions,pair,orders,update_cadles){
 
     container_chart.innerHTML = '';
-    //container_chart.style.position = 'relative';
+    container_chart.style.position = 'relative';
 
-
-    var intervals = ['1m', '5m', '15m', '30m','1h','4h','1d'];
-   // var switcherElement = createSimpleSwitcher(intervals, intervals[0], syncToInterval);
+    let intervals = ['1m', '5m', '15m', '30m','1h','4h','1d'];
+    const switcherElement = createSimpleSwitcher(intervals, intervals[0], syncToInterval);
 
     const chart = LightweightCharts.createChart(container_chart,chartOptions);
-   // container_chart.appendChild(switcherElement);
-    
-
-   var candleSeries = chart.addCandlestickSeries();
-
-   var candles = update_cadles(pair.value,'1m');
-   console.log(candles);
-   candleSeries.setData(candles);
-
-
-    // var candleSeries = null;
-
-    // function syncToInterval(interval) {
-
-
-    //   if (candleSeries) {
-    //     chart.removeSeries(candleSeries);
-    //     candleSeries = null;
-    //   }
-
-
-    //   candleSeries = chart.addCandlestickSeries();
-
-    //   var candles = update_cadles(pair.value,interval);
-    //   console.log(candles);
-    //   candleSeries.setData(candles);
-
-    // }
-
-  
-    // syncToInterval(intervals[0]);
-
-
+    container_chart.appendChild(switcherElement);
 
     // Отображение легенды
-    // var toolTip = document.createElement('div');
-    // toolTip.className = 'three-line-legend';
-    // container_chart.appendChild(toolTip);
-    // toolTip.style.display = 'block';
-    // toolTip.style.left = 3 + 'px';
-    // toolTip.style.top = 3 + 'px';
-    // toolTip.innerHTML = '<div style="font-size: 24px; margin: 4px 0px; color: #20262E">' + pair.value + '</div>';
+    const toolTip = document.createElement('div');
+    toolTip.className = 'three-line-legend';
+    container_chart.appendChild(toolTip);
+    toolTip.style.display = 'block';
+    toolTip.style.left = 3 + 'px';
+    toolTip.style.top = 3 + 'px';
+    toolTip.innerHTML = '<div style="font-size: 24px; margin: 4px 0px; color: #20262E">' + pair.value + '</div>';
+    
+    var candleSeries = null;
+
+    function syncToInterval(interval) {
+      if (candleSeries) {
+        chart.removeSeries(candleSeries);
+        candleSeries = null;
+      }
+
+      candleSeries = chart.addCandlestickSeries();
+
+      let candles = update_cadles(pair.value,interval);
+      candleSeries.setData(candles);
+
+      // Отображение ордеров на графике
+      let markers_chart = []; 
+
+      for (let order of orders) {
+
+        if (order.Pair === pair.value) {
+            let timeCreated = +new Date(order.TimeCreated) / 1000 ;
+            let timeFinished = +new Date(order.Time) / 1000 ;
+
+            if (order.Side=='BUY'){
+                markers_chart.push({ time:timeCreated , position: 'belowBar', color: '#00ff00', shape: 'arrowUp', text: 'Buy @ '});
+            }
+            if (order.Side=='SELL'){
+                markers_chart.push({ time: timeFinished, position: 'aboveBar', color: '#e91e63', shape: 'arrowDown', text: 'Sell @ '}); 
+            }    
+        } 
+    }
+
+    candleSeries.setMarkers(markers_chart);
 
 
-    // Отображение ордеров на графике
-    let markers_chart = []; 
+    }
 
-    for (let order of orders) {
-
-      if (order.Pair === pair.value) {
-          let timeCreated = +new Date(order.TimeCreated) / 1000 ;
-          let timeFinished = +new Date(order.Time) / 1000 ;
-
-          if (order.Side=='BUY'){
-              markers_chart.push({ time:timeCreated , position: 'belowBar', color: '#00ff00', shape: 'arrowUp', text: 'Buy @ '});
-          }
-          if (order.Side=='SELL'){
-              markers_chart.push({ time: timeFinished, position: 'aboveBar', color: '#e91e63', shape: 'arrowDown', text: 'Sell @ '}); 
-          }    
-      } 
-  }
-
-  candleSeries.setMarkers(markers_chart);
-
-
-
-
-
+    syncToInterval(intervals[0]);
   }
 
 

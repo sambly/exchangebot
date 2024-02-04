@@ -559,13 +559,12 @@ function chart_frome_orders_update(chartType) {
     
 
     function update_cadles(pair,frame){
-        // console.log("INs");
-        //let request = { Pair: pair.value, Frame: frame.innerText };
+
         let request = { Pair: pair, Frame: frame };
-        // console.log(request);
         let candles = [];
         $.ajax({
             url: '/getChangeDelta',
+            async:false,
             type: 'POST',
             method: 'POST',
             data: JSON.stringify(request),
@@ -573,7 +572,6 @@ function chart_frome_orders_update(chartType) {
             contentType: 'application/json; charset=utf-8',
             processData: false,
             success: function (data) {
-                // console.log(data);
                 for (let item of data) {
                     candles.push({ time: +new Date(item['Time']) / 1000, open: item['Open'],high: item['High'],low: item['Low'],close: item['Close'] })
                 }
@@ -585,13 +583,7 @@ function chart_frome_orders_update(chartType) {
 
     }
 
-
-    // let fcandles = update_cadles;
     lw_charts(container_chart,chartOptions,pair,orders,update_cadles);     
-
-
-
-
 
 }
 
