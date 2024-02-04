@@ -161,6 +161,13 @@ $(function () {
 
 export function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive, ordersHistory) {
 
+
+
+
+    // TODO  нужно как то очисить ордера они оставались , если делать полную очистку то теряются избранные файлы
+   // localStorage.clear();
+
+  
     show_price_panel();
     show_panel_trade_active();
 
@@ -515,14 +522,6 @@ function chart_volume_update() {
 function chart_frome_orders_update(chartType) {
 
     let pair = document.querySelector('#pairs');
-    //let frames = document.querySelectorAll('.btnFrame');
-    // let frame;
-    // for (let f of frames) {
-    //     if (f.classList.contains('active')) {
-    //         frame = f;
-    //     }
-    // }
-  
 
     let container_chart = document.getElementById('chart-orders');
     let chartWidth = container_chart.clientWidth;
@@ -557,8 +556,7 @@ function chart_frome_orders_update(chartType) {
     }
     
     
-
-    function update_cadles(pair,frame){
+    function update_candles(pair,frame){
 
         let request = { Pair: pair, Frame: frame };
         let candles = [];
@@ -583,7 +581,7 @@ function chart_frome_orders_update(chartType) {
 
     }
 
-    lw_charts(container_chart,chartOptions,pair,orders,update_cadles);     
+    lw_charts(container_chart,chartOptions,pair,orders,update_candles);     
 
 }
 

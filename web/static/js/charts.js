@@ -43,10 +43,20 @@
             let timeFinished = +new Date(order.Time) / 1000 ;
 
             if (order.Side=='BUY'){
-                markers_chart.push({ time:timeCreated , position: 'belowBar', color: '#00ff00', shape: 'arrowUp', text: 'Buy @ '});
+              if (order.Status!='Close'){
+                markers_chart.push({ time:timeCreated , position: 'belowBar', color: '#00ff00', shape: 'arrowUp', text: `long ${order.ID}`});
+              } else {
+                markers_chart.push({ time:timeCreated , position: 'belowBar', color: '#00ff00', shape: 'arrowUp', text: `long ${order.ID}`});
+                markers_chart.push({ time: timeFinished, position: 'aboveBar', color: '#e91e63', shape: 'arrowDown', text: `long ${order.ID}`});
+              }
             }
             if (order.Side=='SELL'){
-                markers_chart.push({ time: timeFinished, position: 'aboveBar', color: '#e91e63', shape: 'arrowDown', text: 'Sell @ '}); 
+              if (order.Status!='Close'){
+                markers_chart.push({ time:timeCreated , position: 'belowBar', color: '#00ff00', shape: 'arrowDown', text: `short ${order.ID}`});
+              } else {
+                markers_chart.push({ time:timeCreated , position: 'belowBar', color: '#00ff00', shape: 'arrowDown', text: `short ${order.ID}`});
+                markers_chart.push({ time: timeFinished, position: 'aboveBar', color: '#e91e63', shape: 'arrowUp', text: `short ${order.ID}`});
+              }
             }    
         } 
     }
