@@ -160,13 +160,6 @@ $(function () {
 
 
 export function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive, ordersHistory) {
-
-
-
-
-    // TODO  нужно как то очисить ордера они оставались , если делать полную очистку то теряются избранные файлы
-   // localStorage.clear();
-
   
     show_price_panel();
     show_panel_trade_active();
@@ -223,6 +216,7 @@ function forming_orders_active(orders) {
         row.className = "order-active";
         row.setAttribute("value", order.ID);
 
+        console.log(order);
 
         // 1 Col Side
         let cell = row.insertCell();
@@ -232,16 +226,20 @@ function forming_orders_active(orders) {
         cell = row.insertCell();
         cell.innerHTML = order.Pair;
         cell.setAttribute("name", "order-a-pair");
-        // 3 Col -
+        // 3 Col Price
+        cell = row.insertCell();
+        cell.innerHTML = order.PriceCreated;
+        cell.setAttribute("name", "order-a-price");
+        // 4 Col Profit
         cell = row.insertCell();
         cell.innerHTML = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
         cell.style.color = color_text_profit(order.Profit)
         cell.setAttribute("name", "order-a-profit");
-        // 4 Col TimeCreated
+        // 5 Col TimeCreated
         cell = row.insertCell();
         cell.innerHTML = new Date(order.TimeCreated).toLocaleString("en-GB");
         cell.setAttribute("name", "order-a-timeCreat");
-        // 5 Col - закрыть позицию 
+        // 6 Col - закрыть позицию 
         cell = row.insertCell();
         let btnCl = document.createElement('button');
         btnCl.setAttribute("type", 'button');
@@ -312,7 +310,7 @@ function forming_orders_history(orders) {
     for (let order of orders) {
 
         let row = tbody.insertRow(-1);
-        row.className = "order-history";
+        row.className = "order-history d-flex align-items-center";
         row.setAttribute("value", order.ID);
 
         // 1 Col Side
@@ -323,12 +321,13 @@ function forming_orders_history(orders) {
         cell = row.insertCell();
         cell.innerHTML = order.Pair;
         cell.setAttribute("name", "order-h-pair");
-        // 3 Col -
+        // 3 Col - Price
         cell = row.insertCell();
-        cell.innerHTML = "";
+        cell.innerHTML = `${order.PriceCreated} <br> ${order.Price}`;
+        cell.setAttribute("name", "order-h-pair");
         // 4 Col TimeCreated
         cell = row.insertCell();
-        cell.innerHTML = new Date(order.Time).toLocaleString("en-GB");
+        cell.innerHTML =    `${new Date(order.TimeCreated).toLocaleString("en-GB")} <br> ${new Date(order.Time).toLocaleString("en-GB")}`;
         cell.setAttribute("name", "order-h-timeCreat");
         // 5 Col - профит 
         cell = row.insertCell();
