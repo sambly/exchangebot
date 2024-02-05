@@ -105,15 +105,12 @@ func (t Telegram) Start() error {
 
 	go func(message chan string) {
 		for mes := range message {
+			// Бит разрешения отправки уведомлений
 			if t.notificationEnable {
 				_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, t.defaultMenu)
 				if err != nil {
-					log.MyLogger.ErrorOut(fmt.Errorf("Error send message tlg: %v", err))
+					log.MyLogger.ErrorOut(fmt.Errorf("error send message tlg: %v", err))
 				}
-			}
-			_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, t.defaultMenu)
-			if err != nil {
-				log.MyLogger.ErrorOut(fmt.Errorf("Error send message tlg: %v", err))
 			}
 		}
 	}(t.Messages.Message)
@@ -197,7 +194,7 @@ func (t Telegram) getPeriods(period string) []string {
 func (t Telegram) getAssets() []string {
 	err := t.app.Account.UpdateAssets()
 	if err != nil {
-		fmt.Println(err)
+		log.MyLogger.ErrorOut(fmt.Errorf("error tlg getAssets: %v", err))
 	}
 	marketStat := t.app.AssetsPrices.MarketsStat
 	var out []string

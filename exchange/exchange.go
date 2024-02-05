@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"main/log"
 	"main/model"
 	"main/service"
 	"sync"
@@ -91,6 +92,7 @@ func (d *DataFeedSubscription) Start(loadSync bool) {
 					}
 				case err := <-feed.Err:
 					if err != nil {
+						log.MyLogger.ErrorOut(fmt.Errorf("error MarketsStatFeed : %v", err))
 						fmt.Println(err)
 					}
 				}
