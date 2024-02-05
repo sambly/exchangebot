@@ -280,3 +280,25 @@ func ClosePosition(db *sql.DB, order *model.Order, id int64) error {
 	return nil
 
 }
+
+func CreateOrdersInfoTable(db *sql.DB) error {
+
+	query := `CREATE TABLE IF NOT EXISTS orders_info(
+		ID int primary key auto_increment,
+		idOrder int,
+		marketsStat json,
+		changePrices json
+		)`
+
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelfunc()
+	res, err := db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("error %s when creating orders_info", err)
+	}
+	_, err = res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error %s when getting rows affected", err)
+	}
+	return nil
+}

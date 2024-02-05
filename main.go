@@ -78,6 +78,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	err = database.CreateOrdersInfoTable(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	notify := &notification.Notification{Message: make(chan string)}
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
