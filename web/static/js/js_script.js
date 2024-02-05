@@ -96,6 +96,7 @@ $(function () {
 
     $('#btn-update-data').click(function (e) {
         e.preventDefault();
+        e.target.disabled = true;
         $.ajax({
             url: '/updatefull',
             type: 'POST',
@@ -111,6 +112,7 @@ $(function () {
                 );
                 $("#toastMessage").text("Данные загружены");
                 $(".toast").toast("show");
+                e.target.disabled = false;
             },
             error: function (response) {
             },
