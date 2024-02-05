@@ -1,4 +1,4 @@
-
+import {timeToLocal} from './help.js';
 
   export function lw_charts(container_chart,chartOptions,pair,orders,update_cadles){
 
@@ -39,8 +39,12 @@
       for (let order of orders) {
 
         if (order.Pair === pair.value) {
-            let timeCreated = +new Date(order.TimeCreated) / 1000 ;
-            let timeFinished = +new Date(order.Time) / 1000 ;
+
+            let timeCreated =timeToLocal(new Date(order.TimeCreated) / 1000);
+            let timeFinished = timeToLocal(new Date(order.Time) / 1000) ;
+
+            console.log(timeCreated);
+
 
             if (order.Side=='BUY'){
               if (order.Status!='Close'){

@@ -214,7 +214,11 @@ tbody td {
   }
 }
 
-@media (min-width: 1400px) {}
+@media (min-width: 1400px) {
+  * {
+    font-size: medium !important;
+  }
+}
 
 
 

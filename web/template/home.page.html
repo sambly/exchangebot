@@ -291,15 +291,6 @@
 
 </div>
 
-
-<!-- <script type = "module" src="/static/js/js_script.js">
-    forming_page({{ .Pairs }}, {{ .MarketsStat }}, {{ .ChangePrices }}, {{ .DeltaFast }}, {{ .OrdersActive }}, {{ .OrdersHistory }}); 
-</script> -->
-
-
-
-<!-- <script type = "module" src="/static/js/charts.js"></script>
-<script type = "module" src="/static/js/js_script.js"></script> -->
 <script type="module">
   import {forming_page} from '/static/js/js_script.js';
   forming_page({{ .Pairs }}, {{ .MarketsStat }}, {{ .ChangePrices }}, {{ .DeltaFast }}, {{ .OrdersActive }}, {{ .OrdersHistory }}); 

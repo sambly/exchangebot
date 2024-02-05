@@ -1,6 +1,6 @@
 
-import {lw_charts,widget_charts} from './charts.js';
-
+import { lw_charts, widget_charts } from './charts.js';
+import {timeToLocal} from './help.js';
 
 $(function () {
 
@@ -17,7 +17,7 @@ $(function () {
         let order = JSON.parse(e.data);
         let orderRow = document.querySelector('tr.order-active[value="' + order.ID + '"]');
         let profitElement = orderRow.querySelector('td[name="order-a-profit"]');
-    
+
         profitElement.textContent = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
         profitElement.style.color = color_text_profit(order.Profit)
 
@@ -35,7 +35,7 @@ $(function () {
     };
 
     //#############################################################################  webSocket #############################################################################
-  
+
     // Сплывающее уведомление
     $('.toast').toast({ animation: true, autohide: true, delay: 3000 });
     $("#toastMessage").text("");
@@ -160,7 +160,7 @@ $(function () {
 
 
 export function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive, ordersHistory) {
-  
+
     show_price_panel();
     show_panel_trade_active();
 
@@ -174,10 +174,10 @@ export function forming_page(pairs, marketsStat, changePrices, deltaFast, orders
     selectPairs.value = "BTCUSDT";
 
     selectPairs.addEventListener('change', (e) => {
-        change_pair(e.target.value,true);
+        change_pair(e.target.value, true);
     });
 
-    widget_charts(document.getElementById('chart-price'),selectPairs.value)
+    widget_charts(document.getElementById('chart-price'), selectPairs.value)
 
     update_main_data(marketsStat, changePrices, deltaFast);
 
@@ -254,7 +254,7 @@ function forming_orders_active(orders) {
     for (let row of rows) {
         row.addEventListener("click", () => {
             let pair = row.querySelector('[name="order-a-pair"]').innerHTML;
-            change_pair(pair,false);
+            change_pair(pair, false);
             show_chart_orders();
             chart_frome_orders_update('Active');
 
@@ -327,24 +327,24 @@ function forming_orders_history(orders) {
         cell.setAttribute("name", "order-h-pair");
         // 4 Col TimeCreated
         cell = row.insertCell();
-        cell.innerHTML =    `${new Date(order.TimeCreated).toLocaleString("en-GB")} <br> ${new Date(order.Time).toLocaleString("en-GB")}`;
+        cell.innerHTML = `${new Date(order.TimeCreated).toLocaleString("en-GB")} <br> ${new Date(order.Time).toLocaleString("en-GB")}`;
         cell.setAttribute("name", "order-h-timeCreat");
         // 5 Col - профит 
         cell = row.insertCell();
         cell.innerHTML = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
     };
 
-        // выбор определенной пары
-        let rows = tbody.rows;
-        for (let row of rows) {
-            row.addEventListener("click", () => {
-                let pair = row.querySelector('[name="order-h-pair"]').innerHTML;
-                change_pair(pair,false);
-                show_chart_orders();
-                chart_frome_orders_update('History');
-    
-            });
-        };
+    // выбор определенной пары
+    let rows = tbody.rows;
+    for (let row of rows) {
+        row.addEventListener("click", () => {
+            let pair = row.querySelector('[name="order-h-pair"]').innerHTML;
+            change_pair(pair, false);
+            show_chart_orders();
+            chart_frome_orders_update('History');
+
+        });
+    };
 
 }
 
@@ -376,14 +376,14 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
 
 }
 
-function change_pair(pair,fromeSelectPairs = false) {
+function change_pair(pair, fromeSelectPairs = false) {
 
     let update_chart = false
     if (pair !== document.querySelector('#pairs').value) {
         document.querySelector('#pairs').value = pair;
         update_chart = true;
     }
-    update_chart = update_chart || fromeSelectPairs; 
+    update_chart = update_chart || fromeSelectPairs;
 
     if ($('#list-ch-price').css('display') == "block") {
         var rowsPrice = document.querySelector("#tbody-price").rows;
@@ -400,7 +400,7 @@ function change_pair(pair,fromeSelectPairs = false) {
         }
 
         if (update_chart) {
-            widget_charts(document.getElementById('chart-price'),pair)
+            widget_charts(document.getElementById('chart-price'), pair)
         }
 
     }
@@ -527,41 +527,41 @@ function chart_frome_orders_update(chartType) {
     let chartHeight = 468;
     const chartOptions = {
         height: chartHeight,
-        width : chartWidth,
-        autosize:true,
+        width: chartWidth,
+        autosize: true,
         layout: {
-        backgroundColor: '#ffffff',
-        textColor: 'rgba(33, 56, 77, 1)',
+            backgroundColor: '#ffffff',
+            textColor: 'rgba(33, 56, 77, 1)',
         },
         grid: {
-        vertLines: {
-        color: 'rgba(197, 203, 206, 0.7)',
-        },
-        horzLines: {
-        color: 'rgba(197, 203, 206, 0.7)',
-        },
+            vertLines: {
+                color: 'rgba(197, 203, 206, 0.7)',
+            },
+            horzLines: {
+                color: 'rgba(197, 203, 206, 0.7)',
+            },
         },
         timeScale: {
-        timeVisible: true,
-        secondsVisible: false
+            timeVisible: true,
+            secondsVisible: false
         },
     };
     let orders;
-    if (chartType==='Active'){
+    if (chartType === 'Active') {
         orders = JSON.parse(localStorage.getItem('ordersActive')) || [];
     }
-    if (chartType==='History'){
+    if (chartType === 'History') {
         orders = JSON.parse(localStorage.getItem('ordersHistory')) || [];
     }
-    
-    
-    function update_candles(pair,frame){
+
+
+    function update_candles(pair, frame) {
 
         let request = { Pair: pair, Frame: frame };
         let candles = [];
         $.ajax({
             url: '/getChangeDelta',
-            async:false,
+            async: false,
             type: 'POST',
             method: 'POST',
             data: JSON.stringify(request),
@@ -570,7 +570,7 @@ function chart_frome_orders_update(chartType) {
             processData: false,
             success: function (data) {
                 for (let item of data) {
-                    candles.push({ time: +new Date(item['Time']) / 1000, open: item['Open'],high: item['High'],low: item['Low'],close: item['Close'] })
+                    candles.push({ time: timeToLocal(new Date(item['Time']) / 1000), open: item['Open'], high: item['High'], low: item['Low'], close: item['Close'] })
                 }
             },
             error: function (response) {
@@ -580,7 +580,7 @@ function chart_frome_orders_update(chartType) {
 
     }
 
-    lw_charts(container_chart,chartOptions,pair,orders,update_candles);     
+    lw_charts(container_chart, chartOptions, pair, orders, update_candles);
 
 }
 
@@ -810,7 +810,7 @@ function show_price_panel() {
 
     $("#panel-chart-orders").hide();
 
-    
+
 }
 
 function show_volume_panel() {
@@ -843,11 +843,11 @@ function show_panel_trade_history() {
     $("#panel-trade-history").show();
 }
 
-function color_text_profit(number){
-    if (Number(number>=0)){
-       return  'green';
+function color_text_profit(number) {
+    if (Number(number >= 0)) {
+        return 'green';
     } else {
-        return  'red';
+        return 'red';
     }
 }
 
