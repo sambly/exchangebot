@@ -1,5 +1,5 @@
 
-import { lw_charts, widget_charts } from './charts.js';
+import { lw_charts_orders, lw_charts_volume, widget_charts } from './charts.js';
 import { timeToLocal } from './help.js';
 
 $(function () {
@@ -471,56 +471,43 @@ function chart_volume_update() {
         }
     }
 
-    let request = { Pair: pair.value, Frame: frame.innerText };
-    $.ajax({
-        url: '/getChangeDelta',
-        type: 'POST',
-        method: 'POST',
-        data: JSON.stringify(request),
-        cache: false,
-        contentType: 'application/json; charset=utf-8',
-        processData: false,
-        success: function (response) {
-            let dataFull = response;
-            let dataVolume = [];
-            for (let item of dataFull) {
-                dataVolume.push({ time: +new Date(item['Time']) / 1000, value: item[checboxType] })
-            }
+    let container_chart = document.getElementById('chart-volume');
+    let chartWidth = container_chart.clientWidth;
 
-            const chartOptions = {
-                layout: {
-                    textColor: 'black',
-                    background: { type: 'solid', color: 'white' },
-                },
-                height: 468,
-            };
-
-            let chart_div = document.getElementById('chart-volume');
-            chart_div.innerHTML = '';
-
-            const chart = LightweightCharts.createChart(chart_div, chartOptions);
-            chart.applyOptions({
-                rightPriceScale: {
-                    scaleMargins: {
-                        top: 0.1,
-                        bottom: 0.1,
-                    },
-                },
-            });
-
-            const lineSeries = chart.addLineSeries({ color: '#2962FF' });
-            lineSeries.setData(dataVolume);
-            chart.timeScale().fitContent();
-
-
+    const chartOptions = {
+        layout: {
+            textColor: 'black',
+            background: { type: 'solid', color: 'white' },
         },
-        error: function (response) {
-        },
-    });
+        height: 468,
+        width: chartWidth,
+    };
 
+    function update_volume_data(pair, frame, checboxType) {
+        let request = { Pair: pair, Frame: frame};
+        let dataVolume = [];
+        $.ajax({
+            url: '/getChangeDelta',
+            async: false,
+            type: 'POST',
+            method: 'POST',
+            data: JSON.stringify(request),
+            cache: false,
+            contentType: 'application/json; charset=utf-8',
+            processData: false,
+            success: function (data) {
+                for (let item of data) {
+                    dataVolume.push({ time: timeToLocal(new Date(item['Time']) / 1000), value: item[checboxType] })
+                }
+            },
+            error: function (response) {
+            },
+        });
+        return dataVolume
 
+    }
 
-
+    lw_charts_volume(container_chart, chartOptions, pair, frame, checboxType, update_volume_data);
 
 
 }
@@ -528,7 +515,6 @@ function chart_volume_update() {
 function chart_frome_orders_update(chartType) {
 
     let pair = document.querySelector('#pairs');
-
     let container_chart = document.getElementById('chart-orders');
     let chartWidth = container_chart.clientWidth;
     let chartHeight = 468;
@@ -561,7 +547,6 @@ function chart_frome_orders_update(chartType) {
         orders = JSON.parse(localStorage.getItem('ordersHistory')) || [];
     }
 
-
     function update_candles(pair, frame) {
 
         let request = { Pair: pair, Frame: frame };
@@ -587,7 +572,7 @@ function chart_frome_orders_update(chartType) {
 
     }
 
-    lw_charts(container_chart, chartOptions, pair, orders, update_candles);
+    lw_charts_orders(container_chart, chartOptions, pair, orders, update_candles);
 
 }
 

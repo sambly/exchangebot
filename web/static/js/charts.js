@@ -3,9 +3,42 @@ import { timeToLocal } from './help.js';
 
 
 
+export function lw_charts_volume(container_chart, chartOptions, pair, frame,checboxType, update_volume_data) {
+    
+    container_chart.innerHTML = '';
+    container_chart.style.position = 'relative';
+
+    const chart = LightweightCharts.createChart(container_chart, chartOptions);
+    chart.applyOptions({
+        rightPriceScale: {
+            scaleMargins: {
+                top: 0.1,
+                bottom: 0.1,
+            },
+        },
+    });
+
+    const lineSeries = chart.addLineSeries({ color: '#2962FF' });
+    let dataVolume = update_volume_data(pair.value, frame.innerText,checboxType);
+
+    lineSeries.setData(dataVolume);
+    chart.timeScale().fitContent();
+
+    // Отображение легенды
+    const toolTip = document.createElement('div');
+    toolTip.className = 'three-line-legend';
+    container_chart.appendChild(toolTip);
+    toolTip.style.display = 'block';
+    toolTip.style.left = 3 + 'px';
+    toolTip.style.top = 3 + 'px';
+    toolTip.innerHTML = '<div style="font-size: 24px; margin: 4px 0px; color: #20262E">' + pair.value + '</div>';
+    
 
 
-export function lw_charts(container_chart, chartOptions, pair, orders, update_cadles) {
+}
+
+
+export function lw_charts_orders(container_chart, chartOptions, pair, orders, update_cadles) {
 
     container_chart.innerHTML = '';
     container_chart.style.position = 'relative';
