@@ -1,6 +1,6 @@
 
 import { lw_charts, widget_charts } from './charts.js';
-import {timeToLocal} from './help.js';
+import { timeToLocal } from './help.js';
 
 $(function () {
 
@@ -171,16 +171,17 @@ export function forming_page(pairs, marketsStat, changePrices, deltaFast, orders
         let option = new Option(pairs[index], pairs[index]);
         selectPairsList.prepend(option)
     }
-    selectPairs.value = "BTCUSDT";
-
     selectPairs.addEventListener('change', (e) => {
-        change_pair(e.target.value, true);
+        change_pair(e.target.value);
     });
 
-    widget_charts(document.getElementById('chart-price'), selectPairs.value)
+    // выбор текущей пары
+    let currentPair = localStorage.getItem('currentPair') || 'BTCUSDT';
+    localStorage.setItem('currentPair', currentPair);
 
     update_main_data(marketsStat, changePrices, deltaFast);
 
+    // TODO Вот этот блок может перенести от сюда ? 
     // Выбор определенного типа графика
     let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
     checkboxes.forEach((checkbox, index) => {
@@ -198,6 +199,92 @@ export function forming_page(pairs, marketsStat, changePrices, deltaFast, orders
     forming_orders_active(ordersActive);
     forming_orders_history(ordersHistory);
 }
+
+function update_main_data(marketsStat, changePrices, deltaFast) {
+
+    localStorage.setItem('marketsStat', JSON.stringify(marketsStat));
+    localStorage.setItem('changePrices', JSON.stringify(changePrices));
+    localStorage.setItem('deltaFast', JSON.stringify(deltaFast));
+
+    let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
+    localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
+
+    forming_tickers_list();
+    forming_tickers_list_volume();
+
+    change_pair(document.querySelector('#pairs').value);
+
+
+    // Загаловки 24ch  Volume
+    let selectPairs = document.querySelector('#pairs');
+    let ch24Top = document.querySelector('#ch24-top');
+    ch24Top.innerHTML = (marketsStat[selectPairs.value].Ch24).toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' }) + '%';
+    let VolumeTop = document.querySelector('#volume-top');
+    VolumeTop.innerHTML = (marketsStat[selectPairs.value].Volume).toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
+
+}
+
+function change_pair(pair) {
+
+    let currentPair = localStorage.getItem('currentPair');
+    let widgetPair = localStorage.getItem('widgetPair');
+    let update_widget = false;
+    if (widgetPair !== pair) {
+        update_widget = true;
+    }
+    if (pair === '') {
+        pair = currentPair;
+    }
+    if (pair !== currentPair) {
+        localStorage.setItem('currentPair', pair);
+    }
+    document.querySelector('#pairs').value = pair;
+
+
+
+
+
+
+    // Перемещение курсора в списке цен
+    if ($('#list-ch-price').css('display') == "block") {
+        var rowsPrice = document.querySelector("#tbody-price").rows;
+        for (let i = 0; i < rowsPrice.length; i++) {
+            rowsPrice[i].classList.remove('table-tr-active');
+            rowsPrice[i].classList.add('table-tr-not-active');
+            if (rowsPrice[i].querySelector("td[name=pair]").innerHTML === pair) {
+                rowsPrice[i].classList.add('table-tr-active');
+                rowsPrice[i].scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+            }
+        }
+
+        if (update_widget) {
+            widget_charts(document.getElementById('chart-price'), pair)
+        }
+
+    }
+    // Перемещение курсора в списке объемов
+    if ($('#list-ch-volume').css('display') == "block") {
+        var rowsVolume = document.querySelector("#tbody-delta").rows;
+        for (let i = 0; i < rowsVolume.length; i++) {
+            rowsVolume[i].classList.remove('table-tr-active');
+            rowsVolume[i].classList.add('table-tr-not-active');
+            if (rowsVolume[i].querySelector("td[name=pair]").innerHTML === pair) {
+                rowsVolume[i].classList.add('table-tr-active');
+                rowsVolume[i].scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+            }
+        }
+        chart_volume_update();
+    }
+
+    update_top_data(pair);
+}
+
 function forming_orders_active(orders) {
 
     localStorage.setItem('ordersActive', JSON.stringify(orders));
@@ -215,8 +302,6 @@ function forming_orders_active(orders) {
         let row = tbody.insertRow(-1);
         row.className = "order-active";
         row.setAttribute("value", order.ID);
-
-        console.log(order);
 
         // 1 Col Side
         let cell = row.insertCell();
@@ -254,7 +339,7 @@ function forming_orders_active(orders) {
     for (let row of rows) {
         row.addEventListener("click", () => {
             let pair = row.querySelector('[name="order-a-pair"]').innerHTML;
-            change_pair(pair, false);
+            change_pair(pair);
             show_chart_orders();
             chart_frome_orders_update('Active');
 
@@ -339,88 +424,13 @@ function forming_orders_history(orders) {
     for (let row of rows) {
         row.addEventListener("click", () => {
             let pair = row.querySelector('[name="order-h-pair"]').innerHTML;
-            change_pair(pair, false);
+            change_pair(pair);
             show_chart_orders();
             chart_frome_orders_update('History');
 
         });
     };
 
-}
-
-function update_main_data(marketsStat, changePrices, deltaFast) {
-
-
-    let selectPairs = document.querySelector('#pairs');
-    // Загаловки 24ch  Volume
-    let ch24Top = document.querySelector('#ch24-top');
-    ch24Top.innerHTML = (marketsStat[selectPairs.value].Ch24).toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' }) + '%';
-    let VolumeTop = document.querySelector('#volume-top');
-    VolumeTop.innerHTML = (marketsStat[selectPairs.value].Volume).toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
-
-    //localStorage.clear();
-
-    localStorage.setItem('marketsStat', JSON.stringify(marketsStat));
-    localStorage.setItem('changePrices', JSON.stringify(changePrices));
-    localStorage.setItem('deltaFast', JSON.stringify(deltaFast));
-
-    let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
-    localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
-
-    forming_tickers_list();
-    forming_tickers_list_volume();
-
-    // Один раз при инициализации запускаем 
-    change_pair(selectPairs.value);
-
-
-}
-
-function change_pair(pair, fromeSelectPairs = false) {
-
-    let update_chart = false
-    if (pair !== document.querySelector('#pairs').value) {
-        document.querySelector('#pairs').value = pair;
-        update_chart = true;
-    }
-    update_chart = update_chart || fromeSelectPairs;
-
-    if ($('#list-ch-price').css('display') == "block") {
-        var rowsPrice = document.querySelector("#tbody-price").rows;
-        for (let i = 0; i < rowsPrice.length; i++) {
-            rowsPrice[i].classList.remove('table-tr-active');
-            rowsPrice[i].classList.add('table-tr-not-active');
-            if (rowsPrice[i].querySelector("td[name=pair]").innerHTML === pair) {
-                rowsPrice[i].classList.add('table-tr-active');
-                rowsPrice[i].scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center'
-                });
-            }
-        }
-
-        if (update_chart) {
-            widget_charts(document.getElementById('chart-price'), pair)
-        }
-
-    }
-    if ($('#list-ch-volume').css('display') == "block") {
-        var rowsVolume = document.querySelector("#tbody-delta").rows;
-        for (let i = 0; i < rowsVolume.length; i++) {
-            rowsVolume[i].classList.remove('table-tr-active');
-            rowsVolume[i].classList.add('table-tr-not-active');
-            if (rowsVolume[i].querySelector("td[name=pair]").innerHTML === pair) {
-                rowsVolume[i].classList.add('table-tr-active');
-                rowsVolume[i].scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center'
-                });
-            }
-        }
-        chart_volume_update();
-    }
-
-    update_top_data(pair);
 }
 
 function update_top_data(pair) {

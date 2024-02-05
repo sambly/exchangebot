@@ -43,9 +43,6 @@ import {timeToLocal} from './help.js';
             let timeCreated =timeToLocal(new Date(order.TimeCreated) / 1000);
             let timeFinished = timeToLocal(new Date(order.Time) / 1000) ;
 
-            console.log(timeCreated);
-
-
             if (order.Side=='BUY'){
               if (order.Status!='Close'){
                 markers_chart.push({ time:timeCreated , position: 'belowBar', color: '#00ff00', shape: 'arrowUp', text: `long ${order.ID}`});
@@ -77,6 +74,7 @@ import {timeToLocal} from './help.js';
 
   export function widget_charts(container_chart,pair){
 
+    localStorage.setItem('widgetPair', pair);
     let chartWidth = container_chart.clientWidth;
     new TradingView.widget(
       {
