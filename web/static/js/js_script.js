@@ -119,6 +119,13 @@ $(function () {
 
         });
     });
+
+    // Аткинвые кнопки меню
+    $('.btnFrameStrategy').click(function () {
+        $('.btnFrameStrategy').removeClass('active'); 
+        $(this).addClass('active');
+    });
+
     // Открыть long/short позицию
     $('.btn-trade-deal').click(function (e) {
         e.preventDefault();
@@ -132,9 +139,20 @@ $(function () {
             sideType = "sell";
         }
 
+        // default
+        let frame = '15m';
+        let btnFrameStrategy = document.querySelectorAll('.btnFrameStrategy');
+        btnFrameStrategy.forEach((btn, index) => { 
+            if (btn.classList.contains("active")) {
+                frame= btn.innerText;
+            }
+        });
+
+
         let form = {
             pair: document.querySelector('#pairs').value,
             sideType: sideType,
+            frame: frame,
             strategy: document.querySelector('#panel-trade-strategy').value,
             comment: document.querySelector('#panel-trade-comment').value
         };

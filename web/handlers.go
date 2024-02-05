@@ -31,6 +31,7 @@ type ViewData struct {
 type Deal struct {
 	Pair     string
 	SideType string
+	Frame    string
 	Strategy string
 	Comment  string
 }
@@ -133,6 +134,8 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 	if deal.SideType == "sell" {
 		sideType = model.SideTypeSell
 	}
+
+	fmt.Println(deal)
 
 	_, err := web.App.OrderController.CreateOrderMarket(sideType, deal.Pair, size)
 	if err != nil {
