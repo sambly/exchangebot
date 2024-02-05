@@ -242,11 +242,6 @@ function change_pair(pair) {
     }
     document.querySelector('#pairs').value = pair;
 
-
-
-
-
-
     // Перемещение курсора в списке цен
     if ($('#list-ch-price').css('display') == "block") {
         var rowsPrice = document.querySelector("#tbody-price").rows;
