@@ -689,6 +689,23 @@ function forming_tickers_list() {
 
 function forming_tickers_list_volume(frame = '1m') {
 
+
+    function resizeBlock() {
+        //  Расчет высоты блоков 
+        document.getElementById('list-ch-volume').style.height = document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight;    
+        document.querySelector("#tbody-delta").style.height =document.getElementById('list-ch-volume').clientHeight - document.querySelector("thead[name=thead-delta]").clientHeight;
+    }
+    resizeBlock();
+    window.onresize = resizeBlock;
+
+    // //  Расчет высоты блоков 
+    // document.getElementById('list-ch-volume').style.height = document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight;    
+    // document.querySelector("#tbody-delta").style.height =document.getElementById('list-ch-volume').clientHeight - document.querySelector("thead[name=thead-delta]").clientHeight;
+    
+    const aa = document.getElementById('list-ch-volume').clientHeight
+    console.log(aa);
+    console.log(document.getElementById('list-ch-volume').style.height);
+
     const tbody = document.querySelector("#tbody-delta");
     tbody.innerHTML = '';
     const th = document.querySelectorAll("thead[name=thead-delta] th");
@@ -729,11 +746,37 @@ function forming_tickers_list_volume(frame = '1m') {
         let value = deltaFast[item][frame]["Volume"].toFixed(2);
         cell.innerHTML = value;
         cell.setAttribute("name", 'volume');
-        // 4 столбец Volume
+
+        // 4 столбец VolumeBuy
         cell = row.insertCell();
-        value = deltaFast[item][frame]["Trades"].toFixed(2);
-        cell.innerHTML = value;
+        let valueBuy = deltaFast[item][frame]["VolumeBuy"].toFixed(2);
+        cell.innerHTML = valueBuy;
+        cell.setAttribute("name", 'volume-buy');
+
+        // 5 столбец VolumeAsk
+        cell = row.insertCell();
+        let VolumeAsk = deltaFast[item][frame]["VolumeAsk"].toFixed(2);
+        cell.innerHTML = VolumeAsk;
+        cell.setAttribute("name", 'volume-ask');
+
+        // 6 столбец Trades
+        cell = row.insertCell();
+        let trades = deltaFast[item][frame]["Trades"].toFixed(2);
+        cell.innerHTML = trades;
         cell.setAttribute("name", 'trades');
+
+        // 7 столбец TradesBuy
+        cell = row.insertCell();
+        let tradesBuy = deltaFast[item][frame]["TradesBuy"].toFixed(2);
+        cell.innerHTML = tradesBuy;
+        cell.setAttribute("name", 'trades-buy');
+
+        // 7 столбец TradesAsk
+        cell = row.insertCell();
+        let tradesAsk = deltaFast[item][frame]["TradesAsk"].toFixed(2);
+        cell.innerHTML = tradesAsk;
+        cell.setAttribute("name", 'trades-ask');
+
     };
 
     // Отображение пар все или избранное
