@@ -105,7 +105,6 @@ $(function () {
             contentType: 'application/json; charset=utf-8',
             processData: false,
             success: function (response) {
-                console.log(response);
                 update_main_data(
                     response.MarketsStat,
                     response.ChangePrices,
@@ -123,7 +122,7 @@ $(function () {
 
     // Аткинвые кнопки меню
     $('.btnFrameStrategy').click(function () {
-        $('.btnFrameStrategy').removeClass('active'); 
+        $('.btnFrameStrategy').removeClass('active');
         $(this).addClass('active');
     });
 
@@ -143,9 +142,9 @@ $(function () {
         // default
         let frame = '15m';
         let btnFrameStrategy = document.querySelectorAll('.btnFrameStrategy');
-        btnFrameStrategy.forEach((btn, index) => { 
+        btnFrameStrategy.forEach((btn, index) => {
             if (btn.classList.contains("active")) {
-                frame= btn.innerText;
+                frame = btn.innerText;
             }
         });
 
@@ -182,8 +181,7 @@ $(function () {
 
 export function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive, ordersHistory) {
 
-    console.log(deltaFast);
-    
+
     show_price_panel();
     show_panel_trade_active();
 
@@ -201,6 +199,8 @@ export function forming_page(pairs, marketsStat, changePrices, deltaFast, orders
     // выбор текущей пары
     let currentPair = localStorage.getItem('currentPair') || 'BTCUSDT';
     localStorage.setItem('currentPair', currentPair);
+
+    console.log(deltaFast);
 
     update_main_data(marketsStat, changePrices, deltaFast);
 
@@ -505,7 +505,7 @@ function chart_volume_update() {
     };
 
     function update_volume_data(pair, frame, checboxType) {
-        let request = { Pair: pair, Frame: frame};
+        let request = { Pair: pair, Frame: frame };
         let dataVolume = [];
         $.ajax({
             url: '/getChangeDelta',
@@ -599,6 +599,11 @@ function chart_frome_orders_update(chartType) {
 
 function forming_tickers_list() {
 
+    // Изменение высоты блоков
+    document.querySelector('#list-ch-price').style.height = `${document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight}` + 'px';
+    document.querySelector("#tbody-price").style.height = `${document.querySelector('#list-ch-price').clientHeight - document.querySelector("thead[name=thead-price]").clientHeight}` + 'px';
+
+
     const heads = ['ch3m', 'ch15m', 'ch1h', 'ch4h'];
     const tbody = document.querySelector("#tbody-price");
     tbody.innerHTML = '';
@@ -689,22 +694,10 @@ function forming_tickers_list() {
 
 function forming_tickers_list_volume(frame = '1m') {
 
+    // Изменение высоты блоков
+    document.querySelector('#list-ch-volume').style.height = `${document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight}` + 'px';
+    document.querySelector("#tbody-delta").style.height = `${document.querySelector('#list-ch-volume').clientHeight - document.querySelector("thead[name=thead-delta]").clientHeight}` + 'px';
 
-    function resizeBlock() {
-        //  Расчет высоты блоков 
-        document.getElementById('list-ch-volume').style.height = document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight;    
-        document.querySelector("#tbody-delta").style.height =document.getElementById('list-ch-volume').clientHeight - document.querySelector("thead[name=thead-delta]").clientHeight;
-    }
-    resizeBlock();
-    window.onresize = resizeBlock;
-
-    // //  Расчет высоты блоков 
-    // document.getElementById('list-ch-volume').style.height = document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight;    
-    // document.querySelector("#tbody-delta").style.height =document.getElementById('list-ch-volume').clientHeight - document.querySelector("thead[name=thead-delta]").clientHeight;
-    
-    const aa = document.getElementById('list-ch-volume').clientHeight
-    console.log(aa);
-    console.log(document.getElementById('list-ch-volume').style.height);
 
     const tbody = document.querySelector("#tbody-delta");
     tbody.innerHTML = '';
@@ -714,11 +707,16 @@ function forming_tickers_list_volume(frame = '1m') {
     let deltaFast = JSON.parse(localStorage.getItem('deltaFast')) || [];
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
 
+
+    // для изменения widht по самому широкому стобцу
+    let colum = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
+
     for (let item in deltaFast) {
 
         if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {
             continue;
         }
+
 
         let row = tbody.insertRow(-1);
         row.className = "pair-delta";
@@ -735,49 +733,78 @@ function forming_tickers_list_volume(frame = '1m') {
             chk.checked = true;
         }
         cell.appendChild(chk);
+        row.appendChild(cell);
+
+        let cellWidth = cell.offsetWidth;
+        console.log("Width of cell:", cellWidth)
+        colum['col1'] = (cell.clientWidth > colum['col1']) ? cell.clientWidth : colum['col1'];
 
         // 2 столбец ПАРА
         cell = row.insertCell();
         cell.innerHTML = item;
         cell.setAttribute("name", "pair");
+        row.appendChild(cell);
 
-        // 3 столбец Volume
-        cell = row.insertCell();
-        let value = deltaFast[item][frame]["Volume"].toFixed(2);
-        cell.innerHTML = value;
-        cell.setAttribute("name", 'volume');
+        cellWidth = cell.offsetWidth;
+        console.log("Width of cell:", cellWidth)
 
-        // 4 столбец VolumeBuy
-        cell = row.insertCell();
-        let valueBuy = deltaFast[item][frame]["VolumeBuy"].toFixed(2);
-        cell.innerHTML = valueBuy;
-        cell.setAttribute("name", 'volume-buy');
+        colum['col2'] = (cell.clientWidth > colum['col2']) ? cell.clientWidth : colum['col2'];
 
-        // 5 столбец VolumeAsk
-        cell = row.insertCell();
-        let VolumeAsk = deltaFast[item][frame]["VolumeAsk"].toFixed(2);
-        cell.innerHTML = VolumeAsk;
-        cell.setAttribute("name", 'volume-ask');
 
-        // 6 столбец Trades
-        cell = row.insertCell();
-        let trades = deltaFast[item][frame]["Trades"].toFixed(2);
-        cell.innerHTML = trades;
-        cell.setAttribute("name", 'trades');
 
-        // 7 столбец TradesBuy
-        cell = row.insertCell();
-        let tradesBuy = deltaFast[item][frame]["TradesBuy"].toFixed(2);
-        cell.innerHTML = tradesBuy;
-        cell.setAttribute("name", 'trades-buy');
+        // // 3 столбец Volume
+        // cell = row.insertCell();
+        // let value = deltaFast[item][frame]["Volume"].toFixed(2);
+        // cell.innerHTML = value;
+        // cell.setAttribute("name", 'volume');
+        // row.appendChild(cell);
 
-        // 7 столбец TradesAsk
-        cell = row.insertCell();
-        let tradesAsk = deltaFast[item][frame]["TradesAsk"].toFixed(2);
-        cell.innerHTML = tradesAsk;
-        cell.setAttribute("name", 'trades-ask');
+        // colum['col3'] = (cell.clientWidth > colum['col3']) ? cell.clientWidth : colum['col3'];
+
+        // // 4 столбец VolumeBuy
+        // cell = row.insertCell();
+        // let valueBuy = deltaFast[item][frame]["VolumeBuy"].toFixed(2);
+        // cell.innerHTML = valueBuy;
+        // cell.setAttribute("name", 'volume-buy');
+        // row.appendChild(cell);
+
+        // colum['col4'] = (cell.clientWidth > colum['col4']) ? cell.clientWidth : colum['col4'];
+
+        // // 5 столбец VolumeAsk
+        // cell = row.insertCell();
+        // let VolumeAsk = deltaFast[item][frame]["VolumeAsk"].toFixed(2);
+        // cell.innerHTML = VolumeAsk;
+        // cell.setAttribute("name", 'volume-ask');
+        // row.appendChild(cell);
+
+        // // 6 столбец Trades
+        // cell = row.insertCell();
+        // let trades = deltaFast[item][frame]["Trades"].toFixed(2);
+        // cell.innerHTML = trades;
+        // cell.setAttribute("name", 'trades');
+        // row.appendChild(cell);
+
+        // // 7 столбец TradesBuy
+        // cell = row.insertCell();
+        // let tradesBuy = deltaFast[item][frame]["TradesBuy"].toFixed(2);
+        // cell.innerHTML = tradesBuy;
+        // cell.setAttribute("name", 'trades-buy');
+        // row.appendChild(cell);
+
+        // // 8 столбец TradesAsk
+        // cell = row.insertCell();
+        // let tradesAsk = deltaFast[item][frame]["TradesAsk"].toFixed(2);
+        // cell.innerHTML = tradesAsk;
+        // cell.setAttribute("name", 'trades-ask');
+        // row.appendChild(cell);
 
     };
+
+    console.log(colum['col1']);
+    console.log(colum['col2']);
+    console.log(colum['col3']);
+    console.log(colum['col4']);
+
 
     // Отображение пар все или избранное
     let checkboxAll = document.querySelectorAll('.favorite-pair');
