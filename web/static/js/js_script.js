@@ -105,6 +105,7 @@ $(function () {
             contentType: 'application/json; charset=utf-8',
             processData: false,
             success: function (response) {
+                console.log(response);
                 update_main_data(
                     response.MarketsStat,
                     response.ChangePrices,
@@ -181,6 +182,8 @@ $(function () {
 
 export function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive, ordersHistory) {
 
+    console.log(deltaFast);
+    
     show_price_panel();
     show_panel_trade_active();
 

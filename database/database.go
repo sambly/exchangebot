@@ -207,7 +207,6 @@ func Orders(db *sql.DB) ([]*model.Order, error) {
 	}
 
 	return orders, nil
-
 }
 
 func CreateOrder(db *sql.DB, order *model.Order) (int64, error) {
@@ -247,7 +246,6 @@ func CreateOrder(db *sql.DB, order *model.Order) (int64, error) {
 	}
 
 	return id, nil
-
 }
 
 func ClosePosition(db *sql.DB, order *model.Order, id int64) error {
@@ -278,7 +276,6 @@ func ClosePosition(db *sql.DB, order *model.Order, id int64) error {
 	}
 
 	return nil
-
 }
 
 func CreateOrdersInfoTable(db *sql.DB) error {
@@ -286,8 +283,12 @@ func CreateOrdersInfoTable(db *sql.DB) error {
 	query := `CREATE TABLE IF NOT EXISTS orders_info(
 		ID int primary key auto_increment,
 		idOrder int,
+		frame text,
+		strategy text,
+		comment text,
 		marketsStat json,
-		changePrices json
+		changePrices json,
+		deltaFast json
 		)`
 
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
@@ -300,5 +301,37 @@ func CreateOrdersInfoTable(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("error %s when getting rows affected", err)
 	}
+	return nil
+}
+
+func InsertOrdersInfoTable(db *sql.DB, idOrder int64, frame, strategy, comment string, mkStat, chData, dFast []byte) error {
+
+	query := "INSERT INTO orders_info (idOrder,frame,strategy,comment,marketsStat,changePrices,deltaFast) VALUES (?,?,?,?,?,?,?)"
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelfunc()
+	stmtLicense, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("error %s when preparing SQL statement", err)
+	}
+	defer stmtLicense.Close()
+
+	res, err := stmtLicense.ExecContext(
+		ctx,
+		idOrder,
+		frame,
+		strategy,
+		comment,
+		mkStat,
+		chData,
+		dFast,
+	)
+	if err != nil {
+		return fmt.Errorf("error %s when inserting row into orders_info table", err)
+	}
+	_, err = res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error %s when finding rows affected", err)
+	}
+
 	return nil
 }

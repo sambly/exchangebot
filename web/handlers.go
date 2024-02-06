@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"io"
 	"main/model"
-	"main/prices"
 	"net/http"
 	"strconv"
 
@@ -22,18 +21,10 @@ type ViewData struct {
 	Menu          []Menu
 	Pairs         []string
 	MarketsStat   map[string]*model.MarketsStat
-	ChangePrices  map[string]map[string]*prices.ChangeData
-	DeltaFast     map[string]map[string]*prices.DeltaFast
+	ChangePrices  map[string]map[string]*model.ChangeData
+	DeltaFast     map[string]map[string]*model.DeltaFast
 	OrdersActive  []*model.Order
 	OrdersHistory []*model.Order
-}
-
-type Deal struct {
-	Pair     string
-	SideType string
-	Frame    string
-	Strategy string
-	Comment  string
 }
 
 var upgrader = websocket.Upgrader{
@@ -84,8 +75,15 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 		"DeltaFast":    web.App.AssetsPrices.DeltaFast,
 	}
 
+	mapsJson, err := json.Marshal(maps)
+	if err != nil {
+		web.logError(err)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(maps)
+	w.Write(mapsJson)
+
+	//json.NewEncoder(w).Encode(maps)
 }
 
 func (web *Web) getChangeDelta(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +116,7 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 
 	bodyByte, _ := io.ReadAll(r.Body)
 
-	deal := Deal{}
+	deal := model.Deal{}
 
 	if err := json.Unmarshal(bodyByte, &deal); err != nil {
 		web.logError(err)
@@ -126,18 +124,7 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	size := 1.0
-
-	var sideType model.SideType
-	if deal.SideType == "buy" {
-		sideType = model.SideTypeBuy
-	}
-	if deal.SideType == "sell" {
-		sideType = model.SideTypeSell
-	}
-
-	fmt.Println(deal)
-
-	_, err := web.App.OrderController.CreateOrderMarket(sideType, deal.Pair, size)
+	_, err := web.App.OrderController.CreateOrderMarket(deal, size)
 	if err != nil {
 		web.logError(err)
 	}

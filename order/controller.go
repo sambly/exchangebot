@@ -4,40 +4,35 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"main/database"
 	"main/exchange"
+	"main/log"
 	"main/model"
 	"main/notification"
+	"main/prices"
 	"sync"
-	"time"
 )
 
 type Status string
 
-const (
-	StatusRunning Status = "running"
-	StatusStopped Status = "stopped"
-	StatusError   Status = "error"
-)
-
 type Controller struct {
-	mtx            sync.Mutex
-	ctx            context.Context
-	exchange       *exchange.PaperWallet
-	database       *sql.DB
-	tickerInterval time.Duration
-	finish         chan bool
-	status         Status
+	mtx      sync.Mutex
+	ctx      context.Context
+	exchange *exchange.PaperWallet
+	database *sql.DB
+
+	assetsPrices   *prices.AsetsPrices
 	socketsMessage *notification.SocketsMessage
 }
 
-func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, socketsMessage *notification.SocketsMessage) (*Controller, error) {
+func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, socketsMessage *notification.SocketsMessage, assetsPrices *prices.AsetsPrices) (*Controller, error) {
 
 	ctrl := &Controller{
 		ctx:            ctx,
 		exchange:       ex,
 		database:       db,
-		tickerInterval: time.Second,
+		assetsPrices:   assetsPrices,
 		socketsMessage: socketsMessage,
 	}
 
@@ -52,25 +47,21 @@ func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, so
 
 }
 
-// func (c *Controller) updateOrders() {
-// 	c.mtx.Lock()
-// 	defer c.mtx.Unlock()
-
-// 	for _, order := range c.exchange.Orders {
-// 		if order.Status == model.OrderStatusTypeActive {
-// 			messageOrder, _ := json.Marshal(order)
-// 			c.socketsMessage.SendData(messageOrder)
-// 		}
-
-// 	}
-
-// }
-
-func (c *Controller) CreateOrderMarket(side model.SideType, pair string, size float64) (*model.Order, error) {
+func (c *Controller) CreateOrderMarket(deal model.Deal, size float64) (*model.Order, error) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
-	order, err := c.exchange.CreateOrderMarket(side, pair, size)
+	pair := deal.Pair
+
+	var sideType model.SideType
+	if deal.SideType == "buy" {
+		sideType = model.SideTypeBuy
+	}
+	if deal.SideType == "sell" {
+		sideType = model.SideTypeSell
+	}
+
+	order, err := c.exchange.CreateOrderMarket(sideType, pair, size)
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +71,32 @@ func (c *Controller) CreateOrderMarket(side model.SideType, pair string, size fl
 		return nil, err
 	}
 	order.ID = id
+
+	go func() {
+		c.assetsPrices.UpdateDelta()
+
+		mkStat := c.assetsPrices.MarketsStat[pair]
+		chData := c.assetsPrices.ChangePrices[pair]
+		dFast := c.assetsPrices.DeltaFast[pair]
+
+		mkStatJson, err := json.Marshal(mkStat)
+		if err != nil {
+			log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal mkStatJson : %v", err))
+		}
+		chDataJson, err := json.Marshal(chData)
+		if err != nil {
+			log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal chDataJson : %v", err))
+		}
+		dFastJson, err := json.Marshal(dFast)
+		if err != nil {
+			log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal dFastJson : %v", err))
+		}
+
+		err = database.InsertOrdersInfoTable(c.database, id, deal.Frame, deal.Strategy, deal.Comment, mkStatJson, chDataJson, dFastJson)
+		if err != nil {
+			log.MyLogger.ErrorOut(fmt.Errorf("error when create order and add insertinfotables : %v", err))
+		}
+	}()
 
 	return order, err
 }
@@ -108,31 +125,6 @@ func (c *Controller) ClosePosition(id int64) error {
 	return nil
 }
 
-//	func (c *Controller) Start() {
-//		if c.status != StatusRunning {
-//			c.status = StatusRunning
-//			go func() {
-//				ticker := time.NewTicker(c.tickerInterval)
-//				for {
-//					select {
-//					case <-ticker.C:
-//						c.updateOrders()
-//					case <-c.finish:
-//						ticker.Stop()
-//						return
-//					}
-//				}
-//			}()
-//		}
-//	}
-//
-//	func (c *Controller) Stop() {
-//		if c.status == StatusRunning {
-//			c.status = StatusStopped
-//			c.updateOrders()
-//			c.finish <- true
-//		}
-//	}
 func (c *Controller) OnMarket(ms model.MarketsStat) {
 
 	// Обновление ордеров

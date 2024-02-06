@@ -20,8 +20,8 @@ type Application struct {
 	dataFeed *exchange.DataFeedSubscription
 	database *sql.DB
 
-	AssetsPrices    *prices.AsetsPrices
 	Account         *account.Account
+	AssetsPrices    *prices.AsetsPrices
 	OrderController *order.Controller
 	PaperWallet     *exchange.PaperWallet
 
@@ -36,7 +36,7 @@ func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings,
 		return nil, err
 	}
 	paperWallet := exchange.NewPaperWallet(ctx)
-	orderController, err := order.NewController(ctx, paperWallet, db, socketsMessage)
+	orderController, err := order.NewController(ctx, paperWallet, db, socketsMessage, assetsPrices)
 	if err != nil {
 		return nil, err
 	}

@@ -49,6 +49,13 @@ type MarketsStat struct {
 	Volume float64
 }
 
+type ChangeData struct {
+	LastPrice           float64
+	LastVolume          float64
+	СhangePercent       float64
+	ChangePercentVolume float64
+}
+
 type Candle struct {
 	Pair                 string
 	Time                 time.Time
@@ -75,4 +82,26 @@ type Candle struct {
 
 	// Aditional collums from CSV inputs
 	Metadata map[string]float64
+}
+
+type DeltaFast struct {
+	Volume    float64
+	VolumeBuy float64
+	VolumeAsk float64
+	Trades    float64
+	TradesBuy float64
+	TradesAsk float64
+}
+
+func (df *DeltaFast) Clear() {
+	df.Volume = 0
+	df.Trades = 0
+}
+
+type Deal struct {
+	Pair     string
+	SideType string
+	Frame    string
+	Strategy string
+	Comment  string
 }

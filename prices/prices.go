@@ -15,20 +15,14 @@ type AsetsPrices struct {
 	PeriodsDelta   []string
 	WeightProcents map[string]float64
 	MarketsStat    map[string]*model.MarketsStat
-	ChangePrices   map[string]map[string]*ChangeData
+	ChangePrices   map[string]map[string]*model.ChangeData
 	ChangeDelta    map[string]map[string][]ChangeDelta
-	DeltaFast      map[string]map[string]*DeltaFast
+	DeltaFast      map[string]map[string]*model.DeltaFast
 	database       *sql.DB
 	Notification   *notification.Notification
 	LengthOfTime   int64
 }
 
-type ChangeData struct {
-	LastPrice           float64
-	LastVolume          float64
-	СhangePercent       float64
-	ChangePercentVolume float64
-}
 type ChangeDelta struct {
 	//Time        int64
 	Time        time.Time
@@ -57,16 +51,6 @@ func (cd *ChangeDelta) Clear() {
 	cd.MinuteCount = 0
 }
 
-type DeltaFast struct {
-	Volume float64
-	Trades float64
-}
-
-func (df *DeltaFast) Clear() {
-	df.Volume = 0
-	df.Trades = 0
-}
-
 func NewAssetsPrices(pairs, periods []string, weightProcents map[string]float64, lenghtTime int64, db *sql.DB, notification *notification.Notification) *AsetsPrices {
 	asetsPrices := &AsetsPrices{
 		Pairs:          pairs,
@@ -74,9 +58,9 @@ func NewAssetsPrices(pairs, periods []string, weightProcents map[string]float64,
 		PeriodsDelta:   []string{"1m", "5m", "30m", "1h", "4h", "1d"},
 		WeightProcents: weightProcents,
 		MarketsStat:    make(map[string]*model.MarketsStat),
-		ChangePrices:   make(map[string]map[string]*ChangeData),
+		ChangePrices:   make(map[string]map[string]*model.ChangeData),
 		ChangeDelta:    make(map[string]map[string][]ChangeDelta),
-		DeltaFast:      make(map[string]map[string]*DeltaFast),
+		DeltaFast:      make(map[string]map[string]*model.DeltaFast),
 		database:       db,
 		Notification:   notification,
 		LengthOfTime:   lenghtTime,
@@ -86,16 +70,16 @@ func NewAssetsPrices(pairs, periods []string, weightProcents map[string]float64,
 	}
 	for _, pair := range pairs {
 		if _, ok := asetsPrices.ChangePrices[pair]; !ok {
-			asetsPrices.ChangePrices[pair] = map[string]*ChangeData{}
+			asetsPrices.ChangePrices[pair] = map[string]*model.ChangeData{}
 			asetsPrices.ChangeDelta[pair] = map[string][]ChangeDelta{}
-			asetsPrices.DeltaFast[pair] = map[string]*DeltaFast{}
+			asetsPrices.DeltaFast[pair] = map[string]*model.DeltaFast{}
 		}
 		for _, period := range periods {
-			asetsPrices.ChangePrices[pair][period] = &ChangeData{}
+			asetsPrices.ChangePrices[pair][period] = &model.ChangeData{}
 		}
 		for _, period := range asetsPrices.PeriodsDelta {
 			asetsPrices.ChangeDelta[pair][period] = []ChangeDelta{}
-			asetsPrices.DeltaFast[pair][period] = &DeltaFast{}
+			asetsPrices.DeltaFast[pair][period] = &model.DeltaFast{}
 		}
 
 	}
@@ -185,7 +169,6 @@ func (ap *AsetsPrices) UpdateDelta() error {
 				frameCope.TradesBuy += candle.AmountTradeBuy
 				frameCope.TradesAsk += candle.AmountTradeAsk
 				frameCope.MinuteCount += 1
-				//frameCope.Time = candle.Time.Unix()
 				frameCope.Time = candle.Time
 
 				// for candles
@@ -234,16 +217,35 @@ func (ap *AsetsPrices) UpdateDelta() error {
 		}
 
 	}
-
+	// TODO здесь не учитывается текущий объем
 	for _, pair := range ap.Pairs {
 		for _, period := range ap.PeriodsDelta {
-			val := ap.ChangeDelta[pair][period]
-			if len(ap.ChangeDelta[pair][period]) >= 2 {
-				ap.DeltaFast[pair][period].Volume = ap.ChangeDelta[pair][period][len(val)-1].Volume/ap.ChangeDelta[pair][period][len(val)-2].Volume*100 - 100
-				ap.DeltaFast[pair][period].Trades = float64(val[len(val)-1].Trades)/float64(val[len(val)-2].Trades)*100 - 100
+			values := ap.ChangeDelta[pair][period]
+			if len(values) >= 2 {
+				itemLatest := len(values) - 1
+				itemLast := len(values) - 2
+
+				ap.DeltaFast[pair][period].Volume = check_values_dividing(values[itemLatest].Volume, values[itemLast].Volume)*100 - 100
+				ap.DeltaFast[pair][period].VolumeBuy = check_values_dividing(values[itemLatest].VolumeBuy, values[itemLast].VolumeBuy)*100 - 100
+				ap.DeltaFast[pair][period].VolumeAsk = check_values_dividing(values[itemLatest].VolumeAsk, values[itemLast].VolumeAsk)*100 - 100
+
+				ap.DeltaFast[pair][period].Trades = check_values_dividing(float64(values[itemLatest].Trades), float64(values[itemLast].Trades)*100-100)
+				ap.DeltaFast[pair][period].TradesBuy = check_values_dividing(float64(values[itemLatest].TradesBuy), float64(values[itemLast].TradesBuy)*100-100)
+				ap.DeltaFast[pair][period].TradesBuy = check_values_dividing(float64(values[itemLatest].TradesBuy), float64(values[itemLast].TradesBuy)*100-100)
+				ap.DeltaFast[pair][period].TradesAsk = check_values_dividing(float64(values[itemLatest].TradesAsk), float64(values[itemLast].TradesAsk)*100-100)
+
 			}
 		}
 
 	}
 	return nil
+}
+
+// +inf/-inf/nan
+func check_values_dividing(numerator, denominator float64) float64 {
+	if numerator == 0.0 || denominator == 0.0 {
+		return 0.0
+	}
+	return float64(numerator / denominator)
+
 }
