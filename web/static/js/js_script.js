@@ -771,10 +771,15 @@ function forming_tickers_list_volume(frame = '1m') {
  
     };
 
+
+
     // Установить ширину столбцов таблицы, основываясь на самой широкой ячейке в каждом столбце.
     for (const colName in maxWidths) {
         document.querySelectorAll(`.delta-${colName}`).forEach(cell => {
-            cell.style.width = `${maxWidths[colName]}px`;
+            let th_col_width = document.querySelector(`thead[name=thead-delta] .delta-${colName}`);
+            console.log(th_col_width.clientWidth);
+            //let th_col_width =th.querySelector(`.delta-${colName}`);
+            cell.style.width = `${Math.max(maxWidths[colName], th_col_width.clientWidth)+5}px`;
         });
     }
 
