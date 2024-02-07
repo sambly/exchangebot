@@ -49,12 +49,14 @@ $(function () {
     // Меню цены
     $('#btn-price').click(function () {
         show_price_panel();
+        forming_tickers_list();
         change_pair(document.querySelector('#pairs').value)
     });
 
     // Меню объема
     $('#btn-volume').click(function () {
         show_volume_panel();
+        forming_tickers_list_volume();
         change_pair(document.querySelector('#pairs').value)
     });
 
@@ -199,8 +201,6 @@ export function forming_page(pairs, marketsStat, changePrices, deltaFast, orders
     // выбор текущей пары
     let currentPair = localStorage.getItem('currentPair') || 'BTCUSDT';
     localStorage.setItem('currentPair', currentPair);
-
-    console.log(deltaFast);
 
     update_main_data(marketsStat, changePrices, deltaFast);
 
@@ -599,15 +599,26 @@ function chart_frome_orders_update(chartType) {
 
 function forming_tickers_list() {
 
-    // Изменение высоты блоков
-    document.querySelector('#list-ch-price').style.height = `${document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight}` + 'px';
-    document.querySelector("#tbody-price").style.height = `${document.querySelector('#list-ch-price').clientHeight - document.querySelector("thead[name=thead-price]").clientHeight}` + 'px';
-
 
     const heads = ['ch3m', 'ch15m', 'ch1h', 'ch4h'];
     const tbody = document.querySelector("#tbody-price");
     tbody.innerHTML = '';
     const th = document.querySelectorAll("thead[name=thead-price] th");
+
+
+    // Изменение высоты блоков
+    let ch_price = document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight;
+    document.querySelector('#list-ch-price').style.height = `${ch_price}px`;
+
+
+    
+    let tbody_price = document.querySelector('#list-ch-price').clientHeight - document.querySelector("thead[name=thead-price]").clientHeight;
+
+
+    document.querySelector("#tbody-price").style.height = `${tbody_price}px`;
+
+
+
     const btnPairsFavorite = document.querySelector("#btnFavoritePairs");
 
     let changePrices = JSON.parse(localStorage.getItem('changePrices')) || [];
@@ -694,116 +705,78 @@ function forming_tickers_list() {
 
 function forming_tickers_list_volume(frame = '1m') {
 
-    // Изменение высоты блоков
-    document.querySelector('#list-ch-volume').style.height = `${document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight}` + 'px';
-    document.querySelector("#tbody-delta").style.height = `${document.querySelector('#list-ch-volume').clientHeight - document.querySelector("thead[name=thead-delta]").clientHeight}` + 'px';
-
-
     const tbody = document.querySelector("#tbody-delta");
     tbody.innerHTML = '';
     const th = document.querySelectorAll("thead[name=thead-delta] th");
     const btnPairsFavorite = document.querySelector("#btnFavoritePairs");
 
+
+    // Изменение высоты блоков
+    document.querySelector('#list-ch-volume').style.height = `${document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight}px`;
+    document.querySelector("#tbody-delta").style.height = `${document.querySelector('#list-ch-volume').clientHeight - document.querySelector("thead[name=thead-delta]").clientHeight}px`;
+
     let deltaFast = JSON.parse(localStorage.getItem('deltaFast')) || [];
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
 
 
-    // для изменения widht по самому широкому стобцу
-    let colum = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
 
+
+    // для изменения widht по самому широкому стобцу
+    let maxWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
     for (let item in deltaFast) {
 
         if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {
             continue;
         }
 
-
         let row = tbody.insertRow(-1);
         row.className = "pair-delta";
 
-        // Favorite checkbox
-        let cell = row.insertCell();
+        function createCell(innerHTML,nameCell,classCell,element,widthColum) {      
+            let cell = row.insertCell();
+            cell.innerHTML = innerHTML;
+            cell.setAttribute("name", nameCell);
+            cell.classList.add(classCell);
+            cell.classList.add(classCell);
+            if (element!=null){
+                cell.appendChild(chk);
+            }
+            maxWidths[widthColum] = Math.max(maxWidths[widthColum], cell.clientWidth);
+        }
 
+
+        // 1 столбец Favorite checkbox
         let chk = document.createElement('input');
         chk.setAttribute('type', 'checkbox');
         chk.setAttribute("name", item);
         chk.setAttribute('class', 'form-check-input favorite-pair');
-
         if (favoritePairs.includes(item)) {
             chk.checked = true;
         }
-        cell.appendChild(chk);
-        row.appendChild(cell);
-
-        let cellWidth = cell.offsetWidth;
-        console.log("Width of cell:", cellWidth)
-        colum['col1'] = (cell.clientWidth > colum['col1']) ? cell.clientWidth : colum['col1'];
-
+        createCell('','','delta-col1',chk,'col1')
         // 2 столбец ПАРА
-        cell = row.insertCell();
-        cell.innerHTML = item;
-        cell.setAttribute("name", "pair");
-        row.appendChild(cell);
-
-        cellWidth = cell.offsetWidth;
-        console.log("Width of cell:", cellWidth)
-
-        colum['col2'] = (cell.clientWidth > colum['col2']) ? cell.clientWidth : colum['col2'];
-
-
-
-        // // 3 столбец Volume
-        // cell = row.insertCell();
-        // let value = deltaFast[item][frame]["Volume"].toFixed(2);
-        // cell.innerHTML = value;
-        // cell.setAttribute("name", 'volume');
-        // row.appendChild(cell);
-
-        // colum['col3'] = (cell.clientWidth > colum['col3']) ? cell.clientWidth : colum['col3'];
-
-        // // 4 столбец VolumeBuy
-        // cell = row.insertCell();
-        // let valueBuy = deltaFast[item][frame]["VolumeBuy"].toFixed(2);
-        // cell.innerHTML = valueBuy;
-        // cell.setAttribute("name", 'volume-buy');
-        // row.appendChild(cell);
-
-        // colum['col4'] = (cell.clientWidth > colum['col4']) ? cell.clientWidth : colum['col4'];
-
-        // // 5 столбец VolumeAsk
-        // cell = row.insertCell();
-        // let VolumeAsk = deltaFast[item][frame]["VolumeAsk"].toFixed(2);
-        // cell.innerHTML = VolumeAsk;
-        // cell.setAttribute("name", 'volume-ask');
-        // row.appendChild(cell);
-
-        // // 6 столбец Trades
-        // cell = row.insertCell();
-        // let trades = deltaFast[item][frame]["Trades"].toFixed(2);
-        // cell.innerHTML = trades;
-        // cell.setAttribute("name", 'trades');
-        // row.appendChild(cell);
-
-        // // 7 столбец TradesBuy
-        // cell = row.insertCell();
-        // let tradesBuy = deltaFast[item][frame]["TradesBuy"].toFixed(2);
-        // cell.innerHTML = tradesBuy;
-        // cell.setAttribute("name", 'trades-buy');
-        // row.appendChild(cell);
-
-        // // 8 столбец TradesAsk
-        // cell = row.insertCell();
-        // let tradesAsk = deltaFast[item][frame]["TradesAsk"].toFixed(2);
-        // cell.innerHTML = tradesAsk;
-        // cell.setAttribute("name", 'trades-ask');
-        // row.appendChild(cell);
-
+        createCell(item,'pair','delta-col2',null,'col2')
+        // 3 столбец Volume
+        createCell(deltaFast[item][frame]["Volume"].toFixed(2),'volume','delta-col3',null,'col3')
+         // 4 столбец VolumeBuy
+        createCell(deltaFast[item][frame]["VolumeBuy"].toFixed(2),'volume-buy','delta-col4',null,'col4')
+        // 5 столбец VolumeAsk
+        createCell(deltaFast[item][frame]["VolumeAsk"].toFixed(2),'volume-ask','delta-col5',null,'col5')
+        // 6 столбец Trades
+        createCell(deltaFast[item][frame]["Trades"].toFixed(2),'trades','delta-col6',null,'col6')
+        // 7 столбец TradesBuy
+        createCell(deltaFast[item][frame]["TradesBuy"].toFixed(2),'trades-buy','delta-col7',null,'col7')
+        // 8 столбец TradesAsk
+        createCell(deltaFast[item][frame]["TradesAsk"].toFixed(2),'trades-ask','delta-col8',null,'col8')
+ 
     };
 
-    console.log(colum['col1']);
-    console.log(colum['col2']);
-    console.log(colum['col3']);
-    console.log(colum['col4']);
+    // Установить ширину столбцов таблицы, основываясь на самой широкой ячейке в каждом столбце.
+    for (const colName in maxWidths) {
+        document.querySelectorAll(`.delta-${colName}`).forEach(cell => {
+            cell.style.width = `${maxWidths[colName]}px`;
+        });
+    }
 
 
     // Отображение пар все или избранное

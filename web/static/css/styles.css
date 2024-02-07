@@ -34,7 +34,7 @@
 thead,
 tbody tr {
   display: table;
-  width: 100%;
+  /* width: 100%; */
 }
 
 /* #table-price tbody,
@@ -54,14 +54,17 @@ tbody {
   overflow-y: auto;
 }
 
-thead th {
+thead th,
+tbody td{
   text-align: center;
 }
 
-tbody td {
+
+
+/* tbody td {
   text-align: center;
   word-break: break-all;
-}
+} */
 
 .table-tr-not-active {
   background-color: #f8f9fa;
@@ -73,12 +76,9 @@ tbody td {
 
 
 
-
-
-
-
  #list-ch-volume {
 	overflow-x: auto;
+  overflow-y: hidden;
 	position: relative;
 }
 *
