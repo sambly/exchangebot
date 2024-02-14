@@ -1,12 +1,9 @@
 import { lw_charts_orders, lw_charts_volume, widget_charts } from './charts.js';
 import { timeToLocal } from './help.js';
+import {Tickers_list} from './table'
 
 
 forming_page();
-
-
-
-
 
 $(function () {
 
@@ -55,7 +52,7 @@ $(function () {
     // Меню цены
     $('#btn-price').click(function () {
         show_price_panel();
-        forming_tickers_list();
+        Tickers_list();
         change_pair(document.querySelector('#pairs').value)
     });
 
@@ -84,7 +81,7 @@ $(function () {
         $('.btnPairs').removeClass('active');
         $(this).addClass('active');
 
-        forming_tickers_list();
+        Tickers_list();
         forming_tickers_list_volume();
 
         change_pair(document.querySelector('#pairs').value);
@@ -187,74 +184,71 @@ $(function () {
 });
 
 
-function forming_page(pairs, marketsStat, changePrices, deltaFast, ordersActive, ordersHistory) {
+function forming_page() {
 
-  $.ajax({
-    url: '/formingPage',
-    type: 'POST',
-    method: 'POST',
-    cache: false,
-    contentType: 'application/json; charset=utf-8',
-    processData: false,
-    success: function (response) {
-        update_main_data(
-            response.MarketsStat,
-            response.ChangePrices,
-            response.DeltaFast,
-        );
- 
-    },
-    error: function (response) {
-    },
+    $.ajax({
+        url: '/formingPage',
+        async: false,
+        type: 'POST',
+        method: 'POST',
+        cache: false,
+        contentType: 'application/json; charset=utf-8',
+        processData: false,
+        success: function (response) {
 
-});
+            let pairs = response.Pairs;
+            let marketsStat = response.MarketsStat;
+            let changePrices = response.ChangePrices;
+            let deltaFast = response.DeltaFast;
+            let ordersActive = response.OrdersActive;
+            let ordersHistory = response.OrdersHistory;
 
 
+            show_price_panel();
+            show_panel_trade_active();
 
+            // Select pairs
+            let selectPairs = document.querySelector('#pairs');
+            let selectPairsList = document.querySelector('#pairslistOptions');
+            for (let index in pairs) {
+                let option = new Option(pairs[index], pairs[index]);
+                selectPairsList.prepend(option)
+            }
+            selectPairs.addEventListener('change', (e) => {
+                change_pair(e.target.value);
+            });
 
+            // выбор текущей пары
+            let currentPair = localStorage.getItem('currentPair') || 'BTCUSDT';
+            localStorage.setItem('currentPair', currentPair);
 
+            update_main_data(marketsStat, changePrices, deltaFast);
 
+            // TODO Вот этот блок может перенести от сюда ? 
+            // Выбор определенного типа графика
+            let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
+            checkboxes.forEach((checkbox, index) => {
+                checkbox.addEventListener('change', (e) => {
+                    // Сбросить все галочки 
+                    checkboxes.forEach((checkboxClear, index) => {
+                        checkboxClear.checked = false;
+                    });
+                    checkbox.checked = true;
+                    chart_volume_update();
+                })
+            })
 
+            // Формирование panel-trade
+            forming_orders_active(ordersActive);
+            forming_orders_history(ordersHistory);
 
+        },
+        error: function (response) {
+        },
 
-
-    show_price_panel();
-    show_panel_trade_active();
-
-    // Select pairs
-    let selectPairs = document.querySelector('#pairs');
-    let selectPairsList = document.querySelector('#pairslistOptions');
-    for (let index in pairs) {
-        let option = new Option(pairs[index], pairs[index]);
-        selectPairsList.prepend(option)
-    }
-    selectPairs.addEventListener('change', (e) => {
-        change_pair(e.target.value);
     });
 
-    // выбор текущей пары
-    let currentPair = localStorage.getItem('currentPair') || 'BTCUSDT';
-    localStorage.setItem('currentPair', currentPair);
 
-    update_main_data(marketsStat, changePrices, deltaFast);
-
-    // TODO Вот этот блок может перенести от сюда ? 
-    // Выбор определенного типа графика
-    let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
-    checkboxes.forEach((checkbox, index) => {
-        checkbox.addEventListener('change', (e) => {
-            // Сбросить все галочки 
-            checkboxes.forEach((checkboxClear, index) => {
-                checkboxClear.checked = false;
-            });
-            checkbox.checked = true;
-            chart_volume_update();
-        })
-    })
-
-    // Формирование panel-trade
-    forming_orders_active(ordersActive);
-    forming_orders_history(ordersHistory);
 }
 
 function update_main_data(marketsStat, changePrices, deltaFast) {
@@ -266,7 +260,7 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
     localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
 
-    forming_tickers_list();
+    Tickers_list();
     forming_tickers_list_volume();
 
     change_pair(document.querySelector('#pairs').value);
@@ -645,7 +639,7 @@ function forming_tickers_list() {
     document.querySelector('#list-ch-price').style.height = `${ch_price}px`;
 
 
-    
+
     let tbody_price = document.querySelector('#list-ch-price').clientHeight - document.querySelector("thead[name=thead-price]").clientHeight;
 
 
@@ -766,13 +760,13 @@ function forming_tickers_list_volume(frame = '1m') {
         let row = tbody.insertRow(-1);
         row.className = "pair-delta";
 
-        function createCell(innerHTML,nameCell,classCell,element,widthColum) {      
+        function createCell(innerHTML, nameCell, classCell, element, widthColum) {
             let cell = row.insertCell();
             cell.innerHTML = innerHTML;
             cell.setAttribute("name", nameCell);
             cell.classList.add(classCell);
             cell.classList.add(classCell);
-            if (element!=null){
+            if (element != null) {
                 cell.appendChild(chk);
             }
             maxWidths[widthColum] = Math.max(maxWidths[widthColum], cell.clientWidth);
@@ -787,22 +781,22 @@ function forming_tickers_list_volume(frame = '1m') {
         if (favoritePairs.includes(item)) {
             chk.checked = true;
         }
-        createCell('','','delta-col1',chk,'col1')
+        createCell('', '', 'delta-col1', chk, 'col1')
         // 2 столбец ПАРА
-        createCell(item,'pair','delta-col2',null,'col2')
+        createCell(item, 'pair', 'delta-col2', null, 'col2')
         // 3 столбец Volume
-        createCell(deltaFast[item][frame]["Volume"].toFixed(2),'volume','delta-col3',null,'col3')
-         // 4 столбец VolumeBuy
-        createCell(deltaFast[item][frame]["VolumeBuy"].toFixed(2),'volume-buy','delta-col4',null,'col4')
+        createCell(deltaFast[item][frame]["Volume"].toFixed(2), 'volume', 'delta-col3', null, 'col3')
+        // 4 столбец VolumeBuy
+        createCell(deltaFast[item][frame]["VolumeBuy"].toFixed(2), 'volume-buy', 'delta-col4', null, 'col4')
         // 5 столбец VolumeAsk
-        createCell(deltaFast[item][frame]["VolumeAsk"].toFixed(2),'volume-ask','delta-col5',null,'col5')
+        createCell(deltaFast[item][frame]["VolumeAsk"].toFixed(2), 'volume-ask', 'delta-col5', null, 'col5')
         // 6 столбец Trades
-        createCell(deltaFast[item][frame]["Trades"].toFixed(2),'trades','delta-col6',null,'col6')
+        createCell(deltaFast[item][frame]["Trades"].toFixed(2), 'trades', 'delta-col6', null, 'col6')
         // 7 столбец TradesBuy
-        createCell(deltaFast[item][frame]["TradesBuy"].toFixed(2),'trades-buy','delta-col7',null,'col7')
+        createCell(deltaFast[item][frame]["TradesBuy"].toFixed(2), 'trades-buy', 'delta-col7', null, 'col7')
         // 8 столбец TradesAsk
-        createCell(deltaFast[item][frame]["TradesAsk"].toFixed(2),'trades-ask','delta-col8',null,'col8')
- 
+        createCell(deltaFast[item][frame]["TradesAsk"].toFixed(2), 'trades-ask', 'delta-col8', null, 'col8')
+
     };
 
 
@@ -811,9 +805,8 @@ function forming_tickers_list_volume(frame = '1m') {
     for (const colName in maxWidths) {
         document.querySelectorAll(`.delta-${colName}`).forEach(cell => {
             let th_col_width = document.querySelector(`thead[name=thead-delta] .delta-${colName}`);
-            console.log(th_col_width.clientWidth);
             //let th_col_width =th.querySelector(`.delta-${colName}`);
-            cell.style.width = `${Math.max(maxWidths[colName], th_col_width.clientWidth)+5}px`;
+            cell.style.width = `${Math.max(maxWidths[colName], th_col_width.clientWidth) + 5}px`;
         });
     }
 

@@ -86,6 +86,28 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 	//json.NewEncoder(w).Encode(maps)
 }
 
+func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
+
+	maps := map[string]interface{}{
+		"Pairs":         web.App.AssetsPrices.Pairs,
+		"MarketsStat":   web.App.AssetsPrices.MarketsStat,
+		"ChangePrices":  web.App.AssetsPrices.ChangePrices,
+		"DeltaFast":     web.App.AssetsPrices.DeltaFast,
+		"OrdersActive":  web.App.PaperWallet.OrdersActive(),
+		"OrdersHistory": web.App.PaperWallet.OrdersHistory(),
+	}
+
+	mapsJson, err := json.Marshal(maps)
+	if err != nil {
+		web.logError(err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(mapsJson)
+
+	//json.NewEncoder(w).Encode(maps)
+}
+
 func (web *Web) getChangeDelta(w http.ResponseWriter, r *http.Request) {
 
 	data := map[string]string{}
