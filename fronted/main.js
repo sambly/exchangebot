@@ -1,6 +1,10 @@
 import { lw_charts_orders, lw_charts_volume, widget_charts } from './charts.js';
 import { timeToLocal } from './help.js';
-import {Tickers_list} from './table'
+
+import './style.css';
+
+
+// import {Tickers_list} from './table'
 
 
 forming_page();
@@ -52,7 +56,7 @@ $(function () {
     // Меню цены
     $('#btn-price').click(function () {
         show_price_panel();
-        Tickers_list();
+        forming_tickers_list();
         change_pair(document.querySelector('#pairs').value)
     });
 
@@ -81,7 +85,7 @@ $(function () {
         $('.btnPairs').removeClass('active');
         $(this).addClass('active');
 
-        Tickers_list();
+        forming_tickers_list();
         forming_tickers_list_volume();
 
         change_pair(document.querySelector('#pairs').value);
@@ -260,7 +264,7 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
     localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
 
-    Tickers_list();
+    forming_tickers_list();
     forming_tickers_list_volume();
 
     change_pair(document.querySelector('#pairs').value);
@@ -738,16 +742,12 @@ function forming_tickers_list_volume(frame = '1m') {
     const th = document.querySelectorAll("thead[name=thead-delta] th");
     const btnPairsFavorite = document.querySelector("#btnFavoritePairs");
 
-
     // Изменение высоты блоков
     document.querySelector('#list-ch-volume').style.height = `${document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight}px`;
     document.querySelector("#tbody-delta").style.height = `${document.querySelector('#list-ch-volume').clientHeight - document.querySelector("thead[name=thead-delta]").clientHeight}px`;
 
     let deltaFast = JSON.parse(localStorage.getItem('deltaFast')) || [];
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
-
-
-
 
     // для изменения widht по самому широкому стобцу
     let maxWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
@@ -805,8 +805,11 @@ function forming_tickers_list_volume(frame = '1m') {
     for (const colName in maxWidths) {
         document.querySelectorAll(`.delta-${colName}`).forEach(cell => {
             let th_col_width = document.querySelector(`thead[name=thead-delta] .delta-${colName}`);
+            console.log(th_col_width.clientWidth);
             //let th_col_width =th.querySelector(`.delta-${colName}`);
             cell.style.width = `${Math.max(maxWidths[colName], th_col_width.clientWidth) + 5}px`;
+            cell.style.minWidth = `${Math.max(maxWidths[colName], th_col_width.clientWidth) + 5}px`;
+            cell.style.maxWidth = `${Math.max(maxWidths[colName], th_col_width.clientWidth) + 5}px`;
         });
     }
 

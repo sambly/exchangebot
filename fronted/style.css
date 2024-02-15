@@ -1,19 +1,14 @@
-.col {
+.col,
+thead th,
+tbody td{
   text-align: center;
 }
 
-#list {
+#list,
+.chart{
   height: 500px;
 }
-/* 
-#list-ch-price,
-#list-ch-volume {
-  height: 100%;
-} */
-
-.chart {
-  height: 500px;
-}
+ 
 
 
 /* #table-price,
@@ -54,10 +49,6 @@ tbody {
   overflow-y: auto;
 }
 
-thead th,
-tbody td{
-  text-align: center;
-}
 
 
 
@@ -81,7 +72,22 @@ tbody td{
   overflow-y: hidden;
 	position: relative;
 }
-*
+
+
+
+/* ########################################
+ */
+
+
+
+/* 
+#table-delta{
+  table-layout: fixed;
+  width: 100%;
+}  */
+
+
+
 /* #table-delta {
 	display: inline-block;
 	vertical-align: top;

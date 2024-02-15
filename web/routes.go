@@ -1,12 +1,14 @@
 package web
 
 import (
+	"fmt"
 	"io/fs"
 	"main/fronted"
 	"net/http"
 )
 
 func staticHandler() http.Handler {
+	fmt.Println("VIVOD")
 	fsys := fs.FS(fronted.Content)
 	contentStatic, _ := fs.Sub(fsys, "dist")
 	return http.FileServer(http.FS(contentStatic))
