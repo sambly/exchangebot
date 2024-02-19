@@ -5,13 +5,31 @@ import (
 	"io/fs"
 	"main/fronted"
 	"net/http"
+	"os"
 )
 
 func staticHandler() http.Handler {
-	fmt.Println("VIVOD")
 	fsys := fs.FS(fronted.Content)
 	contentStatic, _ := fs.Sub(fsys, "dist")
 	return http.FileServer(http.FS(contentStatic))
+
+}
+
+func getFrontendAssets(production bool) fs.FS {
+
+	fmt.Println("Hi")
+	if production {
+		fsys := fs.FS(fronted.Content)
+		f, err := fs.Sub(fsys, "dist")
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		return f
+	} else {
+
+		return os.DirFS("dist")
+	}
 
 }
 
@@ -27,7 +45,15 @@ func (app *Web) routes() *http.ServeMux {
 
 	mux.HandleFunc("/formingPage", app.formingPage)
 
-	mux.Handle("/", staticHandler())
+	//frontend := getFrontendAssets(false)
+	//mux.Handle("/", http.FileServer(http.FS(frontend)))
+
+	mux.Handle("/", http.FileServer(http.FS(getFrontendAssets(true))))
+
+	// fileServer := http.FileServer(http.Dir("/dist/index.html"))
+	// mux.Handle("/", fileServer)
+
+	//mux.Handle("/", staticHandler())
 
 	// fileServer := http.FileServer(http.Dir("web/static/"))
 	// mux.Handle("/static/", http.StripPrefix("/static", fileServer))

@@ -48,5 +48,6 @@ func NewWeb(app *application.Application, socketsMessage *notification.SocketsMe
 
 func (w *Web) Run() {
 	w.Sockets.SendDataRun()
-	go http.ListenAndServe(":80", w.routes())
+	//go http.ListenAndServe(":80", w.routes())
+	go http.ListenAndServe(":5173", w.routes())
 }

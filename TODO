@@ -49,3 +49,5 @@ forming_tickers_list_volume  где то сохранять frame который
 
 
 что за графиком volume почему он выходит по ширине за границу
+
+  "dev": "vite build --watch",
