@@ -751,6 +751,8 @@ function forming_tickers_list_volume(frame = '1m') {
 
     // для изменения widht по самому широкому стобцу
     let maxWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
+    let thWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
+    console.log(typeof(thWidths));
     for (let item in deltaFast) {
 
         if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {
@@ -799,20 +801,45 @@ function forming_tickers_list_volume(frame = '1m') {
 
     };
 
+    var start = new Date().getTime();
+
+
+    for (const colName in thWidths) {
+        const th_col_width = document.querySelector(`thead[name=thead-delta] .delta-${colName}`);
+        console.log(typeof(th_col_width.clientWidth));
+        thWidths[colName] = th_col_width.clientWidth;
+    }
+
+    //const xxxxx = { 'col1': 28, 'col2': 55, 'col3': 69, 'col4': 79, 'col5': 80, 'col6': 73, 'col7': 84, 'col8': 83}
+
+// Клонируем объект thWidths
+    //let clonedThWidths = Object.assign({}, thWidths);
+    let clonedThWidths = JSON.parse(JSON.stringify(thWidths));
+
+    console.log(clonedThWidths);
 
 
     // Установить ширину столбцов таблицы, основываясь на самой широкой ячейке в каждом столбце.
     for (const colName in maxWidths) {
+
+        const colWidth = Math.max(maxWidths[colName], clonedThWidths[colName]) + 1;
+
+        //const colWidth = Math.max(maxWidths[colName], xxxxx[colName]) + 1;
+
         document.querySelectorAll(`.delta-${colName}`).forEach(cell => {
-            let th_col_width = document.querySelector(`thead[name=thead-delta] .delta-${colName}`);
-            console.log(th_col_width.clientWidth);
-            //let th_col_width =th.querySelector(`.delta-${colName}`);
-            cell.style.width = `${Math.max(maxWidths[colName], th_col_width.clientWidth) + 5}px`;
-            cell.style.minWidth = `${Math.max(maxWidths[colName], th_col_width.clientWidth) + 5}px`;
-            cell.style.maxWidth = `${Math.max(maxWidths[colName], th_col_width.clientWidth) + 5}px`;
+            cell.style.width = `${colWidth}px`;
+            cell.style.minWidth = `${colWidth}px`;
+            cell.style.maxWidth = `${colWidth}px`;
         });
     }
+    
 
+    var end = new Date().getTime();
+ 
+    var time = end - start;
+     
+    console.log('Время выполнения = ' + time);
+    
 
     // Отображение пар все или избранное
     let checkboxAll = document.querySelectorAll('.favorite-pair');
