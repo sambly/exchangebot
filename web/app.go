@@ -33,10 +33,6 @@ func (c *Sockets) SendDataRun() {
 func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage) *Web {
 	web := &Web{
 		App: app,
-		Files: []string{
-			"web/template/home.page.html",
-			"web/template/base.layout.html",
-		},
 	}
 	web.Sockets = Sockets{
 		clients:        make(map[*websocket.Conn]bool),
@@ -48,6 +44,5 @@ func NewWeb(app *application.Application, socketsMessage *notification.SocketsMe
 
 func (w *Web) Run() {
 	w.Sockets.SendDataRun()
-	//go http.ListenAndServe(":80", w.routes())
-	go http.ListenAndServe(":5173", w.routes())
+	go http.ListenAndServe(":80", w.routes())
 }

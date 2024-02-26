@@ -2,8 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	"fmt"
-	"html/template"
 	"io"
 	"main/model"
 	"net/http"
@@ -31,35 +29,6 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true // Пропускаем любой запрос
 	},
-}
-
-func (web *Web) home(w http.ResponseWriter, r *http.Request) {
-
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-
-	data := ViewData{
-		Menu:          []Menu{{Name: "Главная", Url: "/"}},
-		Pairs:         web.App.AssetsPrices.Pairs,
-		MarketsStat:   web.App.AssetsPrices.MarketsStat,
-		ChangePrices:  web.App.AssetsPrices.ChangePrices,
-		DeltaFast:     web.App.AssetsPrices.DeltaFast,
-		OrdersActive:  web.App.PaperWallet.OrdersActive(),
-		OrdersHistory: web.App.PaperWallet.OrdersHistory(),
-	}
-
-	ts, err := template.ParseFiles(web.Files...)
-	if err != nil {
-		web.serverError(w, fmt.Errorf("error parseFiles %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	err = ts.Execute(w, data)
-	if err != nil {
-		web.logError(err)
-	}
 }
 
 func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
