@@ -8,7 +8,7 @@
   height: 500px;
 }
 
-
+#list-ch-price,
 #list-ch-volume {
 	overflow-x: auto;
   overflow-y: hidden;
@@ -17,7 +17,7 @@
 
 #table-price{
   table-layout: fixed;
-  width: 100%;
+  width: 475px;
 } 
 
 #table-delta{
@@ -60,37 +60,37 @@ tbody td{
 
 #table-price th:nth-child(1),
 #table-price td:nth-child(1) {
-  width: 5%;
+  width: 35px;
 }
 
 #table-price th:nth-child(2),
 #table-price td:nth-child(2) {
-  width: 29%;
+  width: 140px;
 }
 
 #table-price th:nth-child(3),
 #table-price td:nth-child(3) {
-  width: 13%;
+  width: 70px;
 }
 
 #table-price th:nth-child(4),
 #table-price td:nth-child(4) {
-  width: 13%;
+  width: 70px;
 }
 
 #table-price th:nth-child(5),
 #table-price td:nth-child(5) {
-  width: 13%;
+  width: 70px;
 }
 
 #table-price th:nth-child(6),
 #table-price td:nth-child(6) {
-  width: 13%;
+  width: 70px;
 }
 
 #table-price th:nth-child(7),
 #table-price td:nth-child(7) {
-  width: 13%;
+  width: 70px;
 }
 
 
