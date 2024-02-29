@@ -641,73 +641,86 @@ function chart_frome_orders_update(chartType) {
 function forming_tickers_list() {
 
 
-    const heads = ['ch3m', 'ch15m', 'ch1h', 'ch4h'];
+    var start = performance.now();
+
+    
     const tbody = document.querySelector("#tbody-price");
     tbody.innerHTML = '';
     const th = document.querySelectorAll("thead[name=thead-price] th");
 
+    const listChPrice = document.querySelector('#list-ch-price');
+    const list = document.querySelector('#list');
+    const listTop = document.querySelector('#list-top');
+    const theadPrice = document.querySelector("thead[name=thead-price]");
 
     // Изменение высоты блоков
-    let ch_price = document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight;
-    document.querySelector('#list-ch-price').style.height = `${ch_price}px`;
+    listChPrice.style.height = `${list.clientHeight - listTop.clientHeight}px`;
+    document.querySelector("#tbody-price").style.height = `${listChPrice.clientHeight - theadPrice.clientHeight}px`;
+    document.querySelector("#tbody-price").style.marginBottom = '0';
 
-
-
-    let tbody_price = document.querySelector('#list-ch-price').clientHeight - document.querySelector("thead[name=thead-price]").clientHeight;
-
-
-    document.querySelector("#tbody-price").style.height = `${tbody_price}px`;
-
-
-
+ 
     const btnPairsFavorite = document.querySelector("#btnFavoritePairs");
 
     let changePrices = JSON.parse(localStorage.getItem('changePrices')) || [];
     let marketsStat = JSON.parse(localStorage.getItem('marketsStat')) || [];
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
 
-    for (let item in changePrices) {
 
-        if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {
-            continue;
-        }
-
-        let row = tbody.insertRow(-1);
-        row.className = "pair-price";
-
-        // Favorite checkbox
-        let cell = row.insertCell();
-
-        let chk = document.createElement('input');
-        chk.setAttribute('type', 'checkbox');
-        chk.setAttribute("name", item);
-        chk.setAttribute('class', 'form-check-input favorite-pair');
-
-        if (favoritePairs.includes(item)) {
-            chk.checked = true;
-        }
-        cell.appendChild(chk);
-
-        // 1 столбец ПАРА
-        cell = row.insertCell();
-        cell.innerHTML = item;
-        cell.setAttribute("name", "pair");
-
-        // 2 столбец Volume
-        cell = row.insertCell();
-        cell.innerHTML = (marketsStat[item].Volume).toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' });
-        cell.setAttribute("name", "volume");
-        cell.setAttribute("value", marketsStat[item].Volume);
-
-        // Остальные столбцы
-        for (let j = 0; j < heads.length; j++) {
-            let cell = row.insertCell();
-            let value = changePrices[item][heads[j]]["СhangePercent"].toFixed(2);
-            cell.innerHTML = value;
-            cell.setAttribute("name", heads[j]);
-        }
-    };
-
+      // для изменения widht по самому широкому стобцу
+      let maxWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
+      let exp;
+      for (let item in changePrices) {
+  
+          if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {
+              continue;
+          }
+  
+          let row = tbody.insertRow(-1);
+          row.className = "pair-price";
+  
+          function createCell(innerHTML, attributeObject, classCell, element, widthColum) {
+              let cell = row.insertCell();
+              cell.innerHTML = innerHTML;
+              for (let key in attributeObject) {
+                  cell.setAttribute(key, attributeObject[key]);
+              }
+              cell.classList.add(classCell);
+              if (element != null) {
+                  cell.appendChild(chk);
+              }
+            //   exp = cell.getBoundingClientRect().width;
+            //   maxWidths[widthColum] = cell.getBoundingClientRect().width;
+              //maxWidths[widthColum] = Math.max(maxWidths[widthColum], cell.clientWidth);
+          }
+  
+          // 1 столбец Favorite checkbox
+          let chk = document.createElement('input');
+          chk.setAttribute('type', 'checkbox');
+          chk.setAttribute("name", item);
+          chk.setAttribute('class', 'form-check-input favorite-pair');
+          if (favoritePairs.includes(item)) {
+              chk.checked = true;
+          }
+          createCell('', '', 'price-col1', chk, 'col1');
+          // 2 столбец ПАРА
+          createCell(item, {'name': 'pair'}, 'price-col2', null, 'col2');
+          // 3 столбец Volume
+          createCell(
+              (marketsStat[item].Volume).toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' }),
+              {'name':'volume','value':marketsStat[item].Volume}, 'price-col3', null, 'col3');
+  
+          const heads = ['ch3m', 'ch15m', 'ch1h', 'ch4h'];
+          // 4 столбец ch3m
+          createCell(changePrices[item][heads[0]]['СhangePercent'].toFixed(2), {'name':heads[0]}, 'price-col4', null, 'col4');
+          // 5 столбец ch15m
+          createCell(changePrices[item][heads[1]]['СhangePercent'].toFixed(2), {'name':heads[1]}, 'price-col5', null, 'col5');
+          // 6 столбец ch1h
+          createCell(changePrices[item][heads[2]]['СhangePercent'].toFixed(2), {'name':heads[2]}, 'price-col6', null, 'col6');
+          // 7 столбец ch4h
+          createCell(changePrices[item][heads[3]]['СhangePercent'].toFixed(2), {'name':heads[3]}, 'price-col7', null, 'col7');
+  
+      };
+ 
 
     // Отображение пар все или избранное
     let checkboxAll = document.querySelectorAll('.favorite-pair');
@@ -742,6 +755,10 @@ function forming_tickers_list() {
     sort_table(tbody, th, tr);
 
 
+    // Расчет времени выполнения 
+    var end = performance.now();
+    var time = end - start;
+    console.log('Время выполнения forming_tickers_list = ' + time);
 }
 
 function forming_tickers_list_volume(frame = '1m') {
@@ -756,8 +773,6 @@ function forming_tickers_list_volume(frame = '1m') {
     const listTop = document.querySelector('#list-top');
     const theadDelta = document.querySelector("thead[name=thead-delta]");
 
-
-
     const th = document.querySelectorAll("thead[name=thead-delta] th");
     const btnPairsFavorite = document.querySelector("#btnFavoritePairs");
 
@@ -771,7 +786,7 @@ function forming_tickers_list_volume(frame = '1m') {
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
 
     // для изменения widht по самому широкому стобцу
-    let maxWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
+    //let maxWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
 
     for (let item in deltaFast) {
 
@@ -790,7 +805,7 @@ function forming_tickers_list_volume(frame = '1m') {
             if (element != null) {
                 cell.appendChild(chk);
             }
-            maxWidths[widthColum] = Math.max(maxWidths[widthColum], cell.clientWidth);
+            //maxWidths[widthColum] = Math.max(maxWidths[widthColum], cell.clientWidth);
         }
 
         // 1 столбец Favorite checkbox
@@ -821,19 +836,19 @@ function forming_tickers_list_volume(frame = '1m') {
 
 
 
-    requestAnimationFrame(() => {
-        // Установить ширину столбцов таблицы, основываясь на самой широкой ячейке в каждом столбце.
-        for (const colName in maxWidths) {
+    // requestAnimationFrame(() => {
+    //     // Установить ширину столбцов таблицы, основываясь на самой широкой ячейке в каждом столбце.
+    //     for (const colName in maxWidths) {
 
-            const th_col_width = document.querySelector(`thead[name=thead-delta] .delta-${colName}`);
-            const colWidth = Math.max(maxWidths[colName], th_col_width.clientWidth);
-            document.querySelectorAll(`.delta-${colName}`).forEach(cell => {
-                cell.style.width = `${colWidth}px`;
-                cell.style.minWidth = `${colWidth}px`;
-                cell.style.maxWidth = `${colWidth}px`;
-            });
-        }
-    });
+    //         const th_col_width = document.querySelector(`thead[name=thead-delta] .delta-${colName}`);
+    //         const colWidth = Math.max(maxWidths[colName], th_col_width.clientWidth);
+    //         document.querySelectorAll(`.delta-${colName}`).forEach(cell => {
+    //             cell.style.width = `${colWidth}px`;
+    //             cell.style.minWidth = `${colWidth}px`;
+    //             cell.style.maxWidth = `${colWidth}px`;
+    //         });
+    //     }
+    // });
 
     // Отображение пар все или избранное
     let checkboxAll = document.querySelectorAll('.favorite-pair');
@@ -867,12 +882,11 @@ function forming_tickers_list_volume(frame = '1m') {
     // Сортировка таблицы
     sort_table(tbody, th, tr);
 
+
+    // Расчет времени выполнения 
     var end = performance.now();
-
     var time = end - start;
-
     console.log('Время выполнения forming_tickers_list_volume = ' + time);
-
 };
 
 function sort_table(tbody, th, tr) {

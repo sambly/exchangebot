@@ -1,31 +1,38 @@
 
 
-
 #list {
-  /* display: flex;
-  flex-direction: column; */
   height: 500px;
 }
 
-
+.chart{
+  height: 500px;
+}
 
 
 #list-ch-volume {
 	overflow-x: auto;
   overflow-y: hidden;
 	position: relative;
-  /* flex: 1; */
 }
 
+#table-price{
+  table-layout: fixed;
+  width: 100%;
+} 
+
+#table-delta{
+  table-layout: fixed;
+  width: 685px;
+} 
+
+tbody {
+  display: block;
+  overflow-y: auto; 
+}
 
 thead,
 tbody tr {
   display: table;
-}
-
-tbody {
-  display: block;
-  overflow-y: auto;
 }
 
 thead th,
@@ -33,13 +40,8 @@ tbody td{
   text-align: center;
 }
 
-
 .col{
   text-align: center;
-}
-
-.chart{
-  height: 500px;
 }
 
 .table-tr-not-active {
@@ -50,12 +52,11 @@ tbody td{
   background-color: #6c757d;
 }
 
-
-
 #table-trade-active tbody,
 #table-trade-history tbody {
   max-height: 300px;
 }
+
 
 #table-price th:nth-child(1),
 #table-price td:nth-child(1) {
@@ -92,6 +93,46 @@ tbody td{
   width: 13%;
 }
 
+
+#table-delta th:nth-child(1),
+#table-delta td:nth-child(1) {
+  width: 35px;
+}
+
+#table-delta th:nth-child(2),
+#table-delta td:nth-child(2) {
+  width: 140px;
+}
+
+#table-delta th:nth-child(3),
+#table-delta td:nth-child(3) {
+  width: 85px;
+}
+
+#table-delta th:nth-child(4),
+#table-delta td:nth-child(4) {
+  width: 85px;
+}
+
+#table-delta th:nth-child(5),
+#table-delta td:nth-child(5) {
+  width: 85px;
+}
+
+#table-delta th:nth-child(6),
+#table-delta td:nth-child(6) {
+  width: 85px;
+}
+
+#table-delta th:nth-child(7),
+#table-delta td:nth-child(7) {
+  width: 85px;
+}
+
+#table-delta th:nth-child(8),
+#table-delta td:nth-child(8) {
+  width: 85px;
+}
 
 
 
@@ -241,73 +282,3 @@ tbody td{
 }
 
 
-
-
-/* #table-price,
-#table-delta,
-#table-trade-active,
-#table-trade-history {
-  table-layout: fixed;
-  width: 100%;
-} */
-
-/* #table-price,
-#table-delta,
-#table-trade-active,
-#table-trade-history {
-  height: 100%;
-} */
-
-
-
-/* #table-delta th:nth-child(1),
-#table-delta td:nth-child(1) {
-  width: 5%;
-}
-
-#table-delta th:nth-child(2),
-#table-delta td:nth-child(2) {
-  width: 35%;
-}
-
-#table-delta th:nth-child(3),
-#table-delta td:nth-child(3) {
-  width: 30%;
-}
-
-#table-delta th:nth-child(4),
-#table-delta td:nth-child(4) {
-  width: 30%;
-} */
-
-
-
-/* 
-#table-delta{
-  table-layout: fixed;
-  width: 100%;
-}  */
-
-
-
-/* #table-delta {
-	display: inline-block;
-	vertical-align: top;
-	max-width: 100%;
-	overflow-x: auto;
-	white-space: nowrap;
-	-webkit-overflow-scrolling: touch;
-}  */
-
-
-/* #table-price tbody,
-#table-delta tbody {
-  max-height: 418px;
-} */
-
-
-
-/* tbody td {
-  text-align: center;
-  word-break: break-all;
-} */
