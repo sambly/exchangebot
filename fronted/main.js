@@ -7,9 +7,12 @@ import './style.css';
 // import {Tickers_list} from './table'
 
 
-forming_page();
+
 
 $(function () {
+
+
+    forming_page();
 
     //#############################################################################  webSocket #############################################################################
 
@@ -64,7 +67,7 @@ $(function () {
     $('#btn-volume').click(function () {
         show_volume_panel();
         forming_tickers_list_volume();
-        change_pair(document.querySelector('#pairs').value)
+        change_pair(document.querySelector('#pairs').value);
     });
 
     // Аткинвые кнопки ордеров
@@ -85,6 +88,7 @@ $(function () {
         $('.btnPairs').removeClass('active');
         $(this).addClass('active');
 
+        // TODO здесь надо либо одно открывать либо другое 
         forming_tickers_list();
         forming_tickers_list_volume();
 
@@ -207,7 +211,6 @@ function forming_page() {
             let ordersActive = response.OrdersActive;
             let ordersHistory = response.OrdersHistory;
 
-
             show_price_panel();
             show_panel_trade_active();
 
@@ -257,6 +260,7 @@ function forming_page() {
 
 function update_main_data(marketsStat, changePrices, deltaFast) {
 
+
     localStorage.setItem('marketsStat', JSON.stringify(marketsStat));
     localStorage.setItem('changePrices', JSON.stringify(changePrices));
     localStorage.setItem('deltaFast', JSON.stringify(deltaFast));
@@ -264,8 +268,9 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
     localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
 
+    // TODO здесь я пока уберу forming_tickers_list_volume
     forming_tickers_list();
-    forming_tickers_list_volume();
+    //forming_tickers_list_volume();
 
     change_pair(document.querySelector('#pairs').value);
 
@@ -315,6 +320,8 @@ function change_pair(pair) {
         }
 
     }
+
+    // var listVolume = document.getElementById('list-ch-volume');
     // Перемещение курсора в списке объемов
     if ($('#list-ch-volume').css('display') == "block") {
         var rowsVolume = document.querySelector("#tbody-delta").rows;
@@ -326,7 +333,9 @@ function change_pair(pair) {
                 rowsVolume[i].scrollIntoView({
                     behavior: 'smooth',
                     block: 'center'
+                    // inline: 'nearest' // Указываем явно, что прокрутка должна быть ближайшей к краю контейнера
                 });
+                // listVolume.scrollIntoView(false); // Прокручиваем контейнер #list-ch-volume к его текущему положению
             }
         }
         chart_volume_update();
@@ -737,22 +746,33 @@ function forming_tickers_list() {
 
 function forming_tickers_list_volume(frame = '1m') {
 
+
+    var start = performance.now();
+
     const tbody = document.querySelector("#tbody-delta");
     tbody.innerHTML = '';
+    const listChVolume = document.querySelector('#list-ch-volume');
+    const list = document.querySelector('#list');
+    const listTop = document.querySelector('#list-top');
+    const theadDelta = document.querySelector("thead[name=thead-delta]");
+
+
+
     const th = document.querySelectorAll("thead[name=thead-delta] th");
     const btnPairsFavorite = document.querySelector("#btnFavoritePairs");
 
     // Изменение высоты блоков
-    document.querySelector('#list-ch-volume').style.height = `${document.querySelector('#list').clientHeight - document.querySelector('#list-top').clientHeight}px`;
-    document.querySelector("#tbody-delta").style.height = `${document.querySelector('#list-ch-volume').clientHeight - document.querySelector("thead[name=thead-delta]").clientHeight}px`;
+    listChVolume.style.height = `${list.clientHeight - listTop.clientHeight}px`;
+    document.querySelector("#tbody-delta").style.height = `${listChVolume.clientHeight - theadDelta.clientHeight}px`;
+    document.querySelector("#table-delta").style.marginBottom = '0';
+
 
     let deltaFast = JSON.parse(localStorage.getItem('deltaFast')) || [];
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
 
     // для изменения widht по самому широкому стобцу
     let maxWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
-    let thWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
-    console.log(typeof(thWidths));
+
     for (let item in deltaFast) {
 
         if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {
@@ -767,13 +787,11 @@ function forming_tickers_list_volume(frame = '1m') {
             cell.innerHTML = innerHTML;
             cell.setAttribute("name", nameCell);
             cell.classList.add(classCell);
-            cell.classList.add(classCell);
             if (element != null) {
                 cell.appendChild(chk);
             }
             maxWidths[widthColum] = Math.max(maxWidths[widthColum], cell.clientWidth);
         }
-
 
         // 1 столбец Favorite checkbox
         let chk = document.createElement('input');
@@ -801,45 +819,21 @@ function forming_tickers_list_volume(frame = '1m') {
 
     };
 
-    var start = new Date().getTime();
 
 
-    for (const colName in thWidths) {
-        const th_col_width = document.querySelector(`thead[name=thead-delta] .delta-${colName}`);
-        console.log(typeof(th_col_width.clientWidth));
-        thWidths[colName] = th_col_width.clientWidth;
-    }
+    requestAnimationFrame(() => {
+        // Установить ширину столбцов таблицы, основываясь на самой широкой ячейке в каждом столбце.
+        for (const colName in maxWidths) {
 
-    //const xxxxx = { 'col1': 28, 'col2': 55, 'col3': 69, 'col4': 79, 'col5': 80, 'col6': 73, 'col7': 84, 'col8': 83}
-
-// Клонируем объект thWidths
-    //let clonedThWidths = Object.assign({}, thWidths);
-    let clonedThWidths = JSON.parse(JSON.stringify(thWidths));
-
-    console.log(clonedThWidths);
-
-
-    // Установить ширину столбцов таблицы, основываясь на самой широкой ячейке в каждом столбце.
-    for (const colName in maxWidths) {
-
-        const colWidth = Math.max(maxWidths[colName], clonedThWidths[colName]) + 1;
-
-        //const colWidth = Math.max(maxWidths[colName], xxxxx[colName]) + 1;
-
-        document.querySelectorAll(`.delta-${colName}`).forEach(cell => {
-            cell.style.width = `${colWidth}px`;
-            cell.style.minWidth = `${colWidth}px`;
-            cell.style.maxWidth = `${colWidth}px`;
-        });
-    }
-    
-
-    var end = new Date().getTime();
- 
-    var time = end - start;
-     
-    console.log('Время выполнения = ' + time);
-    
+            const th_col_width = document.querySelector(`thead[name=thead-delta] .delta-${colName}`);
+            const colWidth = Math.max(maxWidths[colName], th_col_width.clientWidth);
+            document.querySelectorAll(`.delta-${colName}`).forEach(cell => {
+                cell.style.width = `${colWidth}px`;
+                cell.style.minWidth = `${colWidth}px`;
+                cell.style.maxWidth = `${colWidth}px`;
+            });
+        }
+    });
 
     // Отображение пар все или избранное
     let checkboxAll = document.querySelectorAll('.favorite-pair');
@@ -872,6 +866,13 @@ function forming_tickers_list_volume(frame = '1m') {
     const tr = document.querySelectorAll(".pair-delta");
     // Сортировка таблицы
     sort_table(tbody, th, tr);
+
+    var end = performance.now();
+
+    var time = end - start;
+
+    console.log('Время выполнения forming_tickers_list_volume = ' + time);
+
 };
 
 function sort_table(tbody, th, tr) {
