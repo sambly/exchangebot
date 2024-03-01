@@ -4,10 +4,6 @@ import { timeToLocal } from './help.js';
 import './style.css';
 
 
-// import {Tickers_list} from './table'
-
-
-
 
 $(function () {
 

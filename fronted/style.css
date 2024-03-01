@@ -8,6 +8,10 @@
   height: 500px;
 }
 
+.col{
+  text-align: center;
+}
+
 #list-ch-price,
 #list-ch-volume {
 	overflow-x: auto;
@@ -23,7 +27,21 @@
 #table-delta{
   table-layout: fixed;
   width: 685px;
-} 
+}
+
+#table-trade-active,
+#table-trade-history{
+  table-layout: fixed;
+  width: 100%;
+}
+
+#table-trade-active tbody,
+#table-trade-history tbody {
+  max-height: 300px;
+
+}
+
+
 
 tbody {
   display: block;
@@ -33,6 +51,7 @@ tbody {
 thead,
 tbody tr {
   display: table;
+  width: 100%;
 }
 
 thead th,
@@ -40,9 +59,7 @@ tbody td{
   text-align: center;
 }
 
-.col{
-  text-align: center;
-}
+
 
 .table-tr-not-active {
   background-color: #f8f9fa;
@@ -52,10 +69,7 @@ tbody td{
   background-color: #6c757d;
 }
 
-#table-trade-active tbody,
-#table-trade-history tbody {
-  max-height: 300px;
-}
+
 
 
 #table-price th:nth-child(1),
