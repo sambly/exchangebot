@@ -206,6 +206,7 @@ function forming_page() {
             let deltaFast = response.DeltaFast;
             let ordersActive = response.OrdersActive;
             let ordersHistory = response.OrdersHistory;
+            let strategyDescription = response.OptionStrategy;
 
             show_price_panel();
             show_panel_trade_active();
@@ -220,6 +221,15 @@ function forming_page() {
             selectPairs.addEventListener('change', (e) => {
                 change_pair(e.target.value);
             });
+
+            // option Strategy
+            let selectStrategy = document.querySelector('#panel-trade-strategy'); 
+
+            for (let optionName in strategyDescription) {
+                let option = new Option(optionName,"");
+                option.setAttribute("title",strategyDescription[optionName].description);
+                selectStrategy.prepend(option);
+            }
 
             // выбор текущей пары
             let currentPair = localStorage.getItem('currentPair') || 'BTCUSDT';
@@ -264,9 +274,8 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
     localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
 
-    // TODO здесь я пока уберу forming_tickers_list_volume
     forming_tickers_list();
-    //forming_tickers_list_volume();
+    forming_tickers_list_volume();
 
     change_pair(document.querySelector('#pairs').value);
 
@@ -979,6 +988,29 @@ function color_text_profit(number) {
         return 'red';
     }
 }
+
+
+function showTooltip(element, text) {
+    var tooltip = document.createElement('div');
+    tooltip.className = 'tooltip';
+    tooltip.textContent = text;
+    document.body.appendChild(tooltip);
+
+    var rect = element.getBoundingClientRect();
+    var tooltipWidth = tooltip.offsetWidth;
+    var tooltipHeight = tooltip.offsetHeight;
+
+    tooltip.style.left = rect.left + (rect.width / 2) - (tooltipWidth / 2) + 'px';
+    tooltip.style.top = rect.top - tooltipHeight - 5 + 'px';
+}
+
+function hideTooltip() {
+    var tooltip = document.querySelector('.tooltip');
+    if (tooltip) {
+        tooltip.parentNode.removeChild(tooltip);
+    }
+}
+
 
 function get_response_message(response, reload) {
     if (response['err'] != "" && response['err'] != null) {

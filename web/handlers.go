@@ -5,6 +5,7 @@ import (
 	"io"
 	"main/model"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/gorilla/websocket"
@@ -57,13 +58,24 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 
 func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
 
+	// Список стратегий
+	optionByte, err := os.ReadFile("web/strategy.json")
+	if err != nil {
+		web.logError(err)
+	}
+	var option map[string]interface{}
+	if err := json.Unmarshal(optionByte, &option); err != nil {
+		web.logError(err)
+	}
+
 	maps := map[string]interface{}{
-		"Pairs":         web.App.AssetsPrices.Pairs,
-		"MarketsStat":   web.App.AssetsPrices.MarketsStat,
-		"ChangePrices":  web.App.AssetsPrices.ChangePrices,
-		"DeltaFast":     web.App.AssetsPrices.DeltaFast,
-		"OrdersActive":  web.App.PaperWallet.OrdersActive(),
-		"OrdersHistory": web.App.PaperWallet.OrdersHistory(),
+		"Pairs":          web.App.AssetsPrices.Pairs,
+		"MarketsStat":    web.App.AssetsPrices.MarketsStat,
+		"ChangePrices":   web.App.AssetsPrices.ChangePrices,
+		"DeltaFast":      web.App.AssetsPrices.DeltaFast,
+		"OrdersActive":   web.App.PaperWallet.OrdersActive(),
+		"OrdersHistory":  web.App.PaperWallet.OrdersHistory(),
+		"OptionStrategy": option,
 	}
 
 	mapsJson, err := json.Marshal(maps)

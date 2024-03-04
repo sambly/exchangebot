@@ -66,9 +66,6 @@ func (app *Application) Run() error {
 	}
 	go app.dataFeed.Start(true)
 
-	// app.OrderController.Start()
-	// defer app.OrderController.Stop()
-
 	//Для предварительного заполения цен всех пар, может сделать меньше время, просто добавляет погрешность для 10m
 	var tickerInterval_Init time.Duration = time.Second * 10 // Здесь выставить 40
 	ticker_Init := time.NewTicker(tickerInterval_Init)
