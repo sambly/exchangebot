@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"main/account"
 	"main/exchange"
 	"main/model"
@@ -100,19 +99,19 @@ func (app *Application) Run() error {
 
 		case <-ticker_1h.C:
 			app.AssetsPrices.UpdateChanges("ch1h")
-			err := app.Account.UpdateAssets()
-			if err != nil {
-				fmt.Printf("%v", err)
-				return err
-			}
+			// err := app.Account.UpdateAssets()
+			// if err != nil {
+			// 	fmt.Printf("%v", err)
+			// 	return err
+			// }
 
 		case <-ticker_4h.C:
 			app.AssetsPrices.UpdateChanges("ch4h")
-			err := app.Account.UpdateAssets()
-			if err != nil {
-				fmt.Printf("%v", err)
-				return err
-			}
+			// err := app.Account.UpdateAssets()
+			// if err != nil {
+			// 	fmt.Printf("%v", err)
+			// 	return err
+			// }
 		}
 	}
 }
