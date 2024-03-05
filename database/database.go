@@ -10,20 +10,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-const (
-	username = "root"
-	password = "q1w2e3"
-	hostname = "127.0.0.1:3306"
-	dbname   = "datafeeder"
-)
-
-func dsn(dbName string) string {
+func dsn(dbname, hostname, username, password string) string {
 	loc := `loc=Europe%2FMoscow`
-	return fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&%s", username, password, hostname, dbName, loc)
+	return fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&%s", username, password, hostname, dbname, loc)
 }
 
-func DbConnection() (*sql.DB, error) {
-	db, err := sql.Open("mysql", dsn(""))
+func DbConnection(dbname, hostname, username, password string) (*sql.DB, error) {
+	db, err := sql.Open("mysql", dsn(dbname, hostname, username, password))
 	if err != nil {
 		return nil, fmt.Errorf("error %s when opening DB", err)
 	}
@@ -39,7 +32,7 @@ func DbConnection() (*sql.DB, error) {
 	}
 	db.Close()
 
-	db, err = sql.Open("mysql", dsn(dbname))
+	db, err = sql.Open("mysql", dsn(dbname, hostname, username, password))
 	if err != nil {
 		return nil, fmt.Errorf("error %s when opening DB", err)
 	}

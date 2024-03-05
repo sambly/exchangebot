@@ -11,7 +11,9 @@ import (
 type Web struct {
 	App *application.Application
 	Sockets
-	auth auth
+	production     bool
+	productionPort string
+	auth           auth
 }
 
 type auth struct {
@@ -35,7 +37,7 @@ func (c *Sockets) SendDataRun() {
 	}(c.socketsMessage.Message)
 }
 
-func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, username, password string) *Web {
+func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, production bool, productionPort, username, password string) *Web {
 	web := &Web{
 		App: app,
 	}
@@ -52,5 +54,11 @@ func NewWeb(app *application.Application, socketsMessage *notification.SocketsMe
 
 func (w *Web) Run() {
 	w.Sockets.SendDataRun()
-	go http.ListenAndServe(":80", w.routes())
+
+	if w.production {
+		go http.ListenAndServe(":"+w.productionPort, w.routes())
+	} else {
+		go http.ListenAndServe(":80", w.routes())
+	}
+
 }
