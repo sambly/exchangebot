@@ -44,6 +44,15 @@ func main() {
 		log.Fatal("No .env str TELEGRAM_USER found")
 	}
 
+	usernameAuth, exists := os.LookupEnv("usernameAuth")
+	if !exists {
+		log.Fatal("No .env str btscadaUsername found")
+	}
+	passwordAuth, exists := os.LookupEnv("passwordAuth")
+	if !exists {
+		log.Fatal("No .env str btscadaPassword found")
+	}
+
 	mylog.InitLogger()
 
 	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(apiKey, secretKey))
@@ -104,7 +113,7 @@ func main() {
 	}
 	appTelegram.Start()
 
-	web := web.NewWeb(app, socketsMessage)
+	web := web.NewWeb(app, socketsMessage, usernameAuth, passwordAuth)
 	web.Run()
 
 	app.Run()

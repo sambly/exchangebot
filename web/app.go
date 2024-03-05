@@ -9,9 +9,14 @@ import (
 )
 
 type Web struct {
-	App   *application.Application
-	Files []string
+	App *application.Application
 	Sockets
+	auth auth
+}
+
+type auth struct {
+	username string
+	password string
 }
 
 type Sockets struct {
@@ -30,7 +35,7 @@ func (c *Sockets) SendDataRun() {
 	}(c.socketsMessage.Message)
 }
 
-func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage) *Web {
+func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, username, password string) *Web {
 	web := &Web{
 		App: app,
 	}
@@ -38,6 +43,9 @@ func NewWeb(app *application.Application, socketsMessage *notification.SocketsMe
 		clients:        make(map[*websocket.Conn]bool),
 		socketsMessage: socketsMessage,
 	}
+
+	auth := auth{username: username, password: password}
+	web.auth = auth
 
 	return web
 }

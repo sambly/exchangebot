@@ -1,6 +1,8 @@
 package web
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"fmt"
 	"io/fs"
 	"main/fronted"
@@ -26,17 +28,73 @@ func getFrontendAssets(production bool) fs.FS {
 }
 
 func (app *Web) routes() *http.ServeMux {
+
+	production := false
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/formingPage", app.formingPage)
-	mux.HandleFunc("/updatefull", app.updateFull)
-	mux.HandleFunc("/getChangeDelta", app.getChangeDelta)
-	mux.HandleFunc("/updateTop", app.updateTop)
-	mux.HandleFunc("/openDeal", app.openDeal)
-	mux.HandleFunc("/closeDeal", app.closeDeal)
-	mux.HandleFunc("/ws", app.echo)
+	mux.HandleFunc("/formingPage", app.basicAuth(app.formingPage))
+	mux.HandleFunc("/updatefull", app.basicAuth(app.updateFull))
+	mux.HandleFunc("/getChangeDelta", app.basicAuth(app.getChangeDelta))
+	mux.HandleFunc("/updateTop", app.basicAuth(app.updateTop))
+	mux.HandleFunc("/openDeal", app.basicAuth(app.openDeal))
+	mux.HandleFunc("/closeDeal", app.basicAuth(app.closeDeal))
+	mux.HandleFunc("/ws", app.basicAuth(app.echo))
 
-	mux.Handle("/", http.FileServer(http.FS(getFrontendAssets(false))))
+	//mux.Handle("/", http.FileServer(http.FS(getFrontendAssets(production))))
+
+	mux.HandleFunc("/", app.basicAuth(http.FileServer(http.FS(getFrontendAssets(production))).ServeHTTP))
 
 	return mux
+}
+
+func (app *Web) basicAuth(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		if ok {
+			usernameHash := sha256.Sum256([]byte(username))
+			passwordHash := sha256.Sum256([]byte(password))
+			expectedUsernameHash := sha256.Sum256([]byte(app.auth.username))
+			expectedPasswordHash := sha256.Sum256([]byte(app.auth.password))
+
+			usernameMatch := (subtle.ConstantTimeCompare(usernameHash[:], expectedUsernameHash[:]) == 1)
+			passwordMatch := (subtle.ConstantTimeCompare(passwordHash[:], expectedPasswordHash[:]) == 1)
+
+			if usernameMatch && passwordMatch {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	})
+}
+
+func (app *Web) middle(next http.HandlerFunc, authBase bool) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		if authBase {
+			username, password, ok := r.BasicAuth()
+			if ok {
+				usernameHash := sha256.Sum256([]byte(username))
+				passwordHash := sha256.Sum256([]byte(password))
+				expectedUsernameHash := sha256.Sum256([]byte(app.auth.username))
+				expectedPasswordHash := sha256.Sum256([]byte(app.auth.password))
+
+				usernameMatch := (subtle.ConstantTimeCompare(usernameHash[:], expectedUsernameHash[:]) == 1)
+				passwordMatch := (subtle.ConstantTimeCompare(passwordHash[:], expectedPasswordHash[:]) == 1)
+
+				if usernameMatch && passwordMatch {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		} else {
+			next.ServeHTTP(w, r)
+		}
+
+	})
 }
