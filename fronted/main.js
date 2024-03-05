@@ -2,6 +2,7 @@ import { lw_charts_orders, lw_charts_volume, widget_charts } from './charts.js';
 import { timeToLocal } from './help.js';
 
 import './style.css';
+import './custom.scss';
 
 
 
@@ -223,11 +224,11 @@ function forming_page() {
             });
 
             // option Strategy
-            let selectStrategy = document.querySelector('#panel-trade-strategy'); 
+            let selectStrategy = document.querySelector('#panel-trade-strategy');
 
             for (let optionName in strategyDescription) {
-                let option = new Option(optionName,"");
-                option.setAttribute("title",strategyDescription[optionName].description);
+                let option = new Option(optionName, "");
+                option.setAttribute("title", strategyDescription[optionName].description);
                 selectStrategy.prepend(option);
             }
 
@@ -648,7 +649,7 @@ function forming_tickers_list() {
 
     var start = performance.now();
 
-    
+
     const tbody = document.querySelector("#tbody-price");
     tbody.innerHTML = '';
     const th = document.querySelectorAll("thead[name=thead-price] th");
@@ -661,71 +662,64 @@ function forming_tickers_list() {
     // Изменение высоты блоков
     listChPrice.style.height = `${list.clientHeight - listTop.clientHeight}px`;
     document.querySelector("#tbody-price").style.height = `${listChPrice.clientHeight - theadPrice.clientHeight}px`;
-    document.querySelector("#tbody-price").style.marginBottom = '0';
+    document.querySelector("#table-price").style.marginBottom = '0';
 
- 
+
     const btnPairsFavorite = document.querySelector("#btnFavoritePairs");
 
     let changePrices = JSON.parse(localStorage.getItem('changePrices')) || [];
     let marketsStat = JSON.parse(localStorage.getItem('marketsStat')) || [];
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
 
+    for (let pair in changePrices) {
 
-      // для изменения widht по самому широкому стобцу
-      let maxWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
-      let exp;
-      for (let item in changePrices) {
-  
-          if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {
-              continue;
-          }
-  
-          let row = tbody.insertRow(-1);
-          row.className = "pair-price";
-  
-          function createCell(innerHTML, attributeObject, classCell, element, widthColum) {
-              let cell = row.insertCell();
-              cell.innerHTML = innerHTML;
-              for (let key in attributeObject) {
-                  cell.setAttribute(key, attributeObject[key]);
-              }
-              cell.classList.add(classCell);
-              if (element != null) {
-                  cell.appendChild(chk);
-              }
-            //   exp = cell.getBoundingClientRect().width;
-            //   maxWidths[widthColum] = cell.getBoundingClientRect().width;
-              //maxWidths[widthColum] = Math.max(maxWidths[widthColum], cell.clientWidth);
-          }
-  
-          // 1 столбец Favorite checkbox
-          let chk = document.createElement('input');
-          chk.setAttribute('type', 'checkbox');
-          chk.setAttribute("name", item);
-          chk.setAttribute('class', 'form-check-input favorite-pair');
-          if (favoritePairs.includes(item)) {
-              chk.checked = true;
-          }
-          createCell('', '', 'price-col1', chk, 'col1');
-          // 2 столбец ПАРА
-          createCell(item, {'name': 'pair'}, 'price-col2', null, 'col2');
-          // 3 столбец Volume
-          createCell(
-              (marketsStat[item].Volume).toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' }),
-              {'name':'volume','value':marketsStat[item].Volume}, 'price-col3', null, 'col3');
-  
-          const heads = ['ch3m', 'ch15m', 'ch1h', 'ch4h'];
-          // 4 столбец ch3m
-          createCell(changePrices[item][heads[0]]['СhangePercent'].toFixed(2), {'name':heads[0]}, 'price-col4', null, 'col4');
-          // 5 столбец ch15m
-          createCell(changePrices[item][heads[1]]['СhangePercent'].toFixed(2), {'name':heads[1]}, 'price-col5', null, 'col5');
-          // 6 столбец ch1h
-          createCell(changePrices[item][heads[2]]['СhangePercent'].toFixed(2), {'name':heads[2]}, 'price-col6', null, 'col6');
-          // 7 столбец ch4h
-          createCell(changePrices[item][heads[3]]['СhangePercent'].toFixed(2), {'name':heads[3]}, 'price-col7', null, 'col7');
-  
-      };
- 
+        if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(pair)) {
+            continue;
+        }
+
+        let row = tbody.insertRow(-1);
+        row.className = "pair-price";
+
+        function createCell(innerHTML, attributeObject, classCell, element, widthColum) {
+            let cell = row.insertCell();
+            cell.innerHTML = innerHTML;
+            for (let key in attributeObject) {
+                cell.setAttribute(key, attributeObject[key]);
+            }
+            cell.classList.add(classCell);
+            if (element != null) {
+                cell.appendChild(chk);
+            }
+        }
+
+        // 1 столбец Favorite checkbox
+        let chk = document.createElement('input');
+        chk.setAttribute('type', 'checkbox');
+        chk.setAttribute("name", pair);
+        chk.setAttribute('class', 'form-check-input favorite-pair');
+        if (favoritePairs.includes(pair)) {
+            chk.checked = true;
+        }
+        createCell('', '', 'price-col1', chk, 'col1');
+        // 2 столбец ПАРА
+        createCell(pair.split("USDT")[0], { 'name': 'pair' }, 'price-col2', null, 'col2');
+        // 3 столбец Volume
+        createCell(
+            (marketsStat[pair].Volume).toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' }),
+            { 'name': 'volume', 'value': marketsStat[pair].Volume }, 'price-col3', null, 'col3');
+
+        const heads = ['ch3m', 'ch15m', 'ch1h', 'ch4h'];
+        // 4 столбец ch3m
+        createCell(changePrices[pair][heads[0]]['СhangePercent'].toFixed(2), { 'name': heads[0] }, 'price-col4', null, 'col4');
+        // 5 столбец ch15m
+        createCell(changePrices[pair][heads[1]]['СhangePercent'].toFixed(2), { 'name': heads[1] }, 'price-col5', null, 'col5');
+        // 6 столбец ch1h
+        createCell(changePrices[pair][heads[2]]['СhangePercent'].toFixed(2), { 'name': heads[2] }, 'price-col6', null, 'col6');
+        // 7 столбец ch4h
+        createCell(changePrices[pair][heads[3]]['СhangePercent'].toFixed(2), { 'name': heads[3] }, 'price-col7', null, 'col7');
+
+    };
+
 
     // Отображение пар все или избранное
     let checkboxAll = document.querySelectorAll('.favorite-pair');
@@ -751,7 +745,7 @@ function forming_tickers_list() {
     for (let row of rows) {
         row.addEventListener("click", () => {
             let pair = row.querySelector('[name="pair"]').innerHTML;
-            change_pair(pair);
+            change_pair(pair+'USDT');
         });
     };
 

@@ -79,7 +79,7 @@ tbody td{
 
 #table-price th:nth-child(2),
 #table-price td:nth-child(2) {
-  width: 140px;
+  width: 100px;
 }
 
 #table-price th:nth-child(3),
