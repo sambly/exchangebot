@@ -13,6 +13,9 @@
     "vite": "^5.1.0"
   },
   "dependencies": {
+    "@popperjs/core": "^2.11.8",
+    "bootstrap": "5.2.3",
+    "jquery": "^3.7.1",
     "primeflex": "^3.3.1",
     "primeicons": "^6.0.1",
     "primereact": "^10.5.0",

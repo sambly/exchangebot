@@ -1,8 +1,18 @@
 import { lw_charts_orders, lw_charts_volume, widget_charts } from './charts.js';
 import { timeToLocal } from './help.js';
 
-import './style.css';
-import './custom.scss';
+
+
+
+import "/node_modules/jquery/jquery.js";
+import '../scss/styles.scss'
+
+
+//import "/node_modules/bootstrap/scss/bootstrap";
+
+
+import '../css/style.css';
+
 
 
 
