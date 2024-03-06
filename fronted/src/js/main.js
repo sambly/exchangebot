@@ -1,17 +1,12 @@
 
 
 
-
-
-//import '../scss/styles.scss';
-// import '../css/style.css';
-
+import '../scss/styles.scss';
+import '../css/style.css';
 
 import * as bootstrap from 'bootstrap'
 import $ from 'jquery'
 window.jQuery = window.$ = $
-
-
 
 
 import { lw_charts_orders, lw_charts_volume, widget_charts } from './charts.js';
@@ -331,7 +326,7 @@ function change_pair(pair) {
         for (let i = 0; i < rowsPrice.length; i++) {
             rowsPrice[i].classList.remove('table-tr-active');
             rowsPrice[i].classList.add('table-tr-not-active');
-            if (rowsPrice[i].querySelector("td[name=pair]").innerHTML === pair) {
+            if (rowsPrice[i].querySelector("td[name=pair]").innerHTML === pair.split("USDT")[0]) {
                 rowsPrice[i].classList.add('table-tr-active');
                 rowsPrice[i].scrollIntoView({
                     behavior: 'smooth',
