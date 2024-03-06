@@ -1,18 +1,21 @@
+
+
+
+
+
+//import '../scss/styles.scss';
+// import '../css/style.css';
+
+
+import * as bootstrap from 'bootstrap'
+import $ from 'jquery'
+window.jQuery = window.$ = $
+
+
+
+
 import { lw_charts_orders, lw_charts_volume, widget_charts } from './charts.js';
 import { timeToLocal } from './help.js';
-
-
-
-
-import "/node_modules/jquery/jquery.js";
-import '../scss/styles.scss'
-
-
-//import "/node_modules/bootstrap/scss/bootstrap";
-
-
-import '../css/style.css';
-
 
 
 
@@ -54,8 +57,14 @@ $(function () {
     //#############################################################################  webSocket #############################################################################
 
     // Сплывающее уведомление
-    $('.toast').toast({ animation: true, autohide: true, delay: 3000 });
+    var myToast = new bootstrap.Toast(document.querySelector('.toast'), {
+        animation: true, // Включить анимацию при отображении/скрытии всплывающего уведомления
+        autohide: true, // Автоматически скрывать всплывающее уведомление после указанной задержки
+        delay: 3000 // Задержка перед автоматическим скрытием всплывающего уведомления (в миллисекундах)
+    });
     $("#toastMessage").text("");
+
+
 
     // Аткинвые кнопки меню
     $('.btnMenu').click(function () {
@@ -131,7 +140,7 @@ $(function () {
                     response.DeltaFast,
                 );
                 $("#toastMessage").text("Данные загружены");
-                $(".toast").toast("show");
+                myToast.show();
                 e.target.disabled = false;
             },
             error: function (response) {
@@ -755,7 +764,7 @@ function forming_tickers_list() {
     for (let row of rows) {
         row.addEventListener("click", () => {
             let pair = row.querySelector('[name="pair"]').innerHTML;
-            change_pair(pair+'USDT');
+            change_pair(pair + 'USDT');
         });
     };
 
