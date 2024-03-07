@@ -16,7 +16,7 @@ import { timeToLocal } from './help.js';
 
 $(function () {
 
-
+    // Формирование страницы 
     forming_page();
 
     //#############################################################################  webSocket #############################################################################
@@ -70,14 +70,12 @@ $(function () {
     // Меню цены
     $('#btn-price').click(function () {
         show_price_panel();
-        forming_tickers_list();
         change_pair(document.querySelector('#pairs').value)
     });
 
     // Меню объема
     $('#btn-volume').click(function () {
         show_volume_panel();
-        forming_tickers_list_volume();
         change_pair(document.querySelector('#pairs').value);
     });
 
@@ -223,9 +221,6 @@ function forming_page() {
             let ordersHistory = response.OrdersHistory;
             let strategyDescription = response.OptionStrategy;
 
-            show_price_panel();
-            show_panel_trade_active();
-
             // Select pairs
             let selectPairs = document.querySelector('#pairs');
             let selectPairsList = document.querySelector('#pairslistOptions');
@@ -250,9 +245,6 @@ function forming_page() {
             let currentPair = localStorage.getItem('currentPair') || 'BTCUSDT';
             localStorage.setItem('currentPair', currentPair);
 
-            update_main_data(marketsStat, changePrices, deltaFast);
-
-            // TODO Вот этот блок может перенести от сюда ? 
             // Выбор определенного типа графика
             let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
             checkboxes.forEach((checkbox, index) => {
@@ -266,9 +258,15 @@ function forming_page() {
                 })
             })
 
+            // Обновление данных 
+            update_main_data(marketsStat, changePrices, deltaFast);
+
             // Формирование panel-trade
             forming_orders_active(ordersActive);
             forming_orders_history(ordersHistory);
+
+            show_panel_trade_active();
+
 
         },
         error: function (response) {
@@ -289,11 +287,19 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
     localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
 
+    // Показать элементы для повторного их формирования
+    $("#list-ch-price").show();
+    $("#list-ch-volume").show();
     forming_tickers_list();
     forming_tickers_list_volume();
 
-    change_pair(document.querySelector('#pairs').value);
+    let tickers = JSON.parse(localStorage.getItem('tickers')) || {'btn-price':true,'btn-volume':false};
 
+    tickers['btn-price'] && show_price_panel();
+    tickers['btn-volume'] && show_volume_panel();
+    
+
+    change_pair(document.querySelector('#pairs').value);
 
     // Загаловки 24ch  Volume
     let selectPairs = document.querySelector('#pairs');
@@ -305,6 +311,8 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
 }
 
 function change_pair(pair) {
+
+    var start = performance.now();
 
     let currentPair = localStorage.getItem('currentPair');
     let widgetPair = localStorage.getItem('widgetPair');
@@ -325,11 +333,10 @@ function change_pair(pair) {
         var rowsPrice = document.querySelector("#tbody-price").rows;
         for (let i = 0; i < rowsPrice.length; i++) {
             rowsPrice[i].classList.remove('table-tr-active');
-            rowsPrice[i].classList.add('table-tr-not-active');
             if (rowsPrice[i].querySelector("td[name=pair]").innerHTML === pair.split("USDT")[0]) {
                 rowsPrice[i].classList.add('table-tr-active');
                 rowsPrice[i].scrollIntoView({
-                    behavior: 'smooth',
+                    behavior: 'auto',
                     block: 'center'
                 });
             }
@@ -341,27 +348,29 @@ function change_pair(pair) {
 
     }
 
-    // var listVolume = document.getElementById('list-ch-volume');
     // Перемещение курсора в списке объемов
     if ($('#list-ch-volume').css('display') == "block") {
         var rowsVolume = document.querySelector("#tbody-delta").rows;
         for (let i = 0; i < rowsVolume.length; i++) {
             rowsVolume[i].classList.remove('table-tr-active');
-            rowsVolume[i].classList.add('table-tr-not-active');
-            if (rowsVolume[i].querySelector("td[name=pair]").innerHTML === pair) {
+            if (rowsVolume[i].querySelector("td[name=pair]").innerHTML === pair.split("USDT")[0]) {
                 rowsVolume[i].classList.add('table-tr-active');
                 rowsVolume[i].scrollIntoView({
-                    behavior: 'smooth',
+                    behavior: 'auto',
                     block: 'center'
-                    // inline: 'nearest' // Указываем явно, что прокрутка должна быть ближайшей к краю контейнера
                 });
-                // listVolume.scrollIntoView(false); // Прокручиваем контейнер #list-ch-volume к его текущему положению
             }
         }
         chart_volume_update();
     }
 
     update_top_data(pair);
+
+    // Расчет времени выполнения 
+    var end = performance.now();
+    var time = end - start;
+    console.log('Время выполнения change_pair = ' + time);
+
 }
 
 function forming_orders_active(orders) {
@@ -801,9 +810,9 @@ function forming_tickers_list_volume(frame = '1m') {
     // для изменения widht по самому широкому стобцу
     //let maxWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
 
-    for (let item in deltaFast) {
+    for (let pair in deltaFast) {
 
-        if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(item)) {
+        if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(pair)) {
             continue;
         }
 
@@ -824,26 +833,26 @@ function forming_tickers_list_volume(frame = '1m') {
         // 1 столбец Favorite checkbox
         let chk = document.createElement('input');
         chk.setAttribute('type', 'checkbox');
-        chk.setAttribute("name", item);
+        chk.setAttribute("name", pair);
         chk.setAttribute('class', 'form-check-input favorite-pair');
-        if (favoritePairs.includes(item)) {
+        if (favoritePairs.includes(pair)) {
             chk.checked = true;
         }
         createCell('', '', 'delta-col1', chk, 'col1')
         // 2 столбец ПАРА
-        createCell(item, 'pair', 'delta-col2', null, 'col2')
+        createCell(pair.split("USDT")[0], 'pair', 'delta-col2', null, 'col2')
         // 3 столбец Volume
-        createCell(deltaFast[item][frame]["Volume"].toFixed(2), 'volume', 'delta-col3', null, 'col3')
+        createCell(deltaFast[pair][frame]["Volume"].toFixed(2), 'volume', 'delta-col3', null, 'col3')
         // 4 столбец VolumeBuy
-        createCell(deltaFast[item][frame]["VolumeBuy"].toFixed(2), 'volume-buy', 'delta-col4', null, 'col4')
+        createCell(deltaFast[pair][frame]["VolumeBuy"].toFixed(2), 'volume-buy', 'delta-col4', null, 'col4')
         // 5 столбец VolumeAsk
-        createCell(deltaFast[item][frame]["VolumeAsk"].toFixed(2), 'volume-ask', 'delta-col5', null, 'col5')
+        createCell(deltaFast[pair][frame]["VolumeAsk"].toFixed(2), 'volume-ask', 'delta-col5', null, 'col5')
         // 6 столбец Trades
-        createCell(deltaFast[item][frame]["Trades"].toFixed(2), 'trades', 'delta-col6', null, 'col6')
+        createCell(deltaFast[pair][frame]["Trades"].toFixed(2), 'trades', 'delta-col6', null, 'col6')
         // 7 столбец TradesBuy
-        createCell(deltaFast[item][frame]["TradesBuy"].toFixed(2), 'trades-buy', 'delta-col7', null, 'col7')
+        createCell(deltaFast[pair][frame]["TradesBuy"].toFixed(2), 'trades-buy', 'delta-col7', null, 'col7')
         // 8 столбец TradesAsk
-        createCell(deltaFast[item][frame]["TradesAsk"].toFixed(2), 'trades-ask', 'delta-col8', null, 'col8')
+        createCell(deltaFast[pair][frame]["TradesAsk"].toFixed(2), 'trades-ask', 'delta-col8', null, 'col8')
 
     };
 
@@ -887,7 +896,8 @@ function forming_tickers_list_volume(frame = '1m') {
     let rows = tbody.rows;
     for (let row of rows) {
         row.addEventListener("click", () => {
-            change_pair(row.querySelector('[name="pair"]').innerHTML);
+            let pair = row.querySelector('[name="pair"]').innerHTML;
+            change_pair(pair + 'USDT');
         });
     };
 
@@ -946,6 +956,8 @@ function sort_table(tbody, th, tr) {
 
 function show_price_panel() {
 
+    localStorage.setItem('tickers', JSON.stringify({'btn-price':true,'btn-volume':false}));
+
     $("#group-btn-frame").hide();
 
     $("#list-ch-price").show();
@@ -960,6 +972,8 @@ function show_price_panel() {
 }
 
 function show_volume_panel() {
+
+    localStorage.setItem('tickers', JSON.stringify({'btn-price':false,'btn-volume':true}));
 
     $("#group-btn-frame").show();
 

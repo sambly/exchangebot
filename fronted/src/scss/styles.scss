@@ -1,9 +1,17 @@
 
 
-$table-cell-padding-y:        .3rem;
-$table-cell-padding-x:        .3rem;
 
+$table-cell-padding-y:        .1rem;
+$table-cell-padding-x:        .1rem;
+
+
+.table-tr-active {
+    --bs-table-bg: #c6c7c8;
+  }
+    
 // Import all of Bootstrap's CSS
 @import "~bootstrap/scss/bootstrap";
+
+
 
 

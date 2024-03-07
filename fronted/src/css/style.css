@@ -1,36 +1,34 @@
-
-
 #list {
   height: 500px;
 }
 
-.chart{
+.chart {
   height: 500px;
 }
 
-.col{
+.col {
   text-align: center;
 }
 
 #list-ch-price,
 #list-ch-volume {
-	overflow-x: auto;
+  overflow-x: auto;
   overflow-y: hidden;
-	position: relative;
+  position: relative;
 }
 
-#table-price{
+#table-price {
   table-layout: fixed;
-  width: 475px;
-} 
+  width: 485px;
+}
 
-#table-delta{
+#table-delta {
   table-layout: fixed;
-  width: 685px;
+  width: 625px;
 }
 
 #table-trade-active,
-#table-trade-history{
+#table-trade-history {
   table-layout: fixed;
   width: 100%;
 }
@@ -41,11 +39,9 @@
 
 }
 
-
-
 tbody {
   display: block;
-  overflow-y: auto; 
+  overflow-y: auto;
 }
 
 thead,
@@ -55,26 +51,9 @@ tbody tr {
 }
 
 thead th,
-tbody td{
+tbody td {
   text-align: center;
 }
-
-
-
-thead th {
-  background-color: #292b2e;
-}
-
-
-.table-tr-not-active {
-  background-color: #f8f9fa;
-}
-
-.table-tr-active {
-  background-color: #030406  !important;;
-}
-
-
 
 
 #table-price th:nth-child(1),
@@ -120,40 +99,38 @@ thead th {
 
 #table-delta th:nth-child(2),
 #table-delta td:nth-child(2) {
-  width: 140px;
+  width: 100px;
 }
 
 #table-delta th:nth-child(3),
 #table-delta td:nth-child(3) {
-  width: 85px;
+  width: 70px;
 }
 
 #table-delta th:nth-child(4),
 #table-delta td:nth-child(4) {
-  width: 85px;
+  width: 70px;
 }
 
 #table-delta th:nth-child(5),
 #table-delta td:nth-child(5) {
-  width: 85px;
+  width: 70px;
 }
 
 #table-delta th:nth-child(6),
 #table-delta td:nth-child(6) {
-  width: 85px;
+  width: 70px;
 }
 
 #table-delta th:nth-child(7),
 #table-delta td:nth-child(7) {
-  width: 85px;
+  width: 70px;
 }
 
 #table-delta th:nth-child(8),
 #table-delta td:nth-child(8) {
-  width: 85px;
+  width: 70px;
 }
-
-
 
 
 #table-trade-active th:nth-child(1),
@@ -263,41 +240,41 @@ thead th {
 
 
 .switcher {
-	display: flex;
-	align-items: center;
-	height: 30px;
-	color: #2196F3;
+  display: flex;
+  align-items: center;
+  height: 30px;
+  color: #2196F3;
 }
 
 
 .switcher-item {
-	cursor: pointer;
-	text-decoration: none;
-	display: inline-block;
-	padding: 6px 8px;
-	font-size: 14px;
-	color: #262b3e;
-	background-color: transparent;
-	margin-right: 8px;
-	border: none;
-	border-radius: 4px;
-	outline: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  padding: 6px 8px;
+  font-size: 14px;
+  color: #262b3e;
+  background-color: transparent;
+  margin-right: 8px;
+  border: none;
+  border-radius: 4px;
+  outline: none;
 }
 
 
 .switcher-item:hover {
-	background-color: #f2f3f5;
+  background-color: #f2f3f5;
 }
 
 .switcher-active-item {
-	text-decoration: none;
-	cursor: default;
-	color: #262b3e;
+  text-decoration: none;
+  cursor: default;
+  color: #262b3e;
 }
 
 .switcher-active-item,
 .switcher-active-item:hover {
-	background-color: #e1eff9;
+  background-color: #e1eff9;
 }
 
 
@@ -308,4 +285,17 @@ thead th {
   padding: 5px 10px;
   border-radius: 5px;
   z-index: 9999;
+}
+
+
+/* Стили для скролла */
+::-webkit-scrollbar {
+	width: 8px;
+  height: 8px;
+} 
+::-webkit-scrollbar-track {
+	box-shadow: inset 0 0 6px #c6c7c8; 
+} 
+::-webkit-scrollbar-thumb {
+	box-shadow: inset 0 0 6px #c6c7c8; 
 }
