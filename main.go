@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"main/application"
+	"main/config"
 	"main/database"
 	"main/exchange"
 	mylog "main/log"
@@ -11,9 +12,6 @@ import (
 	"main/notification"
 	"main/telegram"
 	"main/web"
-	"os"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -21,64 +19,14 @@ func main() {
 	production := false
 
 	ctx := context.Background()
-
-	// loads values from .env into the system
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("No .env file found")
-	}
-	// Exchange
-	apiKey, exists := os.LookupEnv("API_KEY")
-	if !exists {
-		log.Fatal("No .env str API_KEY found")
-	}
-	secretKey, exists := os.LookupEnv("API_SECRET")
-	if !exists {
-		log.Fatal("No .env str API_SECRET found")
-	}
-	// TLG
-	tlgToken, exists := os.LookupEnv("TELEGRAM_TOKEN")
-	if !exists {
-		log.Fatal("No .env str TELEGRAM_TOKEN found")
-	}
-	tlgUser, exists := os.LookupEnv("TELEGRAM_USER")
-	if !exists {
-		log.Fatal("No .env str TELEGRAM_USER found")
-	}
-	// Authentication
-	usernameAuth, exists := os.LookupEnv("usernameAuth")
-	if !exists {
-		log.Fatal("No .env str usernameAuth found")
-	}
-	passwordAuth, exists := os.LookupEnv("passwordAuth")
-	if !exists {
-		log.Fatal("No .env str passwordAuth found")
-	}
-	// DB
-	userNameDb, exists := os.LookupEnv("userNameDb")
-	if !exists {
-		log.Fatal("No .env str userNameDb found")
-	}
-	passwordDb, exists := os.LookupEnv("passwordDb")
-	if !exists {
-		log.Fatal("No .env str passwordDb found")
-	}
-	nameDb, exists := os.LookupEnv("nameDb")
-	if !exists {
-		log.Fatal("No .env str nameDb found")
-	}
-	hostNameDb, exists := os.LookupEnv("hostNameDb")
-	if !exists {
-		log.Fatal("No .env str hostNameDb found")
-	}
-	// httpPort
-	httpPortProduction, exists := os.LookupEnv("httpPortProduction")
-	if !exists {
-		log.Fatal("No .env str httpPortProduction found")
-	}
-
 	mylog.InitLogger()
 
-	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(apiKey, secretKey))
+	config, err := config.NewConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(config.ApiKey, config.SecretKey))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -99,7 +47,7 @@ func main() {
 		LengthOfTime:   1080,
 	}
 
-	db, err := database.DbConnection(nameDb, hostNameDb, userNameDb, passwordDb)
+	db, err := database.DbConnection(config.NameDb, config.HostNameDb, config.UserNameDb, config.PasswordDb)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -130,13 +78,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	appTelegram, err := telegram.NewTelegram(app, tlgToken, tlgUser, notify)
+	appTelegram, err := telegram.NewTelegram(app, config.TlgToken, config.TlgUser, notify)
 	if err != nil {
 		log.Fatal(err)
 	}
 	appTelegram.Start()
 
-	web := web.NewWeb(app, socketsMessage, production, httpPortProduction, usernameAuth, passwordAuth)
+	web := web.NewWeb(app, socketsMessage, production, config.HttpPortProduction, config.UsernameAuth, config.PasswordAuth)
 	web.Run()
 
 	app.Run()

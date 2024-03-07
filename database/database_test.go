@@ -1,6 +1,7 @@
 package database
 
 import (
+	"main/config"
 	"main/model"
 	"testing"
 	"time"
@@ -8,7 +9,12 @@ import (
 
 func TestSelectCandlesTable(t *testing.T) {
 
-	db, err := DbConnection()
+	config, err := config.NewConfig()
+	if err != nil {
+		t.Error(err)
+	}
+
+	db, err := DbConnection(config.NameDb, config.HostNameDb, config.UserNameDb, config.PasswordDb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -22,7 +28,12 @@ func TestSelectCandlesTable(t *testing.T) {
 }
 
 func TestCreateOrder(t *testing.T) {
-	db, err := DbConnection()
+	config, err := config.NewConfig()
+	if err != nil {
+		t.Error(err)
+	}
+
+	db, err := DbConnection(config.NameDb, config.HostNameDb, config.UserNameDb, config.PasswordDb)
 	if err != nil {
 		t.Error(err)
 	}
