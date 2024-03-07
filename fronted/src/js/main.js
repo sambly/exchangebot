@@ -61,7 +61,7 @@ $(function () {
 
 
 
-    // Аткинвые кнопки меню
+    // Аткинвые кнопки меню (Цена,Объем)
     $('.btnMenu').click(function () {
         $('.btnMenu').removeClass('active'); // Удаляем класс 'active' у всех кнопок
         $(this).addClass('active'); // Добавляем класс 'active' текущей кнопке
@@ -93,16 +93,9 @@ $(function () {
     });
     // Аткинвые кнопки выбора пар
     $('.btnPairs').click(function () {
-
         $('.btnPairs').removeClass('active');
         $(this).addClass('active');
-
-        // TODO здесь надо либо одно открывать либо другое 
-        forming_tickers_list();
-        forming_tickers_list_volume();
-
-        change_pair(document.querySelector('#pairs').value);
-
+        forming_tickers_list_All();
     });
 
     // Изменение фрейма для tickers volume
@@ -111,8 +104,7 @@ $(function () {
         $('.btnFrame').removeClass('active');
         $(this).addClass('active');
 
-        let frame = e.target.innerText;
-        forming_tickers_list_volume(frame);
+        forming_tickers_list_volume();
         change_pair(document.querySelector('#pairs').value);
     });
 
@@ -273,8 +265,6 @@ function forming_page() {
         },
 
     });
-
-
 }
 
 function update_main_data(marketsStat, changePrices, deltaFast) {
@@ -287,19 +277,7 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
     localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
 
-    // Показать элементы для повторного их формирования
-    $("#list-ch-price").show();
-    $("#list-ch-volume").show();
-    forming_tickers_list();
-    forming_tickers_list_volume();
-
-    let tickers = JSON.parse(localStorage.getItem('tickers')) || {'btn-price':true,'btn-volume':false};
-
-    tickers['btn-price'] && show_price_panel();
-    tickers['btn-volume'] && show_volume_panel();
-    
-
-    change_pair(document.querySelector('#pairs').value);
+    forming_tickers_list_All();
 
     // Загаловки 24ch  Volume
     let selectPairs = document.querySelector('#pairs');
@@ -308,6 +286,19 @@ function update_main_data(marketsStat, changePrices, deltaFast) {
     let VolumeTop = document.querySelector('#volume-top');
     VolumeTop.innerHTML = (marketsStat[selectPairs.value].Volume).toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
 
+}
+
+function forming_tickers_list_All() {
+
+    $("#list-ch-price").show();
+    $("#list-ch-volume").show();
+    forming_tickers_list();
+    forming_tickers_list_volume();
+
+    $("#btn-price").hasClass("active") && show_price_panel();
+    $("#btn-volume").hasClass("active") && show_volume_panel();
+
+    change_pair(document.querySelector('#pairs').value);
 }
 
 function change_pair(pair) {
@@ -783,8 +774,7 @@ function forming_tickers_list() {
     console.log('Время выполнения forming_tickers_list = ' + time);
 }
 
-function forming_tickers_list_volume(frame = '1m') {
-
+function forming_tickers_list_volume() {
 
     var start = performance.now();
 
@@ -803,9 +793,16 @@ function forming_tickers_list_volume(frame = '1m') {
     document.querySelector("#tbody-delta").style.height = `${listChVolume.clientHeight - theadDelta.clientHeight}px`;
     document.querySelector("#table-delta").style.marginBottom = '0';
 
-
     let deltaFast = JSON.parse(localStorage.getItem('deltaFast')) || [];
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
+
+
+    let frame;
+    document.querySelectorAll('.btnFrame').forEach(function(element) {
+        if (element.classList.contains('active')) {
+            frame = element.innerText;
+        }
+    });
 
     // для изменения widht по самому широкому стобцу
     //let maxWidths = { 'col1': 0, 'col2': 0, 'col3': 0, 'col4': 0, 'col5': 0, 'col6': 0, 'col7': 0, 'col8': 0, }
@@ -855,8 +852,6 @@ function forming_tickers_list_volume(frame = '1m') {
         createCell(deltaFast[pair][frame]["TradesAsk"].toFixed(2), 'trades-ask', 'delta-col8', null, 'col8')
 
     };
-
-
 
     // requestAnimationFrame(() => {
     //     // Установить ширину столбцов таблицы, основываясь на самой широкой ячейке в каждом столбце.
@@ -956,8 +951,6 @@ function sort_table(tbody, th, tr) {
 
 function show_price_panel() {
 
-    localStorage.setItem('tickers', JSON.stringify({'btn-price':true,'btn-volume':false}));
-
     $("#group-btn-frame").hide();
 
     $("#list-ch-price").show();
@@ -972,8 +965,6 @@ function show_price_panel() {
 }
 
 function show_volume_panel() {
-
-    localStorage.setItem('tickers', JSON.stringify({'btn-price':false,'btn-volume':true}));
 
     $("#group-btn-frame").show();
 
