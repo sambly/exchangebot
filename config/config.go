@@ -27,10 +27,6 @@ type Config struct {
 	HttpPortProduction string
 }
 
-func loadEnv() {
-
-}
-
 func NewConfig() (*Config, error) {
 
 	const projectDirName = "exchangeBot" // change to relevant project name
