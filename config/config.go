@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 
 	"github.com/joho/godotenv"
 )
@@ -26,12 +27,23 @@ type Config struct {
 	HttpPortProduction string
 }
 
+func loadEnv() {
+
+}
+
 func NewConfig() (*Config, error) {
 
-	// loads values from .env into the system
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("No .env file found")
+	const projectDirName = "exchangeBot" // change to relevant project name
+
+	projectName := regexp.MustCompile(`^(.*` + projectDirName + `)`)
+	currentWorkDirectory, _ := os.Getwd()
+	rootPath := projectName.Find([]byte(currentWorkDirectory))
+	err := godotenv.Load(string(rootPath) + `/.env`)
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+		return nil, fmt.Errorf("error loading .env file")
 	}
+
 	// Exchange
 	apiKey, exists := os.LookupEnv("API_KEY")
 	if !exists {
