@@ -16,7 +16,7 @@ import (
 
 func main() {
 
-	production := false
+	production := true
 
 	ctx := context.Background()
 	mylog.InitLogger()

@@ -32,17 +32,26 @@ func (app *Web) routes() *http.ServeMux {
 	production := false
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/formingPage", app.basicAuth(app.formingPage))
-	mux.HandleFunc("/updatefull", app.basicAuth(app.updateFull))
-	mux.HandleFunc("/getChangeDelta", app.basicAuth(app.getChangeDelta))
-	mux.HandleFunc("/updateTop", app.basicAuth(app.updateTop))
-	mux.HandleFunc("/openDeal", app.basicAuth(app.openDeal))
-	mux.HandleFunc("/closeDeal", app.basicAuth(app.closeDeal))
-	mux.HandleFunc("/ws", app.basicAuth(app.echo))
+	mux.HandleFunc("/trade/formingPage", app.basicAuth(app.formingPage))
+	mux.HandleFunc("/trade/updatefull", app.basicAuth(app.updateFull))
+	mux.HandleFunc("/trade/getChangeDelta", app.basicAuth(app.getChangeDelta))
+	mux.HandleFunc("/trade/updateTop", app.basicAuth(app.updateTop))
+	mux.HandleFunc("/trade/openDeal", app.basicAuth(app.openDeal))
+	mux.HandleFunc("/trade/closeDeal", app.basicAuth(app.closeDeal))
+	mux.HandleFunc("/trade/ws", app.basicAuth(app.echo))
 
 	//mux.Handle("/", http.FileServer(http.FS(getFrontendAssets(production))))
 
-	mux.HandleFunc("/", app.basicAuth(http.FileServer(http.FS(getFrontendAssets(production))).ServeHTTP))
+	// fileServer := http.FileServer(http.Dir("./static/"))
+	// mux.Handle("/get-pays/static/", http.StripPrefix("/get-pays/static", fileServer))
+
+	// fileServer := http.FileServer(http.Dir("./static/"))
+	// mux.HandleFunc("/static/", app.basicAuth(http.StripPrefix("/static", fileServer).ServeHTTP))
+
+	fileServer := http.FileServer(http.FS(getFrontendAssets(production)))
+	mux.HandleFunc("/trade/", app.basicAuth(http.StripPrefix("/trade", fileServer).ServeHTTP))
+
+	//mux.HandleFunc("/trade", app.basicAuth.ServeHTTP))
 
 	return mux
 }

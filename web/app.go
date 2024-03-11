@@ -39,7 +39,9 @@ func (c *Sockets) SendDataRun() {
 
 func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, production bool, productionPort, username, password string) *Web {
 	web := &Web{
-		App: app,
+		App:            app,
+		production:     production,
+		productionPort: productionPort,
 	}
 	web.Sockets = Sockets{
 		clients:        make(map[*websocket.Conn]bool),

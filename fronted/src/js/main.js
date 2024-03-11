@@ -21,33 +21,35 @@ $(function () {
 
     //#############################################################################  webSocket #############################################################################
 
-    var socket = new WebSocket("ws://localhost:80/ws");
-    socket.onopen = function () {
-        console.log("connected ws");
-    };
+    // var Url = "wss://bt-scada.ru/trade/ws";
+    // var Url2 = "ws://localhost:444/trade/ws"
+    // var socket = new WebSocket(Url2);
+    // socket.onopen = function () {
+    //     console.log("connected ws");
+    // };
 
-    socket.onmessage = function (e) {
+    // socket.onmessage = function (e) {
 
-        // Здесь сделать проверку что это вообще за данные, пока что есть данные только для ордеров
-        let order = JSON.parse(e.data);
-        let orderRow = document.querySelector('tr.order-active[value="' + order.ID + '"]');
-        let profitElement = orderRow.querySelector('td[name="order-a-profit"]');
+    //     // Здесь сделать проверку что это вообще за данные, пока что есть данные только для ордеров
+    //     let order = JSON.parse(e.data);
+    //     let orderRow = document.querySelector('tr.order-active[value="' + order.ID + '"]');
+    //     let profitElement = orderRow.querySelector('td[name="order-a-profit"]');
 
-        profitElement.textContent = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
-        profitElement.style.color = color_text_profit(order.Profit)
+    //     profitElement.textContent = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
+    //     profitElement.style.color = color_text_profit(order.Profit)
 
-    };
+    // };
 
 
-    // если возникла ошибка
-    socket.onerror = (error) => {
-        console.log(`WebSocket Error: ${error}`);
-    };
+    // // если возникла ошибка
+    // socket.onerror = (error) => {
+    //     console.log(`WebSocket Error: ${error}`);
+    // };
 
-    // если соединение закрыто
-    socket.onclose = (event) => {
-        console.log("Connection closed");
-    };
+    // // если соединение закрыто
+    // socket.onclose = (event) => {
+    //     console.log("Connection closed");
+    // };
 
     //#############################################################################  webSocket #############################################################################
 
@@ -112,7 +114,7 @@ $(function () {
         e.preventDefault();
         e.target.disabled = true;
         $.ajax({
-            url: '/updatefull',
+            url: 'updatefull',
             type: 'POST',
             method: 'POST',
             cache: false,
@@ -173,7 +175,7 @@ $(function () {
 
 
         $.ajax({
-            url: '/openDeal',
+            url: 'openDeal',
             type: 'POST',
             method: 'POST',
             cache: false,
@@ -196,7 +198,7 @@ $(function () {
 function forming_page() {
 
     $.ajax({
-        url: '/formingPage',
+        url: 'formingPage',
         async: false,
         type: 'POST',
         method: 'POST',
@@ -432,7 +434,7 @@ function forming_orders_active(orders) {
             e.preventDefault();
 
             $.ajax({
-                url: '/closeDeal',
+                url: 'closeDeal',
                 type: 'POST',
                 method: 'POST',
                 cache: false,
@@ -514,7 +516,7 @@ function forming_orders_history(orders) {
 
 function update_top_data(pair) {
     $.ajax({
-        url: '/updateTop',
+        url: 'updateTop',
         type: 'POST',
         method: 'POST',
         data: pair,
@@ -569,7 +571,7 @@ function chart_volume_update() {
         let request = { Pair: pair, Frame: frame };
         let dataVolume = [];
         $.ajax({
-            url: '/getChangeDelta',
+            url: 'getChangeDelta',
             async: false,
             type: 'POST',
             method: 'POST',
@@ -634,7 +636,7 @@ function chart_frome_orders_update(chartType) {
         let request = { Pair: pair, Frame: frame };
         let candles = [];
         $.ajax({
-            url: '/getChangeDelta',
+            url: 'getChangeDelta',
             async: false,
             type: 'POST',
             method: 'POST',
