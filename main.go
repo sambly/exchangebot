@@ -16,8 +16,6 @@ import (
 
 func main() {
 
-	production := true
-
 	ctx := context.Background()
 	mylog.InitLogger()
 
@@ -84,8 +82,8 @@ func main() {
 	}
 	appTelegram.Start()
 
-	web := web.NewWeb(app, socketsMessage, production, config.HttpPortProduction, config.UsernameAuth, config.PasswordAuth)
-	web.Run()
+	web := web.NewWeb(app, socketsMessage, config)
+	go web.Run()
 
 	app.Run()
 }

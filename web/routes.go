@@ -29,7 +29,6 @@ func getFrontendAssets(production bool) fs.FS {
 
 func (app *Web) routes() *http.ServeMux {
 
-	production := false
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/trade/formingPage", app.basicAuth(app.formingPage))
@@ -48,7 +47,7 @@ func (app *Web) routes() *http.ServeMux {
 	// fileServer := http.FileServer(http.Dir("./static/"))
 	// mux.HandleFunc("/static/", app.basicAuth(http.StripPrefix("/static", fileServer).ServeHTTP))
 
-	fileServer := http.FileServer(http.FS(getFrontendAssets(production)))
+	fileServer := http.FileServer(http.FS(getFrontendAssets(app.production)))
 	mux.HandleFunc("/trade/", app.basicAuth(http.StripPrefix("/trade", fileServer).ServeHTTP))
 
 	//mux.HandleFunc("/trade", app.basicAuth.ServeHTTP))
