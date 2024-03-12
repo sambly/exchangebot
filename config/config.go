@@ -62,21 +62,21 @@ func NewConfig() (*Config, error) {
 
 	// Web
 	productionString, exists := os.LookupEnv("production")
-	if exists {
+	if !exists {
 		return nil, fmt.Errorf("no .env str production found")
 	}
 	if productionString == "true" {
 		production = true
 	}
 	inProductionOnlyAppString, exists := os.LookupEnv("inProductionOnlyApp")
-	if exists {
+	if !exists {
 		return nil, fmt.Errorf("no .env str inProductionOnlyApp found")
 	}
 	if inProductionOnlyAppString == "true" {
 		inProductionOnlyApp = true
 	}
 	inProductionWithFrontedNgingxString, exists := os.LookupEnv("inProductionWithFrontedNgingx")
-	if exists {
+	if !exists {
 		return nil, fmt.Errorf("no .env str inProductionWithFrontedNgingx found")
 	}
 	if inProductionWithFrontedNgingxString == "true" {
