@@ -39,6 +39,8 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/trade/closeDeal", app.basicAuth(app.closeDeal))
 	mux.HandleFunc("/trade/ws", app.basicAuth(app.echo))
 
+	mux.HandleFunc("/", app.basicAuth(app.fullroute))
+
 	//mux.Handle("/", http.FileServer(http.FS(getFrontendAssets(production))))
 
 	// fileServer := http.FileServer(http.Dir("./static/"))
@@ -57,7 +59,14 @@ func (app *Web) routes() *http.ServeMux {
 
 func (app *Web) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		fmt.Println("auth", r.URL)
+
 		username, password, ok := r.BasicAuth()
+		fmt.Println(username)
+		fmt.Println(password)
+		fmt.Println()
+
 		if ok {
 			usernameHash := sha256.Sum256([]byte(username))
 			passwordHash := sha256.Sum256([]byte(password))
@@ -68,6 +77,7 @@ func (app *Web) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 			passwordMatch := (subtle.ConstantTimeCompare(passwordHash[:], expectedPasswordHash[:]) == 1)
 
 			if usernameMatch && passwordMatch {
+
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -75,34 +85,5 @@ func (app *Web) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 
 		w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-	})
-}
-
-func (app *Web) middle(next http.HandlerFunc, authBase bool) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		if authBase {
-			username, password, ok := r.BasicAuth()
-			if ok {
-				usernameHash := sha256.Sum256([]byte(username))
-				passwordHash := sha256.Sum256([]byte(password))
-				expectedUsernameHash := sha256.Sum256([]byte(app.auth.username))
-				expectedPasswordHash := sha256.Sum256([]byte(app.auth.password))
-
-				usernameMatch := (subtle.ConstantTimeCompare(usernameHash[:], expectedUsernameHash[:]) == 1)
-				passwordMatch := (subtle.ConstantTimeCompare(passwordHash[:], expectedPasswordHash[:]) == 1)
-
-				if usernameMatch && passwordMatch {
-					next.ServeHTTP(w, r)
-					return
-				}
-			}
-
-			w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		} else {
-			next.ServeHTTP(w, r)
-		}
-
 	})
 }

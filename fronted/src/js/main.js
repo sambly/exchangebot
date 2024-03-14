@@ -114,7 +114,7 @@ $(function () {
         e.preventDefault();
         e.target.disabled = true;
         $.ajax({
-            url: 'http://localhost:444/trade/updatefull',
+            url: 'updatefull',
             type: 'POST',
             method: 'POST',
             cache: false,
@@ -175,7 +175,7 @@ $(function () {
 
 
         $.ajax({
-            url: 'http://localhost:444/trade/openDeal',
+            url: 'openDeal',
             type: 'POST',
             method: 'POST',
             cache: false,
@@ -198,7 +198,7 @@ $(function () {
 function forming_page() {
 
     $.ajax({
-        url: 'http://localhost:444/trade/formingPage',
+        url: 'formingPage',
         async: false,
         type: 'POST',
         method: 'POST',
@@ -434,7 +434,7 @@ function forming_orders_active(orders) {
             e.preventDefault();
 
             $.ajax({
-                url: 'http://localhost:444/trade/closeDeal',
+                url: 'closeDeal',
                 type: 'POST',
                 method: 'POST',
                 cache: false,
@@ -516,7 +516,7 @@ function forming_orders_history(orders) {
 
 function update_top_data(pair) {
     $.ajax({
-        url: 'http://localhost:444/trade/updateTop',
+        url: 'updateTop',
         type: 'POST',
         method: 'POST',
         data: pair,
@@ -571,7 +571,7 @@ function chart_volume_update() {
         let request = { Pair: pair, Frame: frame };
         let dataVolume = [];
         $.ajax({
-            url: 'http://localhost:444/trade/getChangeDelta',
+            url: 'getChangeDelta',
             async: false,
             type: 'POST',
             method: 'POST',
@@ -636,7 +636,7 @@ function chart_frome_orders_update(chartType) {
         let request = { Pair: pair, Frame: frame };
         let candles = [];
         $.ajax({
-            url: 'http://localhost:444/trade/getChangeDelta',
+            url: 'getChangeDelta',
             async: false,
             type: 'POST',
             method: 'POST',

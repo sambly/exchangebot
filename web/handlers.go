@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"main/model"
 	"net/http"
@@ -32,6 +33,11 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+func (web *Web) fullroute(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("fullroute", r.URL)
+
+}
+
 func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 
 	err := web.App.AssetsPrices.UpdateDelta()
@@ -57,6 +63,15 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 }
 
 func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("In Forming")
+
+	paht := r.Host
+	pathful := r.URL
+	port := r.URL.Port()
+	fmt.Println("paht:", paht)
+	fmt.Println("pathful:", pathful)
+	fmt.Println("port", port)
 
 	// Список стратегий
 	optionByte, err := os.ReadFile("web/strategy.json")
