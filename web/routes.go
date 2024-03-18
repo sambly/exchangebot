@@ -39,8 +39,6 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/trade/closeDeal", app.basicAuth(app.closeDeal))
 	mux.HandleFunc("/trade/ws", app.basicAuth(app.echo))
 
-	mux.HandleFunc("/", app.basicAuth(app.fullroute))
-
 	//mux.Handle("/", http.FileServer(http.FS(getFrontendAssets(production))))
 
 	// fileServer := http.FileServer(http.Dir("./static/"))
@@ -59,13 +57,7 @@ func (app *Web) routes() *http.ServeMux {
 
 func (app *Web) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		fmt.Println("auth", r.URL)
-
 		username, password, ok := r.BasicAuth()
-		fmt.Println(username)
-		fmt.Println(password)
-		fmt.Println()
 
 		if ok {
 			usernameHash := sha256.Sum256([]byte(username))

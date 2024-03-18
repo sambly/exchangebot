@@ -21,35 +21,34 @@ $(function () {
 
     //#############################################################################  webSocket #############################################################################
 
-    // var Url = "wss://bt-scada.ru/trade/ws";
-    // var Url2 = "ws://localhost:444/trade/ws"
-    // var socket = new WebSocket(Url2);
-    // socket.onopen = function () {
-    //     console.log("connected ws");
-    // };
+    var Url = "ws://localhost:444/trade/ws";
+    var socket = new WebSocket(Url);
+    socket.onopen = function () {
+        console.log("connected ws");
+    };
 
-    // socket.onmessage = function (e) {
+    socket.onmessage = function (e) {
 
-    //     // Здесь сделать проверку что это вообще за данные, пока что есть данные только для ордеров
-    //     let order = JSON.parse(e.data);
-    //     let orderRow = document.querySelector('tr.order-active[value="' + order.ID + '"]');
-    //     let profitElement = orderRow.querySelector('td[name="order-a-profit"]');
+        // Здесь сделать проверку что это вообще за данные, пока что есть данные только для ордеров
+        let order = JSON.parse(e.data);
+        let orderRow = document.querySelector('tr.order-active[value="' + order.ID + '"]');
+        let profitElement = orderRow.querySelector('td[name="order-a-profit"]');
 
-    //     profitElement.textContent = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
-    //     profitElement.style.color = color_text_profit(order.Profit)
+        profitElement.textContent = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
+        profitElement.style.color = color_text_profit(order.Profit)
 
-    // };
+    };
 
 
-    // // если возникла ошибка
-    // socket.onerror = (error) => {
-    //     console.log(`WebSocket Error: ${error}`);
-    // };
+    // если возникла ошибка
+    socket.onerror = (error) => {
+        console.log(`WebSocket Error: ${error}`);
+    };
 
-    // // если соединение закрыто
-    // socket.onclose = (event) => {
-    //     console.log("Connection closed");
-    // };
+    // если соединение закрыто
+    socket.onclose = (event) => {
+        console.log("Connection closed");
+    };
 
     //#############################################################################  webSocket #############################################################################
 
