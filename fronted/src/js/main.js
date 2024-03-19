@@ -197,6 +197,8 @@ $(function () {
 
 function forming_page() {
 
+    size_conversion();
+
     $.ajax({
         url: 'formingPage',
         async: false,
@@ -267,6 +269,31 @@ function forming_page() {
         },
 
     });
+}
+
+function size_conversion() {
+    var windowWidth = $('body').innerWidth();
+
+    console.log(windowWidth);
+
+    if (windowWidth < 768) {
+        $('.btn').addClass('btn-sm');
+        $("#trades").removeAttr("class"); 
+        $('#trades').addClass('d-flex flex-column gap-2 justify-content-between'); 
+    } else if (windowWidth >= 768 && windowWidth < 992 ) {
+        $('.btn').addClass('btn-sm');
+        $("#trades").removeAttr("class"); 
+        $('#trades').addClass('d-flex flex-column gap-2 justify-content-between'); 
+    } else if (windowWidth >= 992 && windowWidth < 1200 ) {
+        $('.btn').addClass('btn-sm');
+        $("#trades").removeAttr("class"); 
+        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between'); 
+
+    } else if (windowWidth >= 1200) {
+        $('.btn').removeClass('btn-sm');
+        $("#trades").removeAttr("class"); 
+        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between'); 
+    }
 }
 
 function update_main_data(marketsStat, changePrices, deltaFast) {
