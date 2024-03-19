@@ -21,7 +21,8 @@ $(function () {
 
     //#############################################################################  webSocket #############################################################################
 
-    var Url = "ws://localhost:444/trade/ws";
+    //var Url = "ws://localhost:444/trade/ws";
+    var Url = "wss://bt-scada.ru/trade/ws";
     var socket = new WebSocket(Url);
     socket.onopen = function () {
         console.log("connected ws");
@@ -42,7 +43,7 @@ $(function () {
 
     // если возникла ошибка
     socket.onerror = (error) => {
-        console.log(`WebSocket Error: ${error}`);
+        console.log(`WebSocket Error: ${error.message}`);
     };
 
     // если соединение закрыто

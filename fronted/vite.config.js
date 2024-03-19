@@ -3,7 +3,7 @@ import path from 'path';
 
 export default {
   root: path.resolve(__dirname, 'src'),
-  base:/trade/,
+  base:"/trade/",
   build: {
     outDir: '../dist'
   },

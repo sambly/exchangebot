@@ -18,13 +18,11 @@ func getFrontendAssets(production bool) fs.FS {
 		if err != nil {
 			fmt.Println(err)
 		}
-
 		return f
 	} else {
 
 		return os.DirFS("fronted/dist")
 	}
-
 }
 
 func (app *Web) routes() *http.ServeMux {
@@ -39,24 +37,20 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/trade/closeDeal", app.basicAuth(app.closeDeal))
 	mux.HandleFunc("/trade/ws", app.basicAuth(app.echo))
 
-	//mux.Handle("/", http.FileServer(http.FS(getFrontendAssets(production))))
-
-	// fileServer := http.FileServer(http.Dir("./static/"))
-	// mux.Handle("/get-pays/static/", http.StripPrefix("/get-pays/static", fileServer))
-
-	// fileServer := http.FileServer(http.Dir("./static/"))
-	// mux.HandleFunc("/static/", app.basicAuth(http.StripPrefix("/static", fileServer).ServeHTTP))
+	mux.HandleFunc("/", app.catchAllRoute)
 
 	fileServer := http.FileServer(http.FS(getFrontendAssets(app.production)))
-	mux.HandleFunc("/trade/", app.basicAuth(http.StripPrefix("/trade", fileServer).ServeHTTP))
 
-	//mux.HandleFunc("/trade", app.basicAuth.ServeHTTP))
+	mux.HandleFunc("/trade/", app.basicAuth(http.StripPrefix("/trade", fileServer).ServeHTTP))
 
 	return mux
 }
 
 func (app *Web) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		fmt.Println("URL : ", r.URL.Path)
+
 		username, password, ok := r.BasicAuth()
 
 		if ok {
@@ -74,7 +68,6 @@ func (app *Web) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 		}
-
 		w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 	})

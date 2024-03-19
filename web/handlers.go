@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"main/model"
 	"net/http"
@@ -30,6 +31,10 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true // Пропускаем любой запрос
 	},
+}
+
+func (web *Web) catchAllRoute(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("catchAllRoute URL :", r.URL.Path)
 }
 
 func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
