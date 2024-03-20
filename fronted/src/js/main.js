@@ -274,22 +274,27 @@ function forming_page() {
 function size_conversion() {
     var windowWidth = $('body').innerWidth();
 
-    console.log(windowWidth);
-
-    if (windowWidth < 768) {
-        $('.btn').addClass('btn-sm');
+    if (windowWidth < 576) {                                                                // class none
+        $('.btn').removeClass('btn-sm');
         $("#trades").removeAttr("class"); 
-        $('#trades').addClass('d-flex flex-column gap-2 justify-content-between'); 
-    } else if (windowWidth >= 768 && windowWidth < 992 ) {
-        $('.btn').addClass('btn-sm');
+        $('#trades').addClass('d-flex flex-column gap-4 justify-content-between'); 
+    } else if (windowWidth >= 576 && windowWidth < 768 ) {                                  // class sm
+        $('.btn').removeClass('btn-sm');
         $("#trades").removeAttr("class"); 
-        $('#trades').addClass('d-flex flex-column gap-2 justify-content-between'); 
-    } else if (windowWidth >= 992 && windowWidth < 1200 ) {
+        $('#trades').addClass('d-flex flex-column gap-4 justify-content-between'); 
+    } else if (windowWidth >= 768 && windowWidth < 992 ) {                                  // class md
         $('.btn').addClass('btn-sm');
         $("#trades").removeAttr("class"); 
         $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between'); 
-
-    } else if (windowWidth >= 1200) {
+    } else if (windowWidth >= 992 && windowWidth < 1200 ) {                                 // class lg
+        $('.btn').addClass('btn-sm');
+        $("#trades").removeAttr("class"); 
+        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between'); 
+    } else if (windowWidth >= 1200 && windowWidth < 1400) {                                 // class xl
+        $('.btn').addClass('btn-sm');
+        $("#trades").removeAttr("class"); 
+        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between'); 
+    } else if (windowWidth >= 1400){                                                        // class xxl
         $('.btn').removeClass('btn-sm');
         $("#trades").removeAttr("class"); 
         $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between'); 
@@ -414,6 +419,7 @@ function forming_orders_active(orders) {
         // 1 Col Side
         let cell = row.insertCell();
         cell.innerHTML = order.Side;
+        cell.style.color = color_side(order.Side)
         cell.setAttribute("name", "order-a-side");
         // 2 Col Pair
         cell = row.insertCell();
@@ -509,6 +515,7 @@ function forming_orders_history(orders) {
         // 1 Col Side
         let cell = row.insertCell();
         cell.innerHTML = order.Side;
+        cell.style.color = color_side(order.Side)
         cell.setAttribute("name", "order-h-side");
         // 2 Col Pair
         cell = row.insertCell();
@@ -525,6 +532,7 @@ function forming_orders_history(orders) {
         // 5 Col - профит 
         cell = row.insertCell();
         cell.innerHTML = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
+        cell.style.color = color_text_profit(order.Profit)
     };
 
     // выбор определенной пары
@@ -1029,6 +1037,14 @@ function color_text_profit(number) {
     } else {
         return 'red';
     }
+}
+
+function color_side(side){
+	if (side=='BUY') {
+        return 'green';
+    } else {
+        return 'red';
+    } 
 }
 
 

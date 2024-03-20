@@ -2,7 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"main/model"
 	"net/http"
@@ -33,10 +32,6 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func (web *Web) catchAllRoute(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("catchAllRoute URL :", r.URL.Path)
-}
-
 func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 
 	err := web.App.AssetsPrices.UpdateDelta()
@@ -57,8 +52,6 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(mapsJson)
-
-	//json.NewEncoder(w).Encode(maps)
 }
 
 func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
@@ -90,8 +83,6 @@ func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(mapsJson)
-
-	//json.NewEncoder(w).Encode(maps)
 }
 
 func (web *Web) getChangeDelta(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +96,6 @@ func (web *Web) getChangeDelta(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(web.App.AssetsPrices.ChangeDelta[data["Pair"]][data["Frame"]])
-
 }
 
 func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +107,6 @@ func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
 	pair := string(bodyByte)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(web.App.AssetsPrices.MarketsStat[pair])
-
 }
 
 func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +127,6 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(web.App.PaperWallet.OrdersActive())
-
 }
 
 func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
@@ -158,7 +146,6 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 
 	orders := map[string]interface{}{"OrdersActive": web.App.PaperWallet.OrdersActive(), "OrdersHistory": web.App.PaperWallet.OrdersHistory()}
 	json.NewEncoder(w).Encode(orders)
-
 }
 
 func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
@@ -177,5 +164,4 @@ func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 		}
 
 	}
-
 }
