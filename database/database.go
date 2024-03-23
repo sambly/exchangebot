@@ -328,3 +328,33 @@ func InsertOrdersInfoTable(db *sql.DB, idOrder int64, frame, strategy, comment s
 
 	return nil
 }
+
+func SelectMarketStateTime(db *sql.DB, pair string, timeRounding time.Time) (model.Candle, error) {
+
+	candle := model.Candle{}
+
+	query := "select Close,Volume from candles WHERE Pair = ? and Time = ?;"
+
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancelfunc()
+	stmt, err := db.PrepareContext(ctx, query)
+
+	if err != nil {
+		return candle, fmt.Errorf("error %s when preparing SQL statement", err)
+	}
+	defer stmt.Close()
+
+	err = stmt.QueryRowContext(ctx, pair, timeRounding.Format("2006-01-02 15:04:05")).Scan(
+		&candle.Close,
+		&candle.Volume,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return candle, nil
+		}
+		return candle, err
+	}
+
+	return candle, nil
+
+}
