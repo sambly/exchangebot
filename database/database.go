@@ -358,3 +358,36 @@ func SelectMarketStateTime(db *sql.DB, pair string, timeRounding time.Time) (mod
 	return candle, nil
 
 }
+
+func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]model.Candle, error) {
+	candles := []model.Candle{}
+
+	query := "SELECT Pair, Close, Volume FROM candles WHERE Time <= ?;"
+
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancelfunc()
+	stmt, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		return candles, fmt.Errorf("error %s when preparing SQL statement", err)
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.QueryContext(ctx, timeRounding.Format("2006-01-02 15:04:05"))
+	if err != nil {
+		return candles, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var candle model.Candle
+		if err := rows.Scan(&candle.Pair, &candle.Close, &candle.Volume); err != nil {
+			return candles, err
+		}
+		candles = append(candles, candle)
+	}
+	if err := rows.Err(); err != nil {
+		return candles, err
+	}
+
+	return candles, nil
+}

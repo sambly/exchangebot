@@ -6,6 +6,7 @@ import (
 	"main/config"
 	"main/database"
 	"main/exchange"
+	"main/model"
 	"testing"
 	"time"
 )
@@ -70,20 +71,37 @@ func TestUpdateChanges(t *testing.T) {
 
 	asetsPrices := NewAssetsPrices(pairs, changePeriods, nil, 0, db, nil)
 
-	// periods := map[string]time.Duration{
-	// 	"ch1m":  time.Second * 60,
-	// 	"ch3m":  time.Minute * 3,
-	// 	"ch15m": time.Minute * 15,
-	// 	"ch1h":  time.Hour,
-	// 	"ch4h":  time.Hour * 4,
-	// }
-
 	periods := map[string]time.Duration{
-		"ch1m": time.Second * 60,
+		"ch1m":  time.Second * 60,
+		"ch3m":  time.Minute * 3,
+		"ch15m": time.Minute * 15,
+		"ch1h":  time.Hour,
+		"ch4h":  time.Hour * 4,
 	}
 
 	timeNow := time.Now()
 	timeRounding := timeNow.Truncate(60 * time.Second)
+
+	// Определить масимальное время из периода для запроса в бд
+	var max time.Duration
+	for _, dur := range periods {
+		if dur > max {
+			max = dur
+		}
+	}
+
+	timeRoundingMax := timeRounding.Add(-max)
+
+	candlesList, err := database.SelectMarketStateTimev2(db, timeRoundingMax)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var candles = map[string]map[string][]*model.Candle
+
+	for candle := range candlesList {
+
+	}
 
 	for _, pair := range pairs {
 		for period, timePeriod := range periods {
