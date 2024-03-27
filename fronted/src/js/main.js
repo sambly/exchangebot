@@ -21,7 +21,7 @@ $(function () {
 
     //#############################################################################  webSocket #############################################################################
 
-    //var Url = "ws://localhost:444/trade/ws";
+    // var Url = "ws://localhost:444/trade/ws";
     var Url = "wss://bt-scada.ru/trade/ws";
     var socket = new WebSocket(Url);
     socket.onopen = function () {
@@ -61,6 +61,32 @@ $(function () {
     });
     $("#toastMessage").text("");
 
+
+
+    // Аткинвые кнопки меню (Цена,Объем)
+    $('#exp').click(function (e) {
+
+        e.preventDefault();
+
+        var userInput = prompt('Введите пару :', '');
+
+        $.ajax({
+            url: 'exp',
+            type: 'POST',
+            method: 'POST',
+            cache: false,
+            processData: false,
+            contentType: ' text/html; charset=utf-8',
+            data: userInput,
+            success: function (response) {
+               console.log(response);
+            },
+            error: function (response) {
+                console.log(response);
+            },
+
+        });
+    });
 
 
     // Аткинвые кнопки меню (Цена,Объем)
@@ -276,36 +302,35 @@ function size_conversion() {
 
     if (windowWidth < 576) {                                                                // class none
         $('.btn').removeClass('btn-sm');
-        $("#trades").removeAttr("class"); 
-        $('#trades').addClass('d-flex flex-column gap-4 justify-content-between'); 
-    } else if (windowWidth >= 576 && windowWidth < 768 ) {                                  // class sm
+        $("#trades").removeAttr("class");
+        $('#trades').addClass('d-flex flex-column gap-4 justify-content-between');
+    } else if (windowWidth >= 576 && windowWidth < 768) {                                  // class sm
         $('.btn').removeClass('btn-sm');
-        $("#trades").removeAttr("class"); 
-        $('#trades').addClass('d-flex flex-column gap-4 justify-content-between'); 
-    } else if (windowWidth >= 768 && windowWidth < 992 ) {                                  // class md
+        $("#trades").removeAttr("class");
+        $('#trades').addClass('d-flex flex-column gap-4 justify-content-between');
+    } else if (windowWidth >= 768 && windowWidth < 992) {                                  // class md
         $('.btn').addClass('btn-sm');
-        $("#trades").removeAttr("class"); 
-        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between'); 
-    } else if (windowWidth >= 992 && windowWidth < 1200 ) {                                 // class lg
+        $("#trades").removeAttr("class");
+        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between');
+    } else if (windowWidth >= 992 && windowWidth < 1200) {                                 // class lg
         $('.btn').addClass('btn-sm');
-        $("#trades").removeAttr("class"); 
-        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between'); 
+        $("#trades").removeAttr("class");
+        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between');
     } else if (windowWidth >= 1200 && windowWidth < 1400) {                                 // class xl
         $('.btn').addClass('btn-sm');
-        $("#trades").removeAttr("class"); 
-        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between'); 
-    } else if (windowWidth >= 1400){                                                        // class xxl
+        $("#trades").removeAttr("class");
+        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between');
+    } else if (windowWidth >= 1400) {                                                        // class xxl
         $('.btn').removeClass('btn-sm');
-        $("#trades").removeAttr("class"); 
-        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between'); 
+        $("#trades").removeAttr("class");
+        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between');
     }
 }
 
 function update_main_data(marketsStat, changePrices, deltaFast) {
 
-
-    localStorage.setItem('marketsStat', JSON.stringify(marketsStat));
-    localStorage.setItem('changePrices', JSON.stringify(changePrices));
+    // localStorage.setItem('marketsStat', JSON.stringify(marketsStat));
+    // localStorage.setItem('changePrices', JSON.stringify(changePrices));
     localStorage.setItem('deltaFast', JSON.stringify(deltaFast));
 
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
@@ -718,8 +743,26 @@ function forming_tickers_list() {
 
     const btnPairsFavorite = document.querySelector("#btnFavoritePairs");
 
-    let changePrices = JSON.parse(localStorage.getItem('changePrices')) || [];
-    let marketsStat = JSON.parse(localStorage.getItem('marketsStat')) || [];
+    var marketsStat;
+    var changePrices;
+    $.ajax({
+        url: 'getChPrice',
+        async: false,
+        method: 'GET',
+        cache: false,
+        contentType: 'application/json; charset=utf-8',
+        processData: false,
+        success: function (response) {
+            marketsStat =response.MarketsStat;
+            changePrices =response.ChangePrices;
+        },
+        error: function (response) {
+        },
+
+    });
+
+    // let changePrices = JSON.parse(localStorage.getItem('changePrices')) || [];
+    // let marketsStat = JSON.parse(localStorage.getItem('marketsStat')) || [];
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
 
     for (let pair in changePrices) {
@@ -759,15 +802,19 @@ function forming_tickers_list() {
             (marketsStat[pair].Volume).toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' }),
             { 'name': 'volume', 'value': marketsStat[pair].Volume }, 'price-col3', null, 'col3');
 
-        const heads = ['ch3m', 'ch15m', 'ch1h', 'ch4h'];
-        // 4 столбец ch3m
+        const heads = ['ch1m','ch3m', 'ch15m', 'ch1h', 'ch4h','ch12h'];
+        // 4 столбец ch1m
         createCell(changePrices[pair][heads[0]]['СhangePercent'].toFixed(2), { 'name': heads[0] }, 'price-col4', null, 'col4');
-        // 5 столбец ch15m
+        // 5 столбец ch3m
         createCell(changePrices[pair][heads[1]]['СhangePercent'].toFixed(2), { 'name': heads[1] }, 'price-col5', null, 'col5');
-        // 6 столбец ch1h
+        // 6 столбец ch15m
         createCell(changePrices[pair][heads[2]]['СhangePercent'].toFixed(2), { 'name': heads[2] }, 'price-col6', null, 'col6');
-        // 7 столбец ch4h
+        // 7 столбец ch1h
         createCell(changePrices[pair][heads[3]]['СhangePercent'].toFixed(2), { 'name': heads[3] }, 'price-col7', null, 'col7');
+        // 8 столбец ch4h
+        createCell(changePrices[pair][heads[4]]['СhangePercent'].toFixed(2), { 'name': heads[4] }, 'price-col8', null, 'col8');
+        // 9 столбец ch12h
+        createCell(changePrices[pair][heads[5]]['СhangePercent'].toFixed(2), { 'name': heads[5] }, 'price-col9', null, 'col9');
 
     };
 
@@ -835,7 +882,7 @@ function forming_tickers_list_volume() {
 
 
     let frame;
-    document.querySelectorAll('.btnFrame').forEach(function(element) {
+    document.querySelectorAll('.btnFrame').forEach(function (element) {
         if (element.classList.contains('active')) {
             frame = element.innerText;
         }
@@ -982,6 +1029,8 @@ function sort_table(tbody, th, tr) {
                             : tbody.insertBefore(row, tbody.childNodes[0]);
                     });
             }
+            // // Перемещение к самой первой строке таблицы
+            tbody.childNodes[0].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
         });
     });
 }
@@ -1039,12 +1088,12 @@ function color_text_profit(number) {
     }
 }
 
-function color_side(side){
-	if (side=='BUY') {
+function color_side(side) {
+    if (side == 'BUY') {
         return 'green';
     } else {
         return 'red';
-    } 
+    }
 }
 
 

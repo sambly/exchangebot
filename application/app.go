@@ -60,10 +60,17 @@ func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings,
 
 func (app *Application) Run() error {
 
+	timeStart := time.Now()
+	timeRounding := timeStart.Truncate(60 * time.Second)
+
+	app.AssetsPrices.UpdateTime = timeRounding
+	app.AssetsPrices.InitChangePrices()
+
 	for _, pair := range app.settings.Pairs {
 		app.dataFeed.Subscribe(pair, app.AssetsPrices.OnMarket)
 		app.dataFeed.Subscribe(pair, app.OrderController.OnMarket)
 	}
+
 	go app.dataFeed.Start(true)
 
 	//Для предварительного заполения цен всех пар, может сделать меньше время, просто добавляет погрешность для 10m
@@ -85,17 +92,17 @@ func (app *Application) Run() error {
 	for {
 		select {
 		case <-ticker_Init.C:
-			app.AssetsPrices.UpdateChanges("")
+			// app.AssetsPrices.UpdateChanges("")
 			ticker_Init.Stop()
 
 		case <-ticker_3m.C:
-			app.AssetsPrices.UpdateChanges("ch3m")
+			// app.AssetsPrices.UpdateChanges("ch3m")
 
 		case <-ticker_15m.C:
-			app.AssetsPrices.UpdateChanges("ch15m")
+			// app.AssetsPrices.UpdateChanges("ch15m")
 
 		case <-ticker_1h.C:
-			app.AssetsPrices.UpdateChanges("ch1h")
+			// app.AssetsPrices.UpdateChanges("ch1h")
 			// err := app.Account.UpdateAssets()
 			// if err != nil {
 			// 	fmt.Printf("%v", err)
@@ -103,7 +110,7 @@ func (app *Application) Run() error {
 			// }
 
 		case <-ticker_4h.C:
-			app.AssetsPrices.UpdateChanges("ch4h")
+			// app.AssetsPrices.UpdateChanges("ch4h")
 			// err := app.Account.UpdateAssets()
 			// if err != nil {
 			// 	fmt.Printf("%v", err)

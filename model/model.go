@@ -5,7 +5,7 @@ import "time"
 type Settings struct {
 	Pairs          []string
 	Timeframe      string
-	ChangePeriods  []string
+	ChangePeriods  map[string]time.Duration
 	WeightProcents map[string]float64
 	LengthOfTime   int64
 }
@@ -49,11 +49,21 @@ type MarketsStat struct {
 	Volume float64
 }
 
+type ChangeDataForming struct {
+	DatasetCandle []DatasetCandle
+	Fill          bool
+}
+
 type ChangeData struct {
 	LastPrice           float64
 	LastVolume          float64
 	СhangePercent       float64
 	ChangePercentVolume float64
+}
+type DatasetCandle struct {
+	Price  float64
+	Volume float64
+	Time   time.Time
 }
 
 type Candle struct {

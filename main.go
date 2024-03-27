@@ -12,6 +12,7 @@ import (
 	"main/notification"
 	"main/telegram"
 	"main/web"
+	"time"
 )
 
 func main() {
@@ -33,14 +34,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//pairs := []string{"MBOXUSDT", "AUDIOUSDT", "PROMUSDT", "AIUSDT", "LDOUSDT", "ETCUSDT", "QNTUSDT"}
-
 	// TODO добавить сюда еще периоды PeriodsDelta:   []string{"1m", "5m", "30m", "1h", "4h", "1d"},
+
+	changePeriods := map[string]time.Duration{
+		"ch1m":  time.Second * 60,
+		"ch3m":  time.Minute * 3,
+		"ch15m": time.Minute * 15,
+		"ch1h":  time.Hour,
+		"ch4h":  time.Hour * 4,
+		"ch12h": time.Hour * 12,
+	}
 
 	settings := model.Settings{
 		Pairs:          pairs,
 		Timeframe:      "1m",
-		ChangePeriods:  []string{"ch3m", "ch15m", "ch1h", "ch4h"},
+		ChangePeriods:  changePeriods,
 		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
 		LengthOfTime:   1080,
 	}

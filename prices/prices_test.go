@@ -3,6 +3,7 @@ package prices
 import (
 	"context"
 	"flag"
+	"fmt"
 	"main/config"
 	"main/database"
 	"main/exchange"
@@ -55,21 +56,21 @@ func TestUpdateChanges(t *testing.T) {
 	}
 	defer db.Close()
 
-	binance, err := exchange.NewBinance(context.Background())
-	if err != nil {
-		t.Error(err)
-	}
-	pairs, err := binance.GetPairsToUSDT()
-	if err != nil {
-		t.Error(err)
-	}
+	// binance, err := exchange.NewBinance(context.Background())
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+	// pairs, err := binance.GetPairsToUSDT()
+	// if err != nil {
+	// 	t.Error(err)
+	// }
 
-	pairs = []string{"BTCUSDT"}
+	//pairs = []string{"BTCUSDT"}
 
 	//changePeriods := []string{"ch1m", "ch3m", "ch15m", "ch1h", "ch4h"}
-	changePeriods := []string{"ch1m"}
+	//changePeriods := []string{"ch1m"}
 
-	asetsPrices := NewAssetsPrices(pairs, changePeriods, nil, 0, db, nil)
+	//asetsPrices := NewAssetsPrices(pairs, changePeriods, nil, 0, db, nil)
 
 	periods := map[string]time.Duration{
 		"ch1m":  time.Second * 60,
@@ -97,29 +98,37 @@ func TestUpdateChanges(t *testing.T) {
 		t.Error(err)
 	}
 
-	var candles = map[string]map[string][]*model.Candle
+	var candles = map[string]map[string]*model.ChangeDataFull{}
 
-	for candle := range candlesList {
+	for _, candle := range candlesList {
+		for period, periodValue := range periods {
 
-	}
-
-	for _, pair := range pairs {
-		for period, timePeriod := range periods {
-
-			changeData := asetsPrices.ChangePrices[pair][period]
-
-			timeRoundingFormating := timeRounding.Add(-1 * timePeriod)
-			candle, err := database.SelectMarketStateTime(db, pair, timeRoundingFormating)
-			if err != nil {
-				t.Error(err)
+			if _, ok := candles[candle.Pair]; !ok {
+				candles[candle.Pair] = map[string]*model.ChangeDataFull{}
+			}
+			if _, ok := candles[candle.Pair][period]; !ok {
+				candles[candle.Pair][period] = &model.ChangeDataFull{}
 			}
 
-			// fmt.Println(pair, candle.Close, candle.Volume, period)
-			changeData.LastPrice = candle.Close
-			changeData.LastPrice = candle.Volume
+			item := candles[candle.Pair][period]
+
+			if isTimeMultipleOfInterval1(candle.Time, periodValue) {
+				item.DatasetCandle = append(item.DatasetCandle, model.DatasetCandle{Price: candle.Close, Volume: candle.Volume})
+				item.LastPrice = candle.Close
+				item.LastVolume = candle.Volume
+				item.Fill = true
+			} else {
+				item.DatasetCandle = append(item.DatasetCandle, model.DatasetCandle{Price: candle.Close, Volume: candle.Volume})
+			}
 
 		}
-
 	}
+	fmt.Println("LOL")
 
+}
+
+// Проверка на кратность времени
+func isTimeMultipleOfInterval1(t time.Time, interval time.Duration) bool {
+	startTime := time.Unix(0, 0) // Начальное время (начало Unix эпохи)
+	return t.Sub(startTime)%interval == 0
 }

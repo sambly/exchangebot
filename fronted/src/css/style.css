@@ -19,7 +19,7 @@
 
 #table-price {
   table-layout: fixed;
-  width: 485px;
+  width: 600px;
 }
 
 #table-delta {
@@ -88,6 +88,14 @@ tbody td {
 
 #table-price th:nth-child(7),
 #table-price td:nth-child(7) {
+  width: 70px;
+}
+#table-price th:nth-child(8),
+#table-price td:nth-child(8) {
+  width: 70px;
+}
+#table-price th:nth-child(9),
+#table-price td:nth-child(9) {
   width: 70px;
 }
 

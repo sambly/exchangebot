@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"main/model"
 	"net/http"
@@ -10,21 +11,6 @@ import (
 
 	"github.com/gorilla/websocket"
 )
-
-type Menu struct {
-	Name string
-	Url  string
-}
-
-type ViewData struct {
-	Menu          []Menu
-	Pairs         []string
-	MarketsStat   map[string]*model.MarketsStat
-	ChangePrices  map[string]map[string]*model.ChangeData
-	DeltaFast     map[string]map[string]*model.DeltaFast
-	OrdersActive  []*model.Order
-	OrdersHistory []*model.Order
-}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -47,6 +33,7 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 
 	mapsJson, err := json.Marshal(maps)
 	if err != nil {
+		fmt.Println("ERROR")
 		web.logError(err)
 	}
 
@@ -78,6 +65,7 @@ func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
 
 	mapsJson, err := json.Marshal(maps)
 	if err != nil {
+		fmt.Println("ERROR1")
 		web.logError(err)
 	}
 
@@ -164,4 +152,40 @@ func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 		}
 
 	}
+}
+
+func (web *Web) getChPrice(w http.ResponseWriter, r *http.Request) {
+	maps := map[string]interface{}{
+		"MarketsStat":  web.App.AssetsPrices.MarketsStat,
+		"ChangePrices": web.App.AssetsPrices.ChangePrices,
+	}
+
+	mapsJson, err := json.Marshal(maps)
+	if err != nil {
+		web.logError(err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(mapsJson)
+}
+
+func (web *Web) exp(w http.ResponseWriter, r *http.Request) {
+
+	bodyByte, err := io.ReadAll(r.Body)
+	if err != nil {
+		web.logError(err)
+	}
+
+	maps := map[string]interface{}{
+		"ChangePricesForing": web.App.AssetsPrices.FormingChangePrices[string(bodyByte)]["ch12h"],
+		"ChangePrices":       web.App.AssetsPrices.ChangePrices[string(bodyByte)]["ch12h"],
+	}
+
+	mapsJson, err := json.Marshal(maps)
+	if err != nil {
+		web.logError(err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(mapsJson)
 }

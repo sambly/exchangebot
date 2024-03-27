@@ -85,7 +85,7 @@ func InsertCandlesTables(db *sql.DB, candle model.Candle) error {
 
 func SelectCandlesTable(db *sql.DB) ([]model.Candle, error) {
 
-	query := "select Time,Pair,Open,Close,Low,High,Volume,QuoteVolume,AmountTrade,AmountTradeBuy,ActiveBuyVolume from candles LIMIT 3000000;"
+	query := "select Time,Pair,Open,Close,Low,High,Volume,QuoteVolume,AmountTrade,AmountTradeBuy,ActiveBuyVolume from candlesch1m;"
 
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancelfunc()
@@ -362,7 +362,7 @@ func SelectMarketStateTime(db *sql.DB, pair string, timeRounding time.Time) (mod
 func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]model.Candle, error) {
 	candles := []model.Candle{}
 
-	query := "SELECT Pair, Close, Volume FROM candles WHERE Time <= ?;"
+	query := "SELECT Time, Pair, Close, Volume FROM candlesch1m WHERE Time >= ? ORDER BY Time DESC;"
 
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancelfunc()
@@ -380,7 +380,7 @@ func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]model.Candle
 
 	for rows.Next() {
 		var candle model.Candle
-		if err := rows.Scan(&candle.Pair, &candle.Close, &candle.Volume); err != nil {
+		if err := rows.Scan(&candle.Time, &candle.Pair, &candle.Close, &candle.Volume); err != nil {
 			return candles, err
 		}
 		candles = append(candles, candle)
