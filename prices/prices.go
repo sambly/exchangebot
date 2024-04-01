@@ -16,11 +16,13 @@ type AsetsPrices struct {
 	PeriodsDelta   []string
 	WeightProcents map[string]float64
 
-	MarketsStat         map[string]*model.MarketsStat
+	MarketsStat map[string]*model.MarketsStat
+	// TODO Вот это выделить бы в отдельную структуру
 	FormingChangePrices map[string]map[string]*model.ChangeDataForming
 	ChangePrices        map[string]map[string]*model.ChangeData
-	ChangeDelta         map[string]map[string][]ChangeDelta
-	DeltaFast           map[string]map[string]*model.DeltaFast
+
+	ChangeDelta map[string]map[string][]ChangeDelta
+	DeltaFast   map[string]map[string]*model.DeltaFast
 
 	UpdateTime time.Time
 
@@ -107,19 +109,20 @@ func (ap *AsetsPrices) InitChangePrices() {
 	}
 
 	timeRoundingMax := ap.UpdateTime.Add(-max)
-	// todo а что если очень большой список надо защиту сделать
 	candlesList, err := database.SelectMarketStateTimev2(ap.database, timeRoundingMax)
 	if err != nil {
 		// TODO
 		fmt.Println("ERROR DBBBBBB")
 	}
 
-	// Если в базе данных нет последний записей, то выходим
-	if !candlesList[0].Time.Equal(ap.UpdateTime.Add(-1 * time.Minute)) {
+	// Сделаем небольшую погрешность , для возможности горячего перезапуска приложения
+	if candlesList[0].Time.Sub(ap.UpdateTime) > 10*time.Minute {
+		fmt.Println("Большая погрешность №1")
 		return
 	}
 
 	for _, candle := range candlesList {
+
 		for period, periodValue := range ap.Periods {
 
 			forming := ap.FormingChangePrices[candle.Pair][period]
@@ -131,23 +134,18 @@ func (ap *AsetsPrices) InitChangePrices() {
 					change.LastPrice = forming.DatasetCandle[len(forming.DatasetCandle)-1].Price
 					forming.Fill = true
 				} else {
+
+					if len(forming.DatasetCandle) > 0 {
+						// Большая погрешность дальше не заполняем  forming.DatasetCandle
+						if forming.DatasetCandle[len(forming.DatasetCandle)-1].Time.Sub(candle.Time) > 10*time.Minute {
+							continue
+						}
+					}
 					forming.DatasetCandle = append(forming.DatasetCandle, model.DatasetCandle{Price: candle.Close, Volume: candle.Volume, Time: candle.Time})
 				}
 			}
 		}
 	}
-
-	for _, candle := range candlesList {
-		for period, periodValue := range ap.Periods {
-			forming := ap.FormingChangePrices[candle.Pair][period]
-
-			if !forming.Fill {
-				fmt.Println(candle.Pair)
-				fmt.Println(periodValue)
-			}
-		}
-	}
-
 }
 
 func (ap *AsetsPrices) OnMarket(ms model.MarketsStat) {
