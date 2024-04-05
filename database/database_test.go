@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"main/config"
 	"main/model"
 	"testing"
@@ -60,4 +61,25 @@ func TestCreateOrder(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestSelectDeltaPeriod(t *testing.T) {
+	config, err := config.NewConfig()
+	if err != nil {
+		t.Error(err)
+	}
+
+	db, err := DbConnection(config.NameDb, config.HostNameDb, config.UserNameDb, config.PasswordDb)
+	if err != nil {
+		t.Error(err)
+	}
+	defer db.Close()
+
+	candles, err := SelectDeltaPeriod(db, "BTCUSDT", "1m")
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Println(candles)
+
 }

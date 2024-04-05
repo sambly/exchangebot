@@ -6,8 +6,8 @@ type Settings struct {
 	Pairs          []string
 	Timeframe      string
 	ChangePeriods  map[string]time.Duration
+	DeltaPeriods   map[string]time.Duration
 	WeightProcents map[string]float64
-	LengthOfTime   int64
 }
 
 type AssetInfo struct {
@@ -47,11 +47,6 @@ type MarketsStat struct {
 	Price  float64
 	Ch24   float64
 	Volume float64
-}
-
-type ChangeDataForming struct {
-	DatasetCandle []DatasetCandle
-	Fill          bool
 }
 
 type ChangeData struct {
@@ -94,6 +89,22 @@ type Candle struct {
 	Metadata map[string]float64
 }
 
+type ChangeDelta struct {
+	Time      time.Time
+	Volume    float64
+	VolumeBuy float64
+	VolumeAsk float64
+	Trades    int64
+	TradesBuy int64
+	TradesAsk int64
+
+	// For Candles
+	Open  float64
+	High  float64
+	Low   float64
+	Close float64
+}
+
 type DeltaFast struct {
 	Volume    float64
 	VolumeBuy float64
@@ -101,11 +112,6 @@ type DeltaFast struct {
 	Trades    float64
 	TradesBuy float64
 	TradesAsk float64
-}
-
-func (df *DeltaFast) Clear() {
-	df.Volume = 0
-	df.Trades = 0
 }
 
 type Deal struct {

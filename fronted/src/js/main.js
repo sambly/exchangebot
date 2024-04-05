@@ -62,33 +62,6 @@ $(function () {
     $("#toastMessage").text("");
 
 
-
-    // Аткинвые кнопки меню (Цена,Объем)
-    $('#exp').click(function (e) {
-
-        e.preventDefault();
-
-        var userInput = prompt('Введите пару :', '');
-
-        $.ajax({
-            url: 'exp',
-            type: 'POST',
-            method: 'POST',
-            cache: false,
-            processData: false,
-            contentType: ' text/html; charset=utf-8',
-            data: userInput,
-            success: function (response) {
-               console.log(response);
-            },
-            error: function (response) {
-                console.log(response);
-            },
-
-        });
-    });
-
-
     // Аткинвые кнопки меню (Цена,Объем)
     $('.btnMenu').click(function () {
         $('.btnMenu').removeClass('active'); // Удаляем класс 'active' у всех кнопок
@@ -149,8 +122,6 @@ $(function () {
             success: function (response) {
                 update_main_data(
                     response.MarketsStat,
-                    response.ChangePrices,
-                    response.DeltaFast,
                 );
                 $("#toastMessage").text("Данные загружены");
                 myToast.show();
@@ -237,8 +208,6 @@ function forming_page() {
 
             let pairs = response.Pairs;
             let marketsStat = response.MarketsStat;
-            let changePrices = response.ChangePrices;
-            let deltaFast = response.DeltaFast;
             let ordersActive = response.OrdersActive;
             let ordersHistory = response.OrdersHistory;
             let strategyDescription = response.OptionStrategy;
@@ -276,12 +245,13 @@ function forming_page() {
                         checkboxClear.checked = false;
                     });
                     checkbox.checked = true;
-                    chart_volume_update();
+
+                    chart_volume_update().then();
                 })
             })
 
             // Обновление данных 
-            update_main_data(marketsStat, changePrices, deltaFast);
+            update_main_data(marketsStat);
 
             // Формирование panel-trade
             forming_orders_active(ordersActive);
@@ -316,22 +286,18 @@ function size_conversion() {
         $('.btn').addClass('btn-sm');
         $("#trades").removeAttr("class");
         $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between');
-    } else if (windowWidth >= 1200 && windowWidth < 1400) {                                 // class xl
+    } else if (windowWidth >= 1200 && windowWidth <= 1432) {                                 // class xl
         $('.btn').addClass('btn-sm');
         $("#trades").removeAttr("class");
         $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between');
-    } else if (windowWidth >= 1400) {                                                        // class xxl
+    } else if (windowWidth > 1432) {                                                        // class xxl
         $('.btn').removeClass('btn-sm');
         $("#trades").removeAttr("class");
         $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between');
     }
 }
 
-function update_main_data(marketsStat, changePrices, deltaFast) {
-
-    // localStorage.setItem('marketsStat', JSON.stringify(marketsStat));
-    // localStorage.setItem('changePrices', JSON.stringify(changePrices));
-    localStorage.setItem('deltaFast', JSON.stringify(deltaFast));
+function update_main_data(marketsStat) {
 
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
     localStorage.setItem('favoritePairs', JSON.stringify(favoritePairs));
@@ -411,7 +377,8 @@ function change_pair(pair) {
                 });
             }
         }
-        chart_volume_update();
+
+        chart_volume_update().then();
     }
 
     update_top_data(pair);
@@ -480,7 +447,10 @@ function forming_orders_active(orders) {
             let pair = row.querySelector('[name="order-a-pair"]').innerHTML;
             change_pair(pair);
             show_chart_orders();
-            chart_frome_orders_update('Active');
+            chart_frome_orders_update('Active').then(() => {
+            }).catch(error => {
+                console.error('Ошибка при выполнении функции chart_frome_orders_update:', error);
+            });
 
         });
     };
@@ -567,7 +537,11 @@ function forming_orders_history(orders) {
             let pair = row.querySelector('[name="order-h-pair"]').innerHTML;
             change_pair(pair);
             show_chart_orders();
-            chart_frome_orders_update('History');
+            chart_frome_orders_update('History').then(() => {
+            }).catch(error => {
+                console.error('Ошибка при выполнении функции chart_frome_orders_update:', error);
+            });
+            
 
         });
     };
@@ -595,7 +569,7 @@ function update_top_data(pair) {
     });
 }
 
-function chart_volume_update() {
+async function chart_volume_update() {
 
     let pair = document.querySelector('#pairs');
     let frames = document.querySelectorAll('.btnFrame');
@@ -628,96 +602,107 @@ function chart_volume_update() {
     };
 
     function update_volume_data(pair, frame, checboxType) {
-        let request = { Pair: pair, Frame: frame };
-        let dataVolume = [];
-        $.ajax({
-            url: 'getChangeDelta',
-            async: false,
-            type: 'POST',
-            method: 'POST',
-            data: JSON.stringify(request),
-            cache: false,
-            contentType: 'application/json; charset=utf-8',
-            processData: false,
-            success: function (data) {
-                for (let item of data) {
-                    dataVolume.push({ time: timeToLocal(new Date(item['Time']) / 1000), value: item[checboxType] })
-                }
-            },
-            error: function (response) {
-            },
+        return new Promise((resolve, reject) => {
+            let request = { Pair: pair, Frame: frame };
+            let dataVolume = [];
+            $.ajax({
+                url: 'getChangeDelta',
+                type: 'POST',
+                method: 'POST',
+                data: JSON.stringify(request),
+                cache: false,
+                contentType: 'application/json; charset=utf-8',
+                processData: false,
+                success: function (data) {
+                    for (let item of data) {
+                        dataVolume.push({ time: timeToLocal(new Date(item['Time']) / 1000), value: item[checboxType] });
+                    }
+                    resolve(dataVolume);
+                },
+                error: function (response) {
+                    reject(response);
+                },
+            });
         });
-        return dataVolume
-
     }
 
-    lw_charts_volume(container_chart, chartOptions, pair, frame, checboxType, update_volume_data);
-
+    try {        
+        let dataVolume = await update_volume_data(pair.value, frame.innerText, checboxType);
+        lw_charts_volume(container_chart, chartOptions, pair.value, dataVolume);
+    } catch (error) {
+        console.error('Ошибка в chart_volume_update:', error);
+    }
 
 }
 
-function chart_frome_orders_update(chartType) {
+async function chart_frome_orders_update(chartType) {
 
-    let pair = document.querySelector('#pairs');
-    let container_chart = document.getElementById('chart-orders');
-    let chartWidth = container_chart.clientWidth;
-    let chartHeight = 468;
-    const chartOptions = {
-        height: chartHeight,
-        width: chartWidth,
-        autosize: true,
-        layout: {
-            backgroundColor: '#ffffff',
-            textColor: 'rgba(33, 56, 77, 1)',
-        },
-        grid: {
-            vertLines: {
-                color: 'rgba(197, 203, 206, 0.7)',
+    return new Promise((resolve, reject) => {
+        let pair = document.querySelector('#pairs');
+        let container_chart = document.getElementById('chart-orders');
+        let chartWidth = container_chart.clientWidth;
+        let chartHeight = 468;
+        const chartOptions = {
+            height: chartHeight,
+            width: chartWidth,
+            autosize: true,
+            layout: {
+                backgroundColor: '#ffffff',
+                textColor: 'rgba(33, 56, 77, 1)',
             },
-            horzLines: {
-                color: 'rgba(197, 203, 206, 0.7)',
+            grid: {
+                vertLines: {
+                    color: 'rgba(197, 203, 206, 0.7)',
+                },
+                horzLines: {
+                    color: 'rgba(197, 203, 206, 0.7)',
+                },
             },
-        },
-        timeScale: {
-            timeVisible: true,
-            secondsVisible: false
-        },
-    };
-    let orders;
-    if (chartType === 'Active') {
-        orders = JSON.parse(localStorage.getItem('ordersActive')) || [];
-    }
-    if (chartType === 'History') {
-        orders = JSON.parse(localStorage.getItem('ordersHistory')) || [];
-    }
+            timeScale: {
+                timeVisible: true,
+                secondsVisible: false
+            },
+        };
+        let orders;
+        if (chartType === 'Active') {
+            orders = JSON.parse(localStorage.getItem('ordersActive')) || [];
+        }
+        if (chartType === 'History') {
+            orders = JSON.parse(localStorage.getItem('ordersHistory')) || [];
+        }
 
-    function update_candles(pair, frame) {
+        function update_candles(pair, frame) {
 
-        let request = { Pair: pair, Frame: frame };
-        let candles = [];
-        $.ajax({
-            url: 'getChangeDelta',
-            async: false,
-            type: 'POST',
-            method: 'POST',
-            data: JSON.stringify(request),
-            cache: false,
-            contentType: 'application/json; charset=utf-8',
-            processData: false,
-            success: function (data) {
-                for (let item of data) {
-                    candles.push({ time: timeToLocal(new Date(item['Time']) / 1000), open: item['Open'], high: item['High'], low: item['Low'], close: item['Close'] })
-                }
-            },
-            error: function (response) {
-            },
+            return new Promise((resolve, reject) => {
+                let request = { Pair: pair, Frame: frame };
+                let candles = [];
+                $.ajax({
+                    url: 'getChangeDelta',
+                    type: 'POST',
+                    method: 'POST',
+                    data: JSON.stringify(request),
+                    cache: false,
+                    contentType: 'application/json; charset=utf-8',
+                    processData: false,
+                    success: function (data) {
+                        for (let item of data) {
+                            candles.push({ time: timeToLocal(new Date(item['Time']) / 1000), open: item['Open'], high: item['High'], low: item['Low'], close: item['Close'] })
+                        }
+                        resolve(candles);
+                    },
+                    error: function (response) {
+                        reject(response);
+                    },
+                });
+            });
+        }
+
+        lw_charts_orders(container_chart, chartOptions, pair, orders, update_candles).then(() => {
+            resolve();
+        }).catch(error => {
+            reject(error);
         });
-        return candles
-
-    }
-
-    lw_charts_orders(container_chart, chartOptions, pair, orders, update_candles);
-
+    });
 }
 
 function forming_tickers_list() {
@@ -753,8 +738,8 @@ function forming_tickers_list() {
         contentType: 'application/json; charset=utf-8',
         processData: false,
         success: function (response) {
-            marketsStat =response.MarketsStat;
-            changePrices =response.ChangePrices;
+            marketsStat = response.MarketsStat;
+            changePrices = response.ChangePrices;
         },
         error: function (response) {
         },
@@ -802,7 +787,7 @@ function forming_tickers_list() {
             (marketsStat[pair].Volume).toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' }),
             { 'name': 'volume', 'value': marketsStat[pair].Volume }, 'price-col3', null, 'col3');
 
-        const heads = ['ch1m','ch3m', 'ch15m', 'ch1h', 'ch4h','ch12h'];
+        const heads = ['1m', '3m', '15m', '1h', '4h', '1d'];
         // 4 столбец ch1m
         createCell(changePrices[pair][heads[0]]['СhangePercent'].toFixed(2), { 'name': heads[0] }, 'price-col4', null, 'col4');
         // 5 столбец ch3m
@@ -877,7 +862,24 @@ function forming_tickers_list_volume() {
     document.querySelector("#tbody-delta").style.height = `${listChVolume.clientHeight - theadDelta.clientHeight}px`;
     document.querySelector("#table-delta").style.marginBottom = '0';
 
-    let deltaFast = JSON.parse(localStorage.getItem('deltaFast')) || [];
+    var deltaFast;
+    $.ajax({
+        url: 'getChDelta',
+        async: false,
+        method: 'GET',
+        cache: false,
+        contentType: 'application/json; charset=utf-8',
+        processData: false,
+        success: function (response) {
+            deltaFast = response.DeltaFast;
+        },
+        error: function (response) {
+        },
+
+    });
+
+
+    //let deltaFast = JSON.parse(localStorage.getItem('deltaFast')) || [];
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
 
 
@@ -1030,7 +1032,7 @@ function sort_table(tbody, th, tr) {
                     });
             }
             // // Перемещение к самой первой строке таблицы
-            tbody.childNodes[0].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+            tbody.childNodes[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         });
     });
 }

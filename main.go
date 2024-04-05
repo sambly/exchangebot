@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"main/application"
 	"main/config"
@@ -34,23 +35,23 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// TODO добавить сюда еще периоды PeriodsDelta:   []string{"1m", "5m", "30m", "1h", "4h", "1d"},
+	fmt.Println("Колличество пар:", len(pairs))
 
-	changePeriods := map[string]time.Duration{
-		"ch1m":  time.Second * 60,
-		"ch3m":  time.Minute * 3,
-		"ch15m": time.Minute * 15,
-		"ch1h":  time.Hour,
-		"ch4h":  time.Hour * 4,
-		"ch12h": time.Hour * 12,
+	periods := map[string]time.Duration{
+		"1m":  time.Second * 60,
+		"3m":  time.Minute * 3,
+		"15m": time.Minute * 15,
+		"1h":  time.Hour,
+		"4h":  time.Hour * 4,
+		"1d":  time.Hour * 12,
 	}
 
 	settings := model.Settings{
 		Pairs:          pairs,
 		Timeframe:      "1m",
-		ChangePeriods:  changePeriods,
+		ChangePeriods:  periods,
+		DeltaPeriods:   periods,
 		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
-		LengthOfTime:   1080,
 	}
 
 	db, err := database.DbConnection(config.NameDb, config.HostNameDb, config.UserNameDb, config.PasswordDb)

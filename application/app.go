@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"database/sql"
+	"log"
 	"main/account"
 	"main/exchange"
 	"main/model"
@@ -29,7 +30,7 @@ type Application struct {
 
 func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings, db *sql.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage) (*Application, error) {
 
-	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.WeightProcents, settings.LengthOfTime, db, notification)
+	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, settings.WeightProcents, db, notification)
 	account, err := account.NewAccount(exch, assetsPrices, notification)
 	if err != nil {
 		return nil, err
@@ -61,15 +62,32 @@ func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings,
 func (app *Application) Run() error {
 
 	timeStart := time.Now()
+	log.Println("Ожидание предварительной загрузки данных")
+	// Ожидание, пока текущее время не попадет в интервал от 10 до 50 секунд
+	for {
+		timeStart := time.Now()
+		seconds := timeStart.Second()
+		if seconds >= 10 && seconds <= 50 {
+			break
+		}
+		time.Sleep(1 * time.Second) // Ждем одну секунду перед повторной проверкой
+	}
+
 	timeRounding := timeStart.Truncate(60 * time.Second)
 
 	app.AssetsPrices.UpdateTime = timeRounding
 	app.AssetsPrices.InitChangePrices()
+	app.AssetsPrices.InitDelta()
 
 	for _, pair := range app.settings.Pairs {
 		app.dataFeed.Subscribe(pair, app.AssetsPrices.OnMarket)
 		app.dataFeed.Subscribe(pair, app.OrderController.OnMarket)
 	}
+
+	duration := time.Since(timeStart)
+
+	log.Println("Время выполнения предварительной загрузки данных: ", duration)
+	log.Println("Время старта: ", timeStart)
 
 	go app.dataFeed.Start(true)
 

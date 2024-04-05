@@ -20,20 +20,15 @@ var upgrader = websocket.Upgrader{
 
 func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 
-	err := web.App.AssetsPrices.UpdateDelta()
-	if err != nil {
-		web.logError(err)
-	}
+	web.App.AssetsPrices.MarketsStatMu.RLock()
+	defer web.App.AssetsPrices.MarketsStatMu.RUnlock()
 
 	maps := map[string]interface{}{
-		"MarketsStat":  web.App.AssetsPrices.MarketsStat,
-		"ChangePrices": web.App.AssetsPrices.ChangePrices,
-		"DeltaFast":    web.App.AssetsPrices.DeltaFast,
+		"MarketsStat": web.App.AssetsPrices.MarketsStat,
 	}
 
 	mapsJson, err := json.Marshal(maps)
 	if err != nil {
-		fmt.Println("ERROR")
 		web.logError(err)
 	}
 
@@ -53,11 +48,12 @@ func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
 		web.logError(err)
 	}
 
+	web.App.AssetsPrices.MarketsStatMu.RLock()
+	defer web.App.AssetsPrices.MarketsStatMu.RUnlock()
+
 	maps := map[string]interface{}{
 		"Pairs":          web.App.AssetsPrices.Pairs,
 		"MarketsStat":    web.App.AssetsPrices.MarketsStat,
-		"ChangePrices":   web.App.AssetsPrices.ChangePrices,
-		"DeltaFast":      web.App.AssetsPrices.DeltaFast,
 		"OrdersActive":   web.App.PaperWallet.OrdersActive(),
 		"OrdersHistory":  web.App.PaperWallet.OrdersHistory(),
 		"OptionStrategy": option,
@@ -73,7 +69,7 @@ func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
 	w.Write(mapsJson)
 }
 
-func (web *Web) getChangeDelta(w http.ResponseWriter, r *http.Request) {
+func (web *Web) getDeltaFast(w http.ResponseWriter, r *http.Request) {
 
 	data := map[string]string{}
 
@@ -83,7 +79,13 @@ func (web *Web) getChangeDelta(w http.ResponseWriter, r *http.Request) {
 		web.logError(err)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(web.App.AssetsPrices.ChangeDelta[data["Pair"]][data["Frame"]])
+
+	candles, err := web.App.AssetsPrices.GetDeltaPeriod(data["Pair"], data["Frame"])
+	if err != nil {
+		web.logError(err)
+	}
+
+	json.NewEncoder(w).Encode(candles)
 }
 
 func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
@@ -92,9 +94,12 @@ func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		web.logError(err)
 	}
-	pair := string(bodyByte)
+
+	web.App.AssetsPrices.MarketsStatMu.RLock()
+	defer web.App.AssetsPrices.MarketsStatMu.RUnlock()
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(web.App.AssetsPrices.MarketsStat[pair])
+	json.NewEncoder(w).Encode(web.App.AssetsPrices.MarketsStat[string(bodyByte)]) // string(bodyByte)  - pair
 }
 
 func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
@@ -155,9 +160,34 @@ func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (web *Web) getChPrice(w http.ResponseWriter, r *http.Request) {
+
+	web.App.AssetsPrices.MarketsStatMu.RLock()
+	defer web.App.AssetsPrices.MarketsStatMu.RUnlock()
+
+	web.App.AssetsPrices.ChangePricesMu.RLock()
+	defer web.App.AssetsPrices.ChangePricesMu.RUnlock()
+
 	maps := map[string]interface{}{
 		"MarketsStat":  web.App.AssetsPrices.MarketsStat,
 		"ChangePrices": web.App.AssetsPrices.ChangePrices,
+	}
+
+	mapsJson, err := json.Marshal(maps)
+	if err != nil {
+		web.logError(err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(mapsJson)
+}
+
+func (web *Web) getChDelta(w http.ResponseWriter, r *http.Request) {
+
+	web.App.AssetsPrices.DeltaFastMu.RLock()
+	defer web.App.AssetsPrices.DeltaFastMu.RUnlock()
+
+	maps := map[string]interface{}{
+		"DeltaFast": web.App.AssetsPrices.DeltaFast,
 	}
 
 	mapsJson, err := json.Marshal(maps)

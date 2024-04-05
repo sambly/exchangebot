@@ -115,7 +115,6 @@ func SelectCandlesTable(db *sql.DB) ([]model.Candle, error) {
 			&candle.AmountTrade,
 			&candle.AmountTradeBuy,
 			&candle.ActiveBuyVolume,
-			//&candle.ActiveBuyQuoteVolume,
 		); err != nil {
 			return nil, err
 		}
@@ -362,7 +361,7 @@ func SelectMarketStateTime(db *sql.DB, pair string, timeRounding time.Time) (mod
 func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]model.Candle, error) {
 	candles := []model.Candle{}
 
-	query := "SELECT Time, Pair, Close, Volume FROM candlesch1m WHERE Time >= ? ORDER BY Time DESC;"
+	query := "SELECT Time, Pair, Close, Volume,ActiveBuyVolume,AmountTrade,AmountTradeBuy FROM candlesch1m WHERE Time >= ? ORDER BY Time DESC;"
 
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancelfunc()
@@ -380,9 +379,18 @@ func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]model.Candle
 
 	for rows.Next() {
 		var candle model.Candle
-		if err := rows.Scan(&candle.Time, &candle.Pair, &candle.Close, &candle.Volume); err != nil {
+		if err := rows.Scan(&candle.Time,
+			&candle.Pair,
+			&candle.Close,
+			&candle.Volume,
+			&candle.ActiveBuyVolume,
+			&candle.AmountTrade,
+			&candle.AmountTradeBuy,
+		); err != nil {
 			return candles, err
 		}
+		candle.AmountTradeAsk = candle.AmountTrade - candle.AmountTradeBuy
+		candle.ActiveAskVolume = candle.Volume - candle.ActiveBuyVolume
 		candles = append(candles, candle)
 	}
 	if err := rows.Err(); err != nil {
@@ -390,4 +398,59 @@ func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]model.Candle
 	}
 
 	return candles, nil
+}
+
+func SelectDeltaPeriod(db *sql.DB, pair string, period string) ([]model.ChangeDelta, error) {
+	candles := []model.ChangeDelta{}
+
+	maping := map[string]string{
+		"1m":  "ch1m",
+		"3m":  "ch3m",
+		"15m": "ch15m",
+		"1h":  "ch1h",
+		"4h":  "ch4h",
+		"1d":  "ch12h",
+	}
+
+	query := fmt.Sprintf("select Time,Volume,ActiveBuyVolume,AmountTrade,AmountTradeBuy,Open,Close,High,Low  from %s WHERE Pair = ?;", "candles"+maping[period])
+
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancelfunc()
+	stmt, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		return candles, fmt.Errorf("error %s when preparing SQL statement", err)
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.QueryContext(ctx, pair)
+	if err != nil {
+		return candles, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var changeDelta model.ChangeDelta
+		if err := rows.Scan(
+			&changeDelta.Time,
+			&changeDelta.Volume,
+			&changeDelta.VolumeBuy,
+			&changeDelta.Trades,
+			&changeDelta.TradesBuy,
+			&changeDelta.Open,
+			&changeDelta.Close,
+			&changeDelta.High,
+			&changeDelta.Low,
+		); err != nil {
+			return candles, err
+		}
+		changeDelta.TradesAsk = changeDelta.Trades - changeDelta.TradesBuy
+		changeDelta.VolumeAsk = changeDelta.Volume - changeDelta.VolumeBuy
+		candles = append(candles, changeDelta)
+	}
+	if err := rows.Err(); err != nil {
+		return candles, err
+	}
+
+	return candles, nil
+
 }

@@ -72,31 +72,27 @@ func (c *Controller) CreateOrderMarket(deal model.Deal, size float64) (*model.Or
 	}
 	order.ID = id
 
-	go func() {
-		c.assetsPrices.UpdateDelta()
+	mkStat := c.assetsPrices.MarketsStat[pair]
+	chData := c.assetsPrices.ChangePrices[pair]
+	dFast := c.assetsPrices.DeltaFast[pair]
 
-		mkStat := c.assetsPrices.MarketsStat[pair]
-		chData := c.assetsPrices.ChangePrices[pair]
-		dFast := c.assetsPrices.DeltaFast[pair]
+	mkStatJson, err := json.Marshal(mkStat)
+	if err != nil {
+		log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal mkStatJson : %v", err))
+	}
+	chDataJson, err := json.Marshal(chData)
+	if err != nil {
+		log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal chDataJson : %v", err))
+	}
+	dFastJson, err := json.Marshal(dFast)
+	if err != nil {
+		log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal dFastJson : %v", err))
+	}
 
-		mkStatJson, err := json.Marshal(mkStat)
-		if err != nil {
-			log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal mkStatJson : %v", err))
-		}
-		chDataJson, err := json.Marshal(chData)
-		if err != nil {
-			log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal chDataJson : %v", err))
-		}
-		dFastJson, err := json.Marshal(dFast)
-		if err != nil {
-			log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal dFastJson : %v", err))
-		}
-
-		err = database.InsertOrdersInfoTable(c.database, id, deal.Frame, deal.Strategy, deal.Comment, mkStatJson, chDataJson, dFastJson)
-		if err != nil {
-			log.MyLogger.ErrorOut(fmt.Errorf("error when create order and add insertinfotables : %v", err))
-		}
-	}()
+	err = database.InsertOrdersInfoTable(c.database, id, deal.Frame, deal.Strategy, deal.Comment, mkStatJson, chDataJson, dFastJson)
+	if err != nil {
+		log.MyLogger.ErrorOut(fmt.Errorf("error when create order and add insertinfotables : %v", err))
+	}
 
 	return order, err
 }

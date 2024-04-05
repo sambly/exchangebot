@@ -31,13 +31,14 @@ func (app *Web) routes() *http.ServeMux {
 
 	mux.HandleFunc("/trade/formingPage", app.basicAuth(app.formingPage))
 	mux.HandleFunc("/trade/updatefull", app.basicAuth(app.updateFull))
-	mux.HandleFunc("/trade/getChangeDelta", app.basicAuth(app.getChangeDelta))
+	mux.HandleFunc("/trade/getChangeDelta", app.basicAuth(app.getDeltaFast))
 	mux.HandleFunc("/trade/updateTop", app.basicAuth(app.updateTop))
 	mux.HandleFunc("/trade/openDeal", app.basicAuth(app.openDeal))
 	mux.HandleFunc("/trade/closeDeal", app.basicAuth(app.closeDeal))
 	mux.HandleFunc("/trade/ws", app.basicAuth(app.echo))
 
 	mux.HandleFunc("/trade/getChPrice", app.basicAuth(app.getChPrice))
+	mux.HandleFunc("/trade/getChDelta", app.basicAuth(app.getChDelta))
 
 	mux.HandleFunc("/trade/exp", app.basicAuth(app.exp))
 

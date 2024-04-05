@@ -34,7 +34,7 @@ func TestUpdateDeltaFullData(t *testing.T) {
 	}
 	defer db.Close()
 
-	changePeriods := map[string]time.Duration{
+	periods := map[string]time.Duration{
 		"ch1m":  time.Second * 60,
 		"ch3m":  time.Minute * 3,
 		"ch15m": time.Minute * 15,
@@ -43,7 +43,7 @@ func TestUpdateDeltaFullData(t *testing.T) {
 		"ch12h": time.Hour * 12,
 	}
 
-	asetsPrices := NewAssetsPrices(pairs, changePeriods, nil, 0, db, nil)
+	asetsPrices := NewAssetsPrices(pairs, periods, periods, nil, db, nil)
 
 	asetsPrices.UpdateDelta()
 
