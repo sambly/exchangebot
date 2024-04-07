@@ -297,6 +297,10 @@ function size_conversion() {
     }
 }
 
+function update_orders(){
+
+}
+
 function update_main_data(marketsStat) {
 
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
@@ -402,6 +406,10 @@ function forming_orders_active(orders) {
         orders = [];
     }
 
+    let countOrders;
+    let countOrdersProfit;
+
+
     for (let order of orders) {
 
         let row = tbody.insertRow(-1);
@@ -438,6 +446,9 @@ function forming_orders_active(orders) {
         btnCl.setAttribute('name', 'btn-close-position');
         btnCl.setAttribute('value', order.ID);
         cell.appendChild(btnCl);
+
+        countOrders = countOrders + 1;
+        countOrdersProfit =countOrdersProfit + order.Profit;
     };
 
     // выбор определенной пары
