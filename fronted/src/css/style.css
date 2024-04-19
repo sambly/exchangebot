@@ -311,3 +311,11 @@ tbody td {
 ::-webkit-scrollbar-thumb {
 	box-shadow: inset 0 0 6px #c6c7c8; 
 }
+
+
+.btn-close-deal-all {
+  border: none; /* Убирает границу кнопки */
+  background: none; /* Убирает фон кнопки */
+  padding: 0; /* Убирает отступы внутри кнопки */
+  cursor: pointer; /* Делает курсор указателем при наведении */
+}

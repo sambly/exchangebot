@@ -21,8 +21,8 @@ $(function () {
 
     //#############################################################################  webSocket #############################################################################
 
-    // var Url = "ws://localhost:444/trade/ws";
-    var Url = "wss://bt-scada.ru/trade/ws";
+    var Url = "ws://localhost:444/trade/ws";
+    //var Url = "wss://bt-scada.ru/trade/ws";
     var socket = new WebSocket(Url);
     socket.onopen = function () {
         console.log("connected ws");
@@ -30,13 +30,24 @@ $(function () {
 
     socket.onmessage = function (e) {
 
-        // Здесь сделать проверку что это вообще за данные, пока что есть данные только для ордеров
-        let order = JSON.parse(e.data);
-        let orderRow = document.querySelector('tr.order-active[value="' + order.ID + '"]');
-        let profitElement = orderRow.querySelector('td[name="order-a-profit"]');
+        var data = JSON.parse(e.data); 
 
-        profitElement.textContent = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
-        profitElement.style.color = color_text_profit(order.Profit)
+        if (typeof data === 'object' && data.hasOwnProperty('order')) {
+            let order = data.order;
+            let orderRow = document.querySelector('tr.order-active[value="' + order.ID + '"]');
+            let profitElement = orderRow.querySelector('td[name="order-a-profit"]');
+
+            profitElement.textContent = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
+            profitElement.style.color = color_text_profit(order.Profit);
+        }
+
+
+        if (typeof data === 'object' && data.hasOwnProperty('pnl')) {
+            let pnl = data.pnl;
+            let tradesPnl = document.querySelector('#tradesPnl');
+            tradesPnl.textContent = pnl.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
+            tradesPnl.style.color = color_text_profit(pnl);
+        }
 
     };
 
@@ -188,6 +199,27 @@ $(function () {
 
         });
     });
+    // Закрыть все сделки
+    $('#btnTradeClose').click(function (e) {
+        e.preventDefault();
+        let res =confirm('Вы подтверждаете закрытие всех сделок?');
+        if (res!=true) return;
+        $.ajax({
+            url: 'closeAllDeal',
+            type: 'POST',
+            method: 'POST',
+            cache: false,
+            processData: false,
+            success: function (response) {
+                forming_orders_active(response.OrdersActive);
+                forming_orders_history(response.OrdersHistory);
+
+            },
+            error: function (response) {
+            },
+
+        });
+    });    
 
 });
 
@@ -297,10 +329,6 @@ function size_conversion() {
     }
 }
 
-function update_orders(){
-
-}
-
 function update_main_data(marketsStat) {
 
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
@@ -396,21 +424,33 @@ function change_pair(pair) {
 
 function forming_orders_active(orders) {
 
-    localStorage.setItem('ordersActive', JSON.stringify(orders));
-
     const tbody = document.querySelector("#tbody-trade-active");
     tbody.innerHTML = '';
     const th = document.querySelectorAll("thead[name=trade-active] th");
+    const countOrders = document.querySelector("#tradesCount");
 
-    if (orders == null) {
-        orders = [];
+    let orderList = [];
+    for (let key in orders) {
+        if (orders.hasOwnProperty(key)) {
+            for (let order of orders[key]) {
+            orderList.push(order)
+            }
+        }
     }
 
-    let countOrders;
-    let countOrdersProfit;
+    if (orderList.length==0) {
+        countOrders.innerHTML = 0;
+        return
+    } else {
+        countOrders.innerHTML = orderList.length;
+    }
 
+    // Сортировка orderList по времени (от более новой записи к менее)
+    orderList.sort((a, b) => {
+        return new Date(b.Time) - new Date(a.Time);
+    });
 
-    for (let order of orders) {
+    for (let order of orderList) {
 
         let row = tbody.insertRow(-1);
         row.className = "order-active";
@@ -447,8 +487,6 @@ function forming_orders_active(orders) {
         btnCl.setAttribute('value', order.ID);
         cell.appendChild(btnCl);
 
-        countOrders = countOrders + 1;
-        countOrdersProfit =countOrdersProfit + order.Profit;
     };
 
     // выбор определенной пары
@@ -458,7 +496,7 @@ function forming_orders_active(orders) {
             let pair = row.querySelector('[name="order-a-pair"]').innerHTML;
             change_pair(pair);
             show_chart_orders();
-            chart_frome_orders_update('Active').then(() => {
+            chart_frome_orders_update(orderList).then(() => {
             }).catch(error => {
                 console.error('Ошибка при выполнении функции chart_frome_orders_update:', error);
             });
@@ -485,34 +523,39 @@ function forming_orders_active(orders) {
                     forming_orders_history(orders.OrdersHistory);
                 },
                 error: function (response) {
+                    console.log("SUK2");
                     console.log(response);
                 },
-
             });
-
-
         });
     });
-
-
-
-
 }
 
 function forming_orders_history(orders) {
-
-
-    localStorage.setItem('ordersHistory', JSON.stringify(orders));
 
     const tbody = document.querySelector("#tbody-trade-history");
     tbody.innerHTML = '';
     const th = document.querySelectorAll("thead[name=trade-history] th");
 
-    if (orders == null) {
-        orders = [];
+    let orderList = [];
+    for (let key in orders) {
+        if (orders.hasOwnProperty(key)) {
+            for (let order of orders[key]) {
+            orderList.push(order)
+            }
+        }
     }
 
-    for (let order of orders) {
+    if (orderList.length==0) {
+        return
+    } 
+
+    // Сортировка orderList по времени (от более новой записи к менее)
+    orderList.sort((a, b) => {
+        return new Date(b.Time) - new Date(a.Time);
+    });
+
+    for (let order of orderList) {
 
         let row = tbody.insertRow(-1);
         row.className = "order-history d-flex align-items-center";
@@ -548,12 +591,10 @@ function forming_orders_history(orders) {
             let pair = row.querySelector('[name="order-h-pair"]').innerHTML;
             change_pair(pair);
             show_chart_orders();
-            chart_frome_orders_update('History').then(() => {
+            chart_frome_orders_update(orderList).then(() => {
             }).catch(error => {
                 console.error('Ошибка при выполнении функции chart_frome_orders_update:', error);
             });
-            
-
         });
     };
 
@@ -646,7 +687,7 @@ async function chart_volume_update() {
 
 }
 
-async function chart_frome_orders_update(chartType) {
+async function chart_frome_orders_update(orders) {
 
     return new Promise((resolve, reject) => {
         let pair = document.querySelector('#pairs');
@@ -674,13 +715,6 @@ async function chart_frome_orders_update(chartType) {
                 secondsVisible: false
             },
         };
-        let orders;
-        if (chartType === 'Active') {
-            orders = JSON.parse(localStorage.getItem('ordersActive')) || [];
-        }
-        if (chartType === 'History') {
-            orders = JSON.parse(localStorage.getItem('ordersHistory')) || [];
-        }
 
         function update_candles(pair, frame) {
 
@@ -1094,7 +1128,7 @@ function show_panel_trade_history() {
 }
 
 function color_text_profit(number) {
-    if (Number(number >= 0)) {
+    if (number >= 0) {
         return 'green';
     } else {
         return 'red';
@@ -1108,7 +1142,6 @@ function color_side(side) {
         return 'red';
     }
 }
-
 
 function showTooltip(element, text) {
     var tooltip = document.createElement('div');

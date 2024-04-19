@@ -40,6 +40,8 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/trade/getChPrice", app.basicAuth(app.getChPrice))
 	mux.HandleFunc("/trade/getChDelta", app.basicAuth(app.getChDelta))
 
+	mux.HandleFunc("/trade/closeAllDeal", app.basicAuth(app.closeAllDeal))
+
 	mux.HandleFunc("/trade/exp", app.basicAuth(app.exp))
 
 	fileServer := http.FileServer(http.FS(getFrontendAssets(app.production)))

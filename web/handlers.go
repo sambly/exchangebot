@@ -54,8 +54,8 @@ func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
 	maps := map[string]interface{}{
 		"Pairs":          web.App.AssetsPrices.Pairs,
 		"MarketsStat":    web.App.AssetsPrices.MarketsStat,
-		"OrdersActive":   web.App.PaperWallet.OrdersActive(),
-		"OrdersHistory":  web.App.PaperWallet.OrdersHistory(),
+		"OrdersActive":   web.App.PaperWallet.GetOrdersActive(),
+		"OrdersHistory":  web.App.PaperWallet.GetOrdersHistory(),
 		"OptionStrategy": option,
 	}
 
@@ -119,7 +119,7 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 		web.logError(err)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(web.App.PaperWallet.OrdersActive())
+	json.NewEncoder(w).Encode(web.App.PaperWallet.GetOrdersActive())
 }
 
 func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +137,36 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	orders := map[string]interface{}{"OrdersActive": web.App.PaperWallet.OrdersActive(), "OrdersHistory": web.App.PaperWallet.OrdersHistory()}
+	orders := map[string]interface{}{"OrdersActive": web.App.PaperWallet.GetOrdersActive(), "OrdersHistory": web.App.PaperWallet.GetOrdersHistory()}
+	json.NewEncoder(w).Encode(orders)
+}
+
+func (web *Web) closeAllDeal(w http.ResponseWriter, r *http.Request) {
+
+	// Делаем глубокую копию OrdersActive
+	OrdersActiveCopy := make(map[string][]*model.Order)
+	for key, value := range web.App.PaperWallet.OrdersActive {
+		OrdersActiveCopy[key] = make([]*model.Order, len(value))
+		for i, order := range value {
+			// Делаем копию каждого элемента
+			orderCopy := *order
+			OrdersActiveCopy[key][i] = &orderCopy
+		}
+	}
+
+	for _, orders := range OrdersActiveCopy {
+		for _, order := range orders {
+			err := web.App.OrderController.ClosePosition(order.ID)
+			if err != nil {
+				web.logError(err)
+			}
+		}
+
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	orders := map[string]interface{}{"OrdersActive": web.App.PaperWallet.GetOrdersActive(), "OrdersHistory": web.App.PaperWallet.GetOrdersHistory()}
 	json.NewEncoder(w).Encode(orders)
 }
 

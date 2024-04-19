@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="vite.svg" />
+  <link rel="icon" type="image/svg+xml" href="./svg/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>App</title>
 
@@ -249,17 +249,19 @@
         <div class="bg-light border rounded-3" style="height: 400px;">
           
 
-          <div class="d-flex justify-content-between gap-3 mt-3">
-            <div class="d-flex gap-1 ms-3">Сделок
+          <div class="d-flex mt-3">
+            <div class="d-flex gap-1 ms-3">Сделок 
                 <div class="text-primary" id="tradesCount" style="font-weight: bold;"></div>
             </div>
-            <div class="d-flex gap-1">PNL
-                <div class="text-primary" id="tradesPnl" style="font-weight: bold;"></div>
+            <div class="d-flex gap-1 ms-3">PNL 
+                <div id="tradesPnl" style="font-weight: bold;"></div>
             </div>
-            <div class="d-flex gap-1 ms-auto">Закрыть все
-              <button type="button" class="btn-close" id="btnTradeClose"></button>
+            <div class="d-flex ms-auto" style="margin-right: 5rem !important;">
+              <button class="btn-close-deal-all" id="btnTradeClose">
+                <img src="./svg/btn_close_all.svg" alt="clDealAll" title="Закрыть все сделки">
+              </button>
             </div>
-        </div>
+          </div>
         
 
           <div class="panel-trade mt-3">

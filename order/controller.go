@@ -40,8 +40,19 @@ func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, so
 	if err != nil {
 		return nil, err
 	}
+	countOrdersActive := 0
+	for _, order := range orders {
+		if order.Status == model.OrderStatusTypeActive {
+			ex.AddOrderActive(order)
+			countOrdersActive += 1
+		}
 
-	ex.Orders = orders
+		if order.Status == model.OrderStatusTypeClose {
+			ex.AddOrderHistory(order)
+		}
+
+	}
+	ex.Pnl.CountOrdersActive = countOrdersActive
 
 	return ctrl, nil
 
@@ -110,35 +121,38 @@ func (c *Controller) ClosePosition(id int64) error {
 	if err != nil {
 		return err
 	}
-
-	orders, err := database.Orders(c.database)
-	if err != nil {
-		return err
-	}
-
-	c.exchange.Orders = orders
-
 	return nil
 }
 
 func (c *Controller) OnMarket(ms model.MarketsStat) {
 
 	// Обновление ордеров
-	for index, order := range c.exchange.Orders {
-		if order.Status == model.OrderStatusTypeActive && order.Pair == ms.Pair {
-			c.exchange.Orders[index].Price = ms.Price
 
+	if _, ok := c.exchange.OrdersActive[ms.Pair]; ok {
+
+		for _, order := range c.exchange.OrdersActive[ms.Pair] {
+			order.Price = ms.Price
 			if order.Side == model.SideTypeBuy {
-				c.exchange.Orders[index].Profit = (ms.Price / order.PriceCreated * 100) - 100
+				order.Profit = (ms.Price / order.PriceCreated * 100) - 100
 			}
 			if order.Side == model.SideTypeSell {
-				c.exchange.Orders[index].Profit = (order.PriceCreated / ms.Price * 100) - 100
+				order.Profit = (order.PriceCreated / ms.Price * 100) - 100
 			}
-
 			// Обновления цены webSocket
-			messageOrder, _ := json.Marshal(order)
+			messageOrder, _ := json.Marshal(map[string]interface{}{"order": order})
 			c.socketsMessage.SendData(messageOrder)
 		}
+
+		// Подсчет PNL
+		c.exchange.Pnl.Profit = 0
+		for _, listOrder := range c.exchange.OrdersActive {
+			for _, order := range listOrder {
+				c.exchange.Pnl.Profit += order.Profit
+			}
+		}
+		messageOrder, _ := json.Marshal(map[string]interface{}{"pnl": c.exchange.Pnl.Profit})
+		c.socketsMessage.SendData(messageOrder)
+
 	}
 
 }
