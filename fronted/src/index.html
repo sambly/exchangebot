@@ -40,28 +40,28 @@
       <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" id="btn-update-data">Обновить </button>
     </div>
 
-    <div class="row mt-3">
+    <div class="mt-3">
       <div class="d-flex" id="trades">
-        <div class="col-12 col-md-3">
-          <div class="bg-light border rounded-3">
+        <div class="col-12 col-md-3 px-2">
+          <div class="bg-light border border rounded-3 border-bottom-0 border-start-0 border-end-0">
             <div id="list">
 
-              <div id="list-top" class="px-2 pt-2">
+              <div id="list-top" class="px-2 pt-2 pb-2">
 
                 <div class="d-flex gap-1 justify-content-end">
-                  <div class="btn-group" role="group">
-                    <button type="button" class="btnPairs btn btn-secondary btn-sm active" id="btnAllPairs">Все</button>
-                    <button type="button" class="btnPairs btn btn-secondary btn-sm" id="btnFavoritePairs">♥</button>
+                  <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btnPairs btn btn-secondary active" id="btnAllPairs">Все</button>
+                    <button type="button" class="btnPairs btn btn-secondary " id="btnFavoritePairs">♥</button>
                   </div>
 
                   <div class="collapse" id="group-btn-frame">
-                    <div class="btn-group" role="group">
-                      <button type="button" class="btnFrame btn btn-secondary active  btn-sm">1m</button>
-                      <button type="button" class="btnFrame btn btn-secondary  btn-sm">3m</button>
-                      <button type="button" class="btnFrame btn btn-secondary  btn-sm">15m </button>
-                      <button type="button" class="btnFrame btn btn-secondary  btn-sm">1h </button>
-                      <button type="button" class="btnFrame btn btn-secondary  btn-sm">4h </button>
-                      <button type="button" class="btnFrame btn btn-secondary  btn-sm">1d </button>
+                    <div class="btn-group btn-group-sm" role="group">
+                      <button type="button" class="btnFrame btn btn-secondary active">1m</button>
+                      <button type="button" class="btnFrame btn btn-secondary">3m</button>
+                      <button type="button" class="btnFrame btn btn-secondary">15m </button>
+                      <button type="button" class="btnFrame btn btn-secondary">1h </button>
+                      <button type="button" class="btnFrame btn btn-secondary">4h </button>
+                      <button type="button" class="btnFrame btn btn-secondary">1d </button>
                     </div>
                   </div>
                 </div>
@@ -144,7 +144,7 @@
           </div>
         </div>
 
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-6 px-2">
           <div class="bg-light border rounded-3">
             <div class="collapse chart" id="chart-price">
 
@@ -194,17 +194,17 @@
 
         </div>
 
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-3 px-2">
 
           <div class="bg-light border rounded-3">
             <div id="smart-trade" style="height: 500px;">
               <div class="d-flex gap-1 px-2 pt-2 justify-content-end">
-                <div class="btn-group " role="group">
-                  <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">1m</button>
-                  <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">15m </button>
-                  <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">1h </button>
-                  <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">4h </button>
-                  <button type="button" class="btnFrameStrategy btn btn-secondary  btn-sm">1d </button>
+                <div class="btn-group btn-group-sm " role="group">
+                  <button type="button" class="btnFrameStrategy btn btn-secondary">1m</button>
+                  <button type="button" class="btnFrameStrategy btn btn-secondary">15m </button>
+                  <button type="button" class="btnFrameStrategy btn btn-secondary">1h </button>
+                  <button type="button" class="btnFrameStrategy btn btn-secondary">4h </button>
+                  <button type="button" class="btnFrameStrategy btn btn-secondary">1d </button>
                 </div>
               </div>
 
@@ -222,8 +222,8 @@
               </div>
 
               <div class="d-flex gap-3 justify-content-center mb-3">
-                <button type="button" class="btn-trade-deal btn btn-secondary" id="panel-trdae-open-deal">Покупка</button>
-                <button type="button" class="btn-trade-deal btn btn-secondary"
+                <button type="button" class="btn-trade-deal btn btn-secondary btn-lg" id="panel-trdae-open-deal">Покупка</button>
+                <button type="button" class="btn-trade-deal btn btn-secondary btn-lg"
                   id="panel-trdae-close-deal">Продажа</button>
               </div>
 

@@ -325,7 +325,7 @@ function size_conversion() {
     } else if (windowWidth > 1432) {                                                        // class xxl
         $('.btn').removeClass('btn-sm');
         $("#trades").removeAttr("class");
-        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between');
+        $('#trades').addClass('d-flex align-items-start justify-content-between');
     }
 }
 
