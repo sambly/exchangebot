@@ -376,6 +376,8 @@ func (ap *AsetsPrices) UpdateDelta() error {
 
 func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDelta, error) {
 
+	timeStart := time.Now()
+
 	changeDelta, err := database.SelectDeltaPeriod(ap.database, pair, period)
 	if err != nil {
 		return nil, err
@@ -397,8 +399,11 @@ func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDelta,
 		}
 		clearChangeDelta = append(clearChangeDelta, changeDelta[i])
 	}
+	duration := time.Since(timeStart)
 
-	return changeDelta, nil
+	log.Println("Время выполнения GetDeltaPeriod: ", duration)
+
+	return clearChangeDelta, nil
 }
 
 // +inf/-inf/nan

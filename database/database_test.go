@@ -1,7 +1,6 @@
 package database
 
 import (
-	"fmt"
 	"main/config"
 	"main/model"
 	"testing"
@@ -75,11 +74,9 @@ func TestSelectDeltaPeriod(t *testing.T) {
 	}
 	defer db.Close()
 
-	candles, err := SelectDeltaPeriod(db, "BTCUSDT", "1m")
+	_, err = SelectDeltaPeriod(db, "BTCUSDT", "1m")
 	if err != nil {
 		t.Error(err)
 	}
-
-	fmt.Println(candles)
 
 }

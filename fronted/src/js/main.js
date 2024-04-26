@@ -623,6 +623,8 @@ function update_top_data(pair) {
 
 async function chart_volume_update() {
 
+    var start = performance.now();
+
     let pair = document.querySelector('#pairs');
     let frames = document.querySelectorAll('.btnFrame');
     let frame;
@@ -649,8 +651,13 @@ async function chart_volume_update() {
             textColor: 'black',
             background: { type: 'solid', color: 'white' },
         },
+        autosize : true,
         height: 468,
         width: chartWidth,
+        timeScale: {
+            timeVisible: true,
+            secondsVisible: false
+        },
     };
 
     function update_volume_data(pair, frame, checboxType) {
@@ -670,6 +677,7 @@ async function chart_volume_update() {
                         dataVolume.push({ time: timeToLocal(new Date(item['Time']) / 1000), value: item[checboxType] });
                     }
                     resolve(dataVolume);
+               
                 },
                 error: function (response) {
                     reject(response);
@@ -681,6 +689,10 @@ async function chart_volume_update() {
     try {        
         let dataVolume = await update_volume_data(pair.value, frame.innerText, checboxType);
         lw_charts_volume(container_chart, chartOptions, pair.value, dataVolume);
+         // Расчет времени выполнения 
+        var end = performance.now();
+        var time = end - start;
+        console.log('Время выполнения chart_volume_update = ' + time); 
     } catch (error) {
         console.error('Ошибка в chart_volume_update:', error);
     }
@@ -690,6 +702,7 @@ async function chart_volume_update() {
 async function chart_frome_orders_update(orders) {
 
     return new Promise((resolve, reject) => {
+
         let pair = document.querySelector('#pairs');
         let container_chart = document.getElementById('chart-orders');
         let chartWidth = container_chart.clientWidth;

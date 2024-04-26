@@ -42,7 +42,7 @@ export function lw_charts_orders(container_chart, chartOptions, pair, orders, up
         container_chart.innerHTML = '';
         container_chart.style.position = 'relative';
 
-        let intervals = ['1m', '3m', '15m', '15m', '1h', '4h', '1d'];
+        let intervals = ['1m', '3m', '15m', '1h', '4h', '1d'];
         const switcherElement = createSimpleSwitcher(intervals, intervals[0], syncToInterval);
 
         const chart = createChart(container_chart, chartOptions);
