@@ -219,7 +219,37 @@ $(function () {
             },
 
         });
-    });    
+    });   
+    
+    // Применить фильтры
+    $('#btn-apply-filter').click(function () {
+        // Объем 
+        let minVolume = document.querySelector('#minVolume').value.trim() || null;
+        let maxVolume = document.querySelector('#maxVolume').value.trim() || null;;
+        localStorage.setItem('minVolume', minVolume);
+        localStorage.setItem('maxVolume', maxVolume);
+        // ch1d
+        let minCh1d = document.querySelector('#minCh1d').value.trim() || null;
+        let maxCh1d = document.querySelector('#maxCh1d').value.trim() || null;;
+        localStorage.setItem('minCh1d', minCh1d);
+        localStorage.setItem('maxCh1d', maxCh1d);
+
+    });
+
+    // Сбросить фильтры
+    $('#btn-reset-filter').click(function () {
+        // Объем 
+        document.querySelector('#minVolume').value = null;
+        document.querySelector('#maxVolume').value = null;
+        localStorage.setItem('minVolume', null);
+        localStorage.setItem('maxVolume', null);
+        // ch1d
+        document.querySelector('#minCh1d').value = null;
+        document.querySelector('#maxCh1d').value = null;
+        localStorage.setItem('minCh1d', null);
+        localStorage.setItem('maxCh1d', null);
+    });
+
 
 });
 
@@ -267,6 +297,14 @@ function forming_page() {
             // выбор текущей пары
             let currentPair = localStorage.getItem('currentPair') || 'BTCUSDT';
             localStorage.setItem('currentPair', currentPair);
+
+            // Фильтры
+            // Объем 
+            document.querySelector('#minVolume').value = localStorage.getItem('minVolume');
+            document.querySelector('#maxVolume').value = localStorage.getItem('maxVolume');
+            // Ch1d
+            document.querySelector('#minCh1d').value = localStorage.getItem('minCh1d');
+            document.querySelector('#maxCh1d').value = localStorage.getItem('maxCh1d');
 
             // Выбор определенного типа графика
             let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
@@ -674,6 +712,7 @@ async function chart_volume_update() {
                 processData: false,
                 success: function (data) {
                     for (let item of data) {
+                        console.log(item);
                         dataVolume.push({ time: timeToLocal(new Date(item['Time']) / 1000), value: item[checboxType] });
                     }
                     resolve(dataVolume);
@@ -765,9 +804,7 @@ async function chart_frome_orders_update(orders) {
 
 function forming_tickers_list() {
 
-
     var start = performance.now();
-
 
     const tbody = document.querySelector("#tbody-price");
     tbody.innerHTML = '';
@@ -777,6 +814,8 @@ function forming_tickers_list() {
     const list = document.querySelector('#list');
     const listTop = document.querySelector('#list-top');
     const theadPrice = document.querySelector("thead[name=thead-price]");
+
+    const heads = ['1m', '3m', '15m', '1h', '4h', '1d'];
 
     // Изменение высоты блоков
     listChPrice.style.height = `${list.clientHeight - listTop.clientHeight}px`;
@@ -804,16 +843,33 @@ function forming_tickers_list() {
 
     });
 
-    // let changePrices = JSON.parse(localStorage.getItem('changePrices')) || [];
-    // let marketsStat = JSON.parse(localStorage.getItem('marketsStat')) || [];
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
 
+    // Фильтры 
+    let minVolume = localStorage.getItem('minVolume');
+    let maxVolume = localStorage.getItem('maxVolume');
+    let minCh1d = localStorage.getItem('minCh1d');
+    let maxCh1d = localStorage.getItem('maxCh1d');
+    
     for (let pair in changePrices) {
 
+        // Избранные пары
         if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(pair)) {
             continue;
         }
-
+        // Фильтры
+        // Объем
+        let volume = marketsStat[pair].Volume;
+        let ch1d = changePrices[pair][heads[5]]['СhangePercent'];
+       
+        if ((minVolume != null && volume <= Number(minVolume)) || (maxVolume != null && volume >= Number(maxVolume))) {
+            continue;
+        }
+        // Ch1d
+        if ((minCh1d != null && ch1d <= Number(minCh1d)) || (maxCh1d != null && ch1d >= Number(maxCh1d))) {   
+            continue;
+        }
+        
         let row = tbody.insertRow(-1);
         row.className = "pair-price";
 
@@ -844,8 +900,6 @@ function forming_tickers_list() {
         createCell(
             (marketsStat[pair].Volume).toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' }),
             { 'name': 'volume', 'value': marketsStat[pair].Volume }, 'price-col3', null, 'col3');
-
-        const heads = ['1m', '3m', '15m', '1h', '4h', '1d'];
         // 4 столбец ch1m
         createCell(changePrices[pair][heads[0]]['СhangePercent'].toFixed(2), { 'name': heads[0] }, 'price-col4', null, 'col4');
         // 5 столбец ch3m
