@@ -310,11 +310,11 @@ function forming_page() {
             let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
             checkboxes.forEach((checkbox, index) => {
                 checkbox.addEventListener('change', (e) => {
-                    // Сбросить все галочки 
-                    checkboxes.forEach((checkboxClear, index) => {
-                        checkboxClear.checked = false;
-                    });
-                    checkbox.checked = true;
+                    // // Сбросить все галочки 
+                    // checkboxes.forEach((checkboxClear, index) => {
+                    //     checkboxClear.checked = false;
+                    // });
+                    // checkbox.checked = true;
 
                     chart_volume_update().then();
                 })
@@ -666,12 +666,12 @@ async function chart_volume_update() {
     let pair = document.querySelector('#pairs');
     let frames = document.querySelectorAll('.btnFrame');
     let frame;
-    let checboxType
+    let checboxesActive = [];
 
     let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
     checkboxes.forEach((checkbox, index) => {
         if (checkbox.checked) {
-            checboxType = checkbox.value
+            checboxesActive.push({name:checkbox.value});
         }
     })
 
@@ -682,6 +682,14 @@ async function chart_volume_update() {
     }
 
     let container_chart = document.getElementById('chart-volume');
+    container_chart.innerHTML = `
+    <div class="container d-flex justify-content-center align-items-center" style="height: 468px;">
+      <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  `;
+                                                                
     let chartWidth = container_chart.clientWidth;
 
     const chartOptions = {
@@ -698,10 +706,10 @@ async function chart_volume_update() {
         },
     };
 
-    function update_volume_data(pair, frame, checboxType) {
+    function update_volume_data(pair, frame, checboxesActive) {
         return new Promise((resolve, reject) => {
             let request = { Pair: pair, Frame: frame };
-            let dataVolume = [];
+            let chartData = {};
             $.ajax({
                 url: 'getChangeDelta',
                 type: 'POST',
@@ -711,11 +719,17 @@ async function chart_volume_update() {
                 contentType: 'application/json; charset=utf-8',
                 processData: false,
                 success: function (data) {
-                    for (let item of data) {
-                        console.log(item);
-                        dataVolume.push({ time: timeToLocal(new Date(item['Time']) / 1000), value: item[checboxType] });
+
+                    checboxesActive.forEach(item => {
+                        chartData[item.name] = { value: [] };
+                    });
+
+                    for (let d of data) {
+                        checboxesActive.forEach(item => {
+                            chartData[item.name].value.push({ time: timeToLocal(new Date(d['Time']) / 1000), value: d[item.name] })
+                        });
                     }
-                    resolve(dataVolume);
+                    resolve(chartData);
                
                 },
                 error: function (response) {
@@ -726,8 +740,8 @@ async function chart_volume_update() {
     }
 
     try {        
-        let dataVolume = await update_volume_data(pair.value, frame.innerText, checboxType);
-        lw_charts_volume(container_chart, chartOptions, pair.value, dataVolume);
+        let chartData = await update_volume_data(pair.value, frame.innerText, checboxesActive);
+        lw_charts_volume(container_chart, chartOptions, pair.value, chartData);
          // Расчет времени выполнения 
         var end = performance.now();
         var time = end - start;
@@ -990,10 +1004,7 @@ function forming_tickers_list_volume() {
 
     });
 
-
-    //let deltaFast = JSON.parse(localStorage.getItem('deltaFast')) || [];
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
-
 
     let frame;
     document.querySelectorAll('.btnFrame').forEach(function (element) {

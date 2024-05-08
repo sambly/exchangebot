@@ -3,10 +3,14 @@ import { timeToLocal } from './help.js';
 import { createChart } from 'lightweight-charts';
 
 
-export function lw_charts_volume(container_chart, chartOptions, pair, dataVolume) {
+export function lw_charts_volume(container_chart, chartOptions, pair, chartData) {
 
     container_chart.innerHTML = '';
     container_chart.style.position = 'relative';
+
+    const chartColors = ['#2962FF', '#FF5733', '#8c7401', '#5733FF', '#FF33E9','#23605f']; // Массив цветов для графиков
+    const legendItems = []; // Массив для хранения меток графиков
+
 
     const chart = createChart(container_chart, chartOptions);
     chart.applyOptions({
@@ -18,11 +22,21 @@ export function lw_charts_volume(container_chart, chartOptions, pair, dataVolume
         },
     });
 
-    const lineSeries = chart.addLineSeries({ color: '#2962FF' });
+    let colorIndex = 0;
+    let lineSeriesList = [];
 
-    lineSeries.setData(dataVolume);
-    chart.timeScale().fitContent();
-
+    for (let key in chartData) {
+        if (chartData.hasOwnProperty(key)) {
+            const lineSeries = chart.addLineSeries({ color: chartColors[colorIndex] });   
+            lineSeries.setData(chartData[key].value);
+            
+            lineSeriesList.push(lineSeries);
+            // Добавляем метку графика в легенду
+            legendItems.push({label: key,color: chartColors[colorIndex]});
+            colorIndex = colorIndex + 1;
+        }
+    }
+    
     // Отображение легенды
     const toolTip = document.createElement('div');
     toolTip.className = 'three-line-legend';
@@ -30,9 +44,42 @@ export function lw_charts_volume(container_chart, chartOptions, pair, dataVolume
     toolTip.style.display = 'block';
     toolTip.style.left = 3 + 'px';
     toolTip.style.top = 3 + 'px';
-    toolTip.innerHTML = '<div style="font-size: 24px; margin: 4px 0px; color: #20262E">' + pair + '</div>';
 
+    // Создание HTML-кода для легенды на основе данных о метках графиков
+    let legendHTML = '';
+    legendHTML = '<div style="margin: 4px 0px; color: #000000; font-weight: bold;">' + pair + '</div>';
+    legendItems.forEach(item => {
+        legendHTML += `<div style="margin: 4px 0px; color: ${item.color}">${item.label}</div>`;
+    });
 
+    toolTip.innerHTML = legendHTML;
+   
+    let priceFormatted = [];
+    let time = '';
+    chart.subscribeCrosshairMove(param => {
+        for (let i = 0; i < lineSeriesList.length; i++) {
+            priceFormatted.push('');
+        }
+        if (param.time) {
+            time = param.time;
+            for (let i = 0; i < lineSeriesList.length; i++) {
+                const data = param.seriesData.get(lineSeriesList[i]);
+                const price = data.value !== undefined ? data.value : data.close;
+                priceFormatted[i] = price.toLocaleString('en-US', { useGrouping: true, maximumFractionDigits: 0 }).replace(/,/g, ' ');
+            }
+        }
+        legendHTML = '<div style="margin: 4px 0px; color: #000000; font-weight: bold;">' + pair + '</div>';
+        for (let i = 0; i < legendItems.length; i++) {   
+            legendHTML += `<div style="margin: 4px 0px; color: ${legendItems[i].color}">${legendItems[i].label}  ${priceFormatted[i]}</div>`;
+        }
+        const options = { year: 'numeric', month: '2-digit', day: '2-digit',hour: '2-digit',minute: '2-digit',second: '2-digit',hour12: false};
+        // const forпmattedDate = new Date(time * 1000).toLocaleString('en-US', options); 
+        // legendHTML += '<div style="margin: 4px 0px; color: #000000; font-weight: bold;">' + forпmattedDate + '</div>';
+
+        toolTip.innerHTML = legendHTML;
+    });
+
+    chart.timeScale().fitContent();
 
 }
 
@@ -55,7 +102,7 @@ export function lw_charts_orders(container_chart, chartOptions, pair, orders, up
         toolTip.style.display = 'block';
         toolTip.style.left = 3 + 'px';
         toolTip.style.top = 3 + 'px';
-        toolTip.innerHTML = '<div style="font-size: 24px; margin: 4px 0px; color: #20262E">' + pair.value + '</div>';
+        toolTip.innerHTML = '<div style="margin: 4px 0px; color: #000000; font-weight: bold;">' + pair.value + '</div>';
 
         var candleSeries = null;
 
@@ -106,7 +153,22 @@ export function lw_charts_orders(container_chart, chartOptions, pair, orders, up
             });
         }
 
-        syncToInterval(intervals[0]);
+        syncToInterval(intervals[2]);
+
+        let price = '';
+        chart.subscribeCrosshairMove(param => {
+
+            if (param.time) {
+                const data = param.seriesData.get(candleSeries);
+                price = data.value !== undefined ? data.value : data.close;
+            }
+            toolTip.innerHTML = '<div style="margin: 4px 0px; color: #000000;font-weight: bold;">' + pair.value + '</div>';
+            toolTip.innerHTML += `<div style="margin: 4px 0px; color: #2962FF">Value ${price}</div>`; 
+       
+        });
+
+        chart.timeScale().fitContent();
+
     });
 }
 
