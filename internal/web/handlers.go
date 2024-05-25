@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"main/model"
+	"main/internal/model"
 	"net/http"
 	"os"
 	"strconv"
@@ -39,7 +39,7 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
 
 	// Список стратегий
-	optionByte, err := os.ReadFile("web/strategy.json")
+	optionByte, err := os.ReadFile("internal/web/strategy.json")
 	if err != nil {
 		web.logError(err)
 	}

@@ -1,4 +1,24 @@
-# Этап сборки
+# Этап сборки фронтенда
+FROM node:22-alpine AS frontend
+
+# Устанавливаем рабочую директорию в контейнере
+WORKDIR /app/frontend
+
+# Копирование файлов package.json, yarn.lock для установки зависимостей
+COPY ./frontend/package.json ./frontend/yarn.lock ./
+# Копирование vite.config.js в рабочую директорию
+COPY ./frontend/vite.config.js ./
+
+# Установить зависимости фронтенда
+RUN yarn install
+
+# Копируем остальные файлы фронтенда, за исключением указанных в .dockerignore
+COPY ./frontend ./
+
+# Сборка фронтенда
+RUN yarn build
+
+# Этап сборки Go-приложения
 FROM golang:1.21-alpine3.18 AS builder
 
 # Установка необходимого для сборки
@@ -10,32 +30,15 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . .
+# Копирование скомпилированного фронтенда
+COPY --from=frontend /app/frontend/dist ./frontend/dist
+
+# Копируем остальные файлы проекта
+COPY internal ./internal
+COPY main.go embed.go ./
+
 RUN go mod tidy
 RUN go build -o exchangebot .
-
-# Этап сборки фронтенда
-FROM node:14-alpine AS frontend
-
-# Установка yarn и дополнительных зависимостей
-RUN npm install -g yarn vite
-
-# Устанавливаем рабочую директорию в контейнере
-WORKDIR /app/frontend
-
-# Копирование файлов package.json, yarn.lock для установки зависимостей
-COPY ./frontend/package.json ./frontend/yarn.lock ./
-
-# Копирование vite.config.js в рабочую директорию
-COPY ./frontend/vite.config.js ./
-# Установить зависимости фронтенда
-RUN yarn install
-
-# Копируем остальные файлы фронтенда, за исключением указанных в .dockerignore
-COPY ./frontend/ ./
-
-# Сборка фронтенда
-RUN yarn build
 
 # Финальный образ для запуска
 FROM alpine:3.18
@@ -46,11 +49,14 @@ RUN apk add --no-cache ca-certificates
 # Устанавливаем рабочую директорию в контейнере
 WORKDIR /app
 
-# Копировать скомпилированное Go приложение из builder этапа
+# Копировать скомпилированное Go-приложение из builder этапа
 COPY --from=builder /app/exchangebot .
 
-# Копировать статические файлы фронтенда из frontend этапа
-COPY --from=frontend /app/frontend/dist ./dist
+# Копировать статические файлы фронтенда из builder этапа
+COPY --from=builder /app/frontend/dist ./dist
+
+# Создание точки монтирования для логов
+VOLUME /log
 
 # Указать порт, если требуется
 EXPOSE 80

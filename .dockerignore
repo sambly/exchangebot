@@ -1,7 +1,7 @@
 # Игнорировать node_modules
 frontend/node_modules
 
-# Игнорировать frontend build output (если собирается на хосте)
+# Игнорировать все содержимое frontend/dist
 frontend/dist
 
 # Игнорировать локальные окружения и конфигурационные файлы

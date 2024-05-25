@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  exchange_app:
+    build: .
+    volumes:
+      - ./log:/log
+    environment:
+      ENVIRONMENT: docker
+
+      production: ${production}
+      inProductionOnlyApp: ${inProductionOnlyApp}
+      inProductionWithFrontedNgingx: ${inProductionWithFrontedNgingx}
+      httpPortProduction: ${httpPortProduction}
+      hostWeb: ${hostWeb}
+      usernameAuth: ${usernameAuth}
+      passwordAuth: ${passwordAuth}
+
+      API_KEY: ${API_KEY}
+      API_SECRET: ${API_SECRET}
+
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      TELEGRAM_USER: ${TELEGRAM_USER}
+
+      DB_HOST_Docker: ${DB_HOST_Docker}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+    depends_on:
+      - mysql
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:

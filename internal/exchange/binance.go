@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"main/model"
+	"main/internal/model"
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/jpillora/backoff"

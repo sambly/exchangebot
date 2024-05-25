@@ -2,10 +2,10 @@ package account
 
 import (
 	"context"
-	"main/model"
-	"main/notification"
-	"main/prices"
-	"main/service"
+	"main/internal/model"
+	"main/internal/notification"
+	"main/internal/prices"
+	"main/internal/service"
 	"sync"
 
 	"golang.org/x/exp/slices"

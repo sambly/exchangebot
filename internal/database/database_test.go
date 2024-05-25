@@ -1,8 +1,8 @@
 package database
 
 import (
-	"main/config"
-	"main/model"
+	"main/internal/config"
+	"main/internal/model"
 	"testing"
 	"time"
 )
@@ -14,7 +14,7 @@ func TestSelectCandlesTable(t *testing.T) {
 		t.Error(err)
 	}
 
-	db, err := DbConnection(config.NameDb, config.HostNameDb, config.UserNameDb, config.PasswordDb)
+	db, err := DbConnection(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -33,7 +33,7 @@ func TestCreateOrder(t *testing.T) {
 		t.Error(err)
 	}
 
-	db, err := DbConnection(config.NameDb, config.HostNameDb, config.UserNameDb, config.PasswordDb)
+	db, err := DbConnection(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -68,7 +68,7 @@ func TestSelectDeltaPeriod(t *testing.T) {
 		t.Error(err)
 	}
 
-	db, err := DbConnection(config.NameDb, config.HostNameDb, config.UserNameDb, config.PasswordDb)
+	db, err := DbConnection(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
 	if err != nil {
 		t.Error(err)
 	}

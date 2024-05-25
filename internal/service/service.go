@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"main/model"
+	"main/internal/model"
 	"time"
 )
 

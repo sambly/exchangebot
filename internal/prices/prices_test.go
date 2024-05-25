@@ -3,9 +3,9 @@ package prices
 import (
 	"context"
 	"flag"
-	"main/config"
-	"main/database"
-	"main/exchange"
+	"main/internal/config"
+	"main/internal/database"
+	"main/internal/exchange"
 	"testing"
 	"time"
 )
@@ -28,7 +28,7 @@ func TestUpdateDeltaFullData(t *testing.T) {
 		t.Error(err)
 	}
 
-	db, err := database.DbConnection(config.NameDb, config.HostNameDb, config.UserNameDb, config.PasswordDb)
+	db, err := database.DbConnection(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
 	if err != nil {
 		t.Error(err)
 	}

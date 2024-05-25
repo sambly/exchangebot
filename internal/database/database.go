@@ -4,19 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"main/model"
+	"main/internal/model"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-func dsn(dbname, hostname, username, password string) string {
-	loc := `loc=Europe%2FMoscow`
-	return fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&%s", username, password, hostname, dbname, loc)
+func dsn(dbname, hostname, port, username, password string) string {
+	loc := `&loc=Local`
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&%s", username, password, hostname, port, dbname, loc)
 }
 
-func DbConnection(dbname, hostname, username, password string) (*sql.DB, error) {
-	db, err := sql.Open("mysql", dsn(dbname, hostname, username, password))
+func DbConnection(dbname, hostname, port, username, password string) (*sql.DB, error) {
+	db, err := sql.Open("mysql", dsn(dbname, hostname, port, username, password))
 	if err != nil {
 		return nil, fmt.Errorf("error %s when opening DB", err)
 	}
@@ -32,7 +32,7 @@ func DbConnection(dbname, hostname, username, password string) (*sql.DB, error) 
 	}
 	db.Close()
 
-	db, err = sql.Open("mysql", dsn(dbname, hostname, username, password))
+	db, err = sql.Open("mysql", dsn(dbname, hostname, port, username, password))
 	if err != nil {
 		return nil, fmt.Errorf("error %s when opening DB", err)
 	}

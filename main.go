@@ -4,15 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"main/application"
-	"main/config"
-	"main/database"
-	"main/exchange"
-	mylog "main/logging"
-	"main/model"
-	"main/notification"
-	"main/telegram"
-	"main/web"
+	"main/internal/application"
+	"main/internal/config"
+	"main/internal/database"
+	"main/internal/exchange"
+	mylog "main/internal/logging"
+	"main/internal/model"
+	"main/internal/notification"
+	"main/internal/telegram"
+	"main/internal/web"
 	"time"
 )
 
@@ -53,8 +53,7 @@ func main() {
 		DeltaPeriods:   periods,
 		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
 	}
-
-	db, err := database.DbConnection(config.NameDb, config.HostNameDb, config.UserNameDb, config.PasswordDb)
+	db, err := database.DbConnection(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -91,7 +90,7 @@ func main() {
 	}
 	appTelegram.Start()
 
-	web := web.NewWeb(app, socketsMessage, config)
+	web := web.NewWeb(app, socketsMessage, config, Content)
 	go web.Run()
 
 	app.Run()

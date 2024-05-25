@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"main/logging"
-	"main/model"
-	"main/service"
+	"main/internal/logging"
+	"main/internal/model"
+	"main/internal/service"
 	"sync"
 
 	"golang.org/x/exp/slices"

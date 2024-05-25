@@ -3,7 +3,7 @@ package exchange
 import (
 	"context"
 	"fmt"
-	"main/model"
+	"main/internal/model"
 	"sync"
 )
 

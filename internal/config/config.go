@@ -27,10 +27,11 @@ type Config struct {
 	UsernameAuth string
 	PasswordAuth string
 	// DB
-	UserNameDb string
-	PasswordDb string
 	NameDb     string
-	HostNameDb string
+	PasswordDb string
+	HostDb     string
+	PortDb     string
+	UserDb     string
 }
 
 func loadEnv(projectDirName string) error {
@@ -56,8 +57,24 @@ func NewConfig() (*Config, error) {
 	inProductionOnlyApp := false
 	inProductionWithFrontedNgingx := false
 
-	if err := loadEnv("exchangeBot"); err != nil {
-		return nil, err
+	var hostDb string
+
+	if os.Getenv("ENVIRONMENT") == "docker" {
+		var exists bool
+		hostDb, exists = os.LookupEnv("DB_HOST_Docker")
+		if !exists {
+			return nil, fmt.Errorf("no .env str DB_HOST_Docker  found")
+		}
+
+	} else {
+		var exists bool
+		if err := loadEnv("exchangeBot"); err != nil {
+			return nil, err
+		}
+		hostDb, exists = os.LookupEnv("DB_HOST_Local")
+		if !exists {
+			return nil, fmt.Errorf("no .env str DB_HOST_Local  found")
+		}
 	}
 
 	// Web
@@ -119,21 +136,22 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("no .env str passwordAuth  found")
 	}
 	// DB
-	userNameDb, exists := os.LookupEnv("userNameDb")
+	nameDb, exists := os.LookupEnv("DB_NAME")
 	if !exists {
-		return nil, fmt.Errorf("no .env str userNameDb  found")
+		return nil, fmt.Errorf("no .env str DB_NAME found")
 	}
-	passwordDb, exists := os.LookupEnv("passwordDb")
+	passwordDb, exists := os.LookupEnv("DB_PASSWORD")
 	if !exists {
-		return nil, fmt.Errorf("no .env str passwordDb  found")
+		return nil, fmt.Errorf("no .env str DB_PASSWORD found")
 	}
-	nameDb, exists := os.LookupEnv("nameDb")
+	portDb, exists := os.LookupEnv("DB_PORT")
 	if !exists {
-		return nil, fmt.Errorf("no .env str nameDb  found")
+		return nil, fmt.Errorf("no .env str DB_PORT found")
 	}
-	hostNameDb, exists := os.LookupEnv("hostNameDb")
+
+	userDb, exists := os.LookupEnv("DB_USER")
 	if !exists {
-		return nil, fmt.Errorf("no .env str hostNameDb  found")
+		return nil, fmt.Errorf("no .env str DB_USER found")
 	}
 
 	c := &Config{
@@ -153,10 +171,11 @@ func NewConfig() (*Config, error) {
 		UsernameAuth: usernameAuth,
 		PasswordAuth: passwordAuth,
 
-		UserNameDb: userNameDb,
-		PasswordDb: passwordDb,
 		NameDb:     nameDb,
-		HostNameDb: hostNameDb,
+		PasswordDb: passwordDb,
+		HostDb:     hostDb,
+		PortDb:     portDb,
+		UserDb:     userDb,
 	}
 	return c, nil
 }

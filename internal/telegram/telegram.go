@@ -2,9 +2,9 @@ package telegram
 
 import (
 	"fmt"
-	"main/application"
-	"main/logging"
-	"main/notification"
+	"main/internal/application"
+	"main/internal/logging"
+	"main/internal/notification"
 	"strconv"
 	"strings"
 	"time"

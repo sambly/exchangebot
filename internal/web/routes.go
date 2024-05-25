@@ -3,25 +3,25 @@ package web
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	"embed"
 	"fmt"
 	"io/fs"
-	"main/fronted"
 	"net/http"
 	"os"
 )
 
-func getFrontendAssets(production bool) fs.FS {
+func getFrontendAssets(production bool, content embed.FS) fs.FS {
 
 	if production {
-		fsys := fs.FS(fronted.Content)
-		f, err := fs.Sub(fsys, "dist")
+		fsys := fs.FS(content)
+		f, err := fs.Sub(fsys, "frontend/dist")
 		if err != nil {
 			fmt.Println(err)
 		}
 		return f
 	} else {
 
-		return os.DirFS("fronted/dist")
+		return os.DirFS("frontend/dist")
 	}
 }
 
@@ -44,7 +44,7 @@ func (app *Web) routes() *http.ServeMux {
 
 	mux.HandleFunc("/trade/exp", app.basicAuth(app.exp))
 
-	fileServer := http.FileServer(http.FS(getFrontendAssets(app.production)))
+	fileServer := http.FileServer(http.FS(getFrontendAssets(app.production, app.content)))
 
 	mux.HandleFunc("/trade/", app.basicAuth(http.StripPrefix("/trade", fileServer).ServeHTTP))
 

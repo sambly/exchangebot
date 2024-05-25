@@ -1,10 +1,11 @@
 package web
 
 import (
+	"embed"
 	"log"
-	"main/application"
-	"main/config"
-	"main/notification"
+	"main/internal/application"
+	"main/internal/config"
+	"main/internal/notification"
 	"net/http"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 type Web struct {
 	App *application.Application
 	Sockets
+	content                       embed.FS
 	production                    bool
 	inProductionOnlyApp           bool
 	inProductionWithFrontedNgingx bool
@@ -44,9 +46,10 @@ func (c *Sockets) SendDataRun() {
 	}(c.socketsMessage.Message)
 }
 
-func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, config *config.Config) *Web {
+func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, config *config.Config, content embed.FS) *Web {
 	web := &Web{
 		App:                           app,
+		content:                       content,
 		production:                    config.Production,
 		inProductionOnlyApp:           config.InProductionOnlyApp,
 		inProductionWithFrontedNgingx: config.InProductionWithFrontedNgingx,

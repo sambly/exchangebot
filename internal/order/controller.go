@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"main/database"
-	"main/exchange"
-	"main/logging"
-	"main/model"
-	"main/notification"
-	"main/prices"
+	"main/internal/database"
+	"main/internal/exchange"
+	"main/internal/logging"
+	"main/internal/model"
+	"main/internal/notification"
+	"main/internal/prices"
 	"sync"
 )
 
