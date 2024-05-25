@@ -8,7 +8,7 @@ import (
 	"main/config"
 	"main/database"
 	"main/exchange"
-	mylog "main/log"
+	mylog "main/logging"
 	"main/model"
 	"main/notification"
 	"main/telegram"

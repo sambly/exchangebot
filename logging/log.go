@@ -1,9 +1,10 @@
-package log
+package logging
 
 import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 )
 
@@ -16,17 +17,21 @@ var MyLogger = &Loggerr{}
 
 func InitLogger() {
 
-	infoLogFile, err := os.OpenFile("log/data/info.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatal(err)
+	logDir := "./log"
+	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
+		log.Fatalf("Failed to create log directory: %v", err)
 	}
-	//defer infoLogFile.Close()
 
-	errorLogFile, err := os.OpenFile("log/data/error.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	infoLogFile, err := os.OpenFile(filepath.Join(logDir, "info.log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
-	//defer errorLogFile.Close()
+	// defer infoLogFile.Close()
+
+	errorLogFile, err := os.OpenFile(filepath.Join(logDir, "error.log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	MyLogger.InfoLog = log.New(infoLogFile, "INFO\t", log.Ldate|log.Ltime)
 	MyLogger.ErrorLog = log.New(errorLogFile, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)

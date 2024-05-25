@@ -3,7 +3,7 @@ package telegram
 import (
 	"fmt"
 	"main/application"
-	"main/log"
+	"main/logging"
 	"main/notification"
 	"strconv"
 	"strings"
@@ -29,13 +29,13 @@ func NewTelegram(app *application.Application, tlgToken, tlgUser string, notific
 
 	userMiddleware := tele.NewMiddlewarePoller(poller, func(u *tele.Update) bool {
 		if u.Message == nil || u.Message.Sender == nil {
-			log.MyLogger.InfoLog.Println("No message")
+			logging.MyLogger.InfoLog.Println("No message")
 			return false
 		}
 		if u.Message.Sender.ID == user {
 			return true
 		}
-		log.MyLogger.InfoLog.Println("Invalid user")
+		logging.MyLogger.InfoLog.Println("Invalid user")
 		return false
 	})
 
@@ -109,12 +109,12 @@ func (t Telegram) Start() error {
 			if t.notificationEnable {
 				_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, t.defaultMenu)
 				if err != nil {
-					log.MyLogger.ErrorOut(fmt.Errorf("error send message tlg: %v", err))
+					logging.MyLogger.ErrorOut(fmt.Errorf("error send message tlg: %v", err))
 				}
 			}
 		}
 	}(t.Messages.Message)
-	log.MyLogger.InfoLog.Println("Telegram started")
+	logging.MyLogger.InfoLog.Println("Telegram started")
 	return nil
 }
 
@@ -194,7 +194,7 @@ func (t Telegram) getPeriods(period string) []string {
 func (t Telegram) getAssets() []string {
 	err := t.app.Account.UpdateAssets()
 	if err != nil {
-		log.MyLogger.ErrorOut(fmt.Errorf("error tlg getAssets: %v", err))
+		logging.MyLogger.ErrorOut(fmt.Errorf("error tlg getAssets: %v", err))
 	}
 	marketStat := t.app.AssetsPrices.MarketsStat
 	var out []string

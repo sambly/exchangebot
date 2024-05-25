@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"main/database"
 	"main/exchange"
-	"main/log"
+	"main/logging"
 	"main/model"
 	"main/notification"
 	"main/prices"
@@ -89,20 +89,20 @@ func (c *Controller) CreateOrderMarket(deal model.Deal, size float64) (*model.Or
 
 	mkStatJson, err := json.Marshal(mkStat)
 	if err != nil {
-		log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal mkStatJson : %v", err))
+		logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal mkStatJson : %v", err))
 	}
 	chDataJson, err := json.Marshal(chData)
 	if err != nil {
-		log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal chDataJson : %v", err))
+		logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal chDataJson : %v", err))
 	}
 	dFastJson, err := json.Marshal(dFast)
 	if err != nil {
-		log.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal dFastJson : %v", err))
+		logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal dFastJson : %v", err))
 	}
 
 	err = database.InsertOrdersInfoTable(c.database, id, deal.Frame, deal.Strategy, deal.Comment, mkStatJson, chDataJson, dFastJson)
 	if err != nil {
-		log.MyLogger.ErrorOut(fmt.Errorf("error when create order and add insertinfotables : %v", err))
+		logging.MyLogger.ErrorOut(fmt.Errorf("error when create order and add insertinfotables : %v", err))
 	}
 
 	return order, err
