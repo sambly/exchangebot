@@ -37,6 +37,8 @@ COPY --from=frontend /app/frontend/dist ./frontend/dist
 COPY internal ./internal
 COPY main.go embed.go ./
 
+COPY ./configs ./configs
+
 RUN go mod tidy
 RUN go build -o exchangebot .
 
@@ -54,6 +56,8 @@ COPY --from=builder /app/exchangebot .
 
 # Копировать статические файлы фронтенда из builder этапа
 COPY --from=builder /app/frontend/dist ./dist
+
+COPY --from=builder /app/configs ./configs
 
 # Создание точки монтирования для логов
 VOLUME /log
