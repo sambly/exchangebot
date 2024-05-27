@@ -1,15 +1,19 @@
+// для frontend
+-необходимо установить npm 
+-добавить yarn 
+-добавить vite 
+
 yarn create vite
   # Set the "project name" to "fronted"
   # Set the "web framework" to "vanilf js"
 
-yarn add bootstrap
-yarn add @popperjs/core
-yarn add sass
-yarn add sass-loader
-yarn add jquery
+// установить зависимости  
+exchangeBot\frontend\yarn install 
+// построить проект
+yarn build 
+// или запустить сервер с hot    
+yarn dev 
 
+// backend
 
-
-  Для мой конфигурации нужно вместо 
-"dev": "vite"
-"dev": "vite build --watch"
+для файла embed нужна директория frontend/dist  которая создается при yarn build 
