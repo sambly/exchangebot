@@ -384,24 +384,27 @@ func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDelta,
 	}
 
 	clearChangeDelta := []model.ChangeDelta{}
-	clearChangeDelta = append(clearChangeDelta, changeDelta[0])
 
-	// Если есть пропуски по времени , то заполняем их
-	for i := 1; i < len(changeDelta); i++ {
-		prevTime := changeDelta[i-1].Time
-		currTime := changeDelta[i].Time
+	if len(changeDelta) > 0 {
+		clearChangeDelta = append(clearChangeDelta, changeDelta[0])
 
-		for currTime.Sub(prevTime) > ap.PeriodsDelta[period] {
-			buffer := clearChangeDelta[len(clearChangeDelta)-1]
-			prevTime = prevTime.Add(ap.PeriodsDelta[period])
-			buffer.Time = buffer.Time.Add(ap.PeriodsDelta[period])
-			clearChangeDelta = append(clearChangeDelta, buffer)
+		// Если есть пропуски по времени , то заполняем их
+		for i := 1; i < len(changeDelta); i++ {
+			prevTime := changeDelta[i-1].Time
+			currTime := changeDelta[i].Time
+
+			for currTime.Sub(prevTime) > ap.PeriodsDelta[period] {
+				buffer := clearChangeDelta[len(clearChangeDelta)-1]
+				prevTime = prevTime.Add(ap.PeriodsDelta[period])
+				buffer.Time = buffer.Time.Add(ap.PeriodsDelta[period])
+				clearChangeDelta = append(clearChangeDelta, buffer)
+			}
+			clearChangeDelta = append(clearChangeDelta, changeDelta[i])
 		}
-		clearChangeDelta = append(clearChangeDelta, changeDelta[i])
-	}
-	duration := time.Since(timeStart)
+		duration := time.Since(timeStart)
 
-	log.Println("Время выполнения GetDeltaPeriod: ", duration)
+		log.Println("Время выполнения GetDeltaPeriod: ", duration)
+	}
 
 	return clearChangeDelta, nil
 }
