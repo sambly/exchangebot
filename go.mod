@@ -10,6 +10,7 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/exp v0.0.0-20231206192017-f3f8817b8deb
+	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29
 	gopkg.in/telebot.v3 v3.2.1
 )
 

@@ -1,10 +1,12 @@
 package web
 
 import (
+	"context"
 	"embed"
-	"log"
+	"fmt"
 	"main/internal/application"
 	"main/internal/config"
+	"main/internal/logging"
 	"main/internal/notification"
 	"net/http"
 	"time"
@@ -14,7 +16,8 @@ import (
 )
 
 type Web struct {
-	App *application.Application
+	server *http.Server
+	App    *application.Application
 	Sockets
 	content                       embed.FS
 	production                    bool
@@ -35,12 +38,23 @@ type Sockets struct {
 	socketsMessage *notification.SocketsMessage
 }
 
-func (c *Sockets) SendDataRun() {
+func (c *Sockets) SendDataRun(ctx context.Context) {
 
 	go func(message chan []byte) {
-		for mes := range message {
-			for conn := range c.clients {
-				conn.WriteMessage(websocket.TextMessage, mes)
+		for {
+			select {
+			case mes := <-message:
+				for conn := range c.clients {
+					err := conn.WriteMessage(websocket.TextMessage, mes)
+					if err != nil {
+						logging.MyLogger.ErrorOut(fmt.Errorf("error writing message to websocket: %v", err))
+						conn.Close()
+						delete(c.clients, conn)
+					}
+				}
+			case <-ctx.Done():
+				logging.MyLogger.InfoLog.Println("Shutting down socket message processing")
+				return
 			}
 		}
 	}(c.socketsMessage.Message)
@@ -67,46 +81,97 @@ func NewWeb(app *application.Application, socketsMessage *notification.SocketsMe
 	return web
 }
 
-func (w *Web) Run() {
-	w.Sockets.SendDataRun()
+func (w *Web) Run(ctx context.Context) error {
+	w.Sockets.SendDataRun(ctx)
 
-	if w.inProductionOnlyApp {
+	// Создаем канал для передачи ошибок сервера
+	serverErrChan := make(chan error, 1)
 
-		certManager := &autocert.Manager{
-			Cache:      autocert.DirCache("certs"),
-			Prompt:     autocert.AcceptTOS,
-			HostPolicy: autocert.HostWhitelist(w.hostWeb),
+	go func() {
+		var err error
+		if w.inProductionOnlyApp {
+			err = w.runProductionServer()
+		} else if w.inProductionWithFrontedNgingx {
+			err = w.runNginxServer()
+		} else {
+			err = w.runLocalServer()
 		}
-		srv := &http.Server{
-			Addr:         ":443",
-			ReadTimeout:  5 * time.Second,
-			WriteTimeout: 5 * time.Second,
-			IdleTimeout:  120 * time.Second,
-			Handler:      w.routes(),
-			TLSConfig:    certManager.TLSConfig(),
+		serverErrChan <- err
+	}()
+	var err error
+	// Ожидание завершения контекста или ошибки сервера
+	select {
+	case <-ctx.Done():
+		// Завершение работы сервера
+		stopErr := w.stop()
+		if stopErr != nil {
+			logging.MyLogger.ErrorOut(fmt.Errorf("ошибка при завершении работы HTTP-сервера: %v", stopErr))
+			err = stopErr
 		}
+	case serverErr := <-serverErrChan:
+		if serverErr != nil {
+			logging.MyLogger.ErrorOut(fmt.Errorf("произошла ошибка во время работы сервера: %v", err))
+			err = serverErr
+		}
+	}
+	logging.MyLogger.InfoLog.Println("HTTP сервер завершен")
 
-		log.Println("Запуск сервера: production")
-		log.Fatal(srv.ListenAndServeTLS("", ""))
+	return err
+}
+
+func (w *Web) runProductionServer() error {
+
+	logging.MyLogger.InfoLog.Println("Запуск сервера: production")
+
+	certManager := &autocert.Manager{
+		Cache:      autocert.DirCache("certs"),
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(w.hostWeb),
 	}
 
-	if w.inProductionWithFrontedNgingx {
-		srvHttps := &http.Server{
-			Addr:    ":" + w.productionPort,
-			Handler: w.routes(),
-		}
-
-		log.Println("Запуск сервера: inProductionWithFrontedNgingx")
-		log.Fatal(srvHttps.ListenAndServe())
+	srv := &http.Server{
+		Addr:         ":443",
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  120 * time.Second,
+		Handler:      w.routes(),
+		TLSConfig:    certManager.TLSConfig(),
 	}
+	w.server = srv
 
-	if !w.inProductionOnlyApp && !w.inProductionWithFrontedNgingx {
-		srv := &http.Server{
-			Addr:    ":80",
-			Handler: w.routes(),
-		}
-		log.Println("Запуск сервера: local")
-		log.Fatal(srv.ListenAndServe())
+	return srv.ListenAndServeTLS("", "")
+}
+
+func (w *Web) runNginxServer() error {
+
+	logging.MyLogger.InfoLog.Println("Запуск сервера: inProductionWithFrontedNgingx")
+
+	srv := &http.Server{
+		Addr:    ":" + w.productionPort,
+		Handler: w.routes(),
 	}
+	w.server = srv
+	return srv.ListenAndServe()
+}
 
+func (w *Web) runLocalServer() error {
+
+	logging.MyLogger.InfoLog.Println("Запуск сервера: local")
+
+	srv := &http.Server{
+		Addr:    ":80",
+		Handler: w.routes(),
+	}
+	w.server = srv
+	return srv.ListenAndServe()
+}
+
+func (w *Web) stop() error {
+	ctxShutdown, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelShutdown()
+	if err := w.server.Shutdown(ctxShutdown); err != nil {
+		logging.MyLogger.ErrorOut(fmt.Errorf("ошибка при завершении работы HTTP-сервера: %v", err))
+		return err
+	}
+	return nil
 }

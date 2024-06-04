@@ -3,9 +3,9 @@ package application
 import (
 	"context"
 	"database/sql"
-	"log"
 	"main/internal/account"
 	"main/internal/exchange"
+	"main/internal/logging"
 	"main/internal/model"
 	"main/internal/notification"
 	"main/internal/order"
@@ -59,10 +59,12 @@ func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings,
 	return app, nil
 }
 
-func (app *Application) Run() error {
+func (app *Application) Run(ctx context.Context) error {
 
 	timeStart := time.Now()
-	log.Println("Ожидание предварительной загрузки данных")
+
+	logging.MyLogger.InfoLog.Println("Ожидание предварительной загрузки данных")
+
 	// Ожидание, пока текущее время не попадет в интервал от 10 до 50 секунд
 	for {
 		timeStart := time.Now()
@@ -86,8 +88,8 @@ func (app *Application) Run() error {
 
 	duration := time.Since(timeStart)
 
-	log.Println("Время выполнения предварительной загрузки данных: ", duration)
-	log.Println("Время старта: ", timeStart)
+	logging.MyLogger.InfoLog.Println("Время выполнения предварительной загрузки данных: ", duration)
+	logging.MyLogger.InfoLog.Println("Время старта: ", timeStart)
 
 	go app.dataFeed.Start(true)
 

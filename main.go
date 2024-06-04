@@ -8,24 +8,30 @@ import (
 	"main/internal/config"
 	"main/internal/database"
 	"main/internal/exchange"
-	mylog "main/internal/logging"
+	"main/internal/logging"
 	"main/internal/model"
 	"main/internal/notification"
 	"main/internal/telegram"
 	"main/internal/web"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
 
-	ctx := context.Background()
-	mylog.InitLogger()
+	logging.InitLogger()
+	logging.MyLogger.InfoLog.Println("Запуск приложения")
 
 	config, err := config.NewConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(config.ApiKey, config.SecretKey))
 	if err != nil {
 		log.Fatal(err)
@@ -72,6 +78,8 @@ func main() {
 	notify := &notification.Notification{Message: make(chan string)}
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
+	g, gCtx := errgroup.WithContext(ctx)
+
 	app, err := application.NewApp(
 		ctx,
 		binance,
@@ -88,10 +96,22 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	appTelegram.Start()
-
 	web := web.NewWeb(app, socketsMessage, config, Content)
-	go web.Run()
 
-	app.Run()
+	g.Go(func() error {
+		return appTelegram.Start(gCtx)
+	})
+
+	g.Go(func() error {
+		return web.Run(gCtx)
+	})
+
+	g.Go(func() error {
+		return app.Run(gCtx)
+	})
+	if err := g.Wait(); err != nil && gCtx.Err() != context.Canceled {
+		log.Fatalf("Приложение завершено с ошибкой: %v", err)
+	} else {
+		logging.MyLogger.InfoLog.Println("Приложение завершено")
+	}
 }

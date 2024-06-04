@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"fmt"
 	"main/internal/application"
 	"main/internal/logging"
@@ -96,25 +97,34 @@ func NewTelegram(app *application.Application, tlgToken, tlgUser string, notific
 	return bot, nil
 }
 
-func (t Telegram) Start() error {
+func (t Telegram) Start(ctx context.Context) error {
 	go t.client.Start()
 	_, err := t.client.Send(&tele.User{ID: t.tlgUser}, "Bot initialized.", t.defaultMenu)
 	if err != nil {
 		return err
 	}
+	logging.MyLogger.InfoLog.Println("Telegram started")
 
 	go func(message chan string) {
-		for mes := range message {
-			// Бит разрешения отправки уведомлений
-			if t.notificationEnable {
-				_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, t.defaultMenu)
-				if err != nil {
-					logging.MyLogger.ErrorOut(fmt.Errorf("error send message tlg: %v", err))
+		for {
+			select {
+			case mes := <-message:
+				// Проверяем бит разрешения отправки уведомлений
+				if t.notificationEnable {
+					_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, t.defaultMenu)
+					if err != nil {
+						logging.MyLogger.ErrorOut(fmt.Errorf("error send message tlg: %v", err))
+					}
 				}
+			case <-ctx.Done():
+				return
 			}
 		}
 	}(t.Messages.Message)
-	logging.MyLogger.InfoLog.Println("Telegram started")
+
+	<-ctx.Done()
+	t.client.Stop()
+	logging.MyLogger.InfoLog.Println("Telegram stopped gracefully")
 	return nil
 }
 
