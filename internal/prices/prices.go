@@ -3,8 +3,8 @@ package prices
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"main/internal/database"
+	"main/internal/logging"
 	"main/internal/model"
 	"main/internal/notification"
 	"slices"
@@ -112,7 +112,7 @@ func (ap *AsetsPrices) OnMarket(ms model.MarketsStat) {
 			// Ожидание пока данные запишутся в базу данных, потом мы считаем новые значения
 			time.Sleep(10 * time.Second)
 			if err := ap.UpdateDelta(); err != nil {
-				log.Println("Error in UpdateDelta:", err)
+				logging.MyLogger.ErrorOut(fmt.Errorf("error in updateDelta: %v", err))
 			}
 		}()
 	}
@@ -131,18 +131,17 @@ func (ap *AsetsPrices) InitChangePrices() {
 	timeRoundingMax := ap.UpdateTime.Add(-max)
 	candles, err := database.SelectMarketStateTimev2(ap.database, timeRoundingMax)
 	if err != nil {
-		// TODO
-		fmt.Println("ERROR DBBBBBB InitChangePrices")
+		logging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
 	}
 
 	if len(candles) == 0 {
-		fmt.Println("Нет candles")
+		logging.MyLogger.InfoLog.Println("Нет candles")
 		return
 	}
 
 	// Сделаем небольшую погрешность , для возможности горячего перезапуска приложения
 	if candles[0].Time.Sub(ap.UpdateTime) > 10*time.Minute {
-		fmt.Println("Большая погрешность №1")
+		logging.MyLogger.InfoLog.Println("Большая погрешность, горячий перезапуск не удался")
 		return
 	}
 
@@ -162,6 +161,7 @@ func (ap *AsetsPrices) InitChangePrices() {
 						if len(forming.DatasetCandle) > 0 {
 							// Большая погрешность дальше не заполняем  forming.DatasetCandle
 							if forming.DatasetCandle[len(forming.DatasetCandle)-1].Time.Sub(candle.Time) > 10*time.Minute {
+								logging.MyLogger.InfoLog.Println("Большая погрешность, при формировании candles (continue)")
 								continue
 							}
 						}
@@ -214,7 +214,7 @@ func (ap *AsetsPrices) UpdateChanges() {
 	}
 	duration := time.Since(timeStart)
 
-	log.Println("Время выполнения UpdateChanges: ", duration)
+	logging.MyLogger.InfoLog.Println("Время выполнения UpdateChanges: ", duration)
 }
 
 func (ap *AsetsPrices) InitDelta() {
@@ -229,18 +229,17 @@ func (ap *AsetsPrices) InitDelta() {
 	timeRoundingMax := ap.UpdateTime.Add(-max * 2)
 	candles, err := database.SelectMarketStateTimev2(ap.database, timeRoundingMax)
 	if err != nil {
-		// TODO
-		fmt.Println("ERROR DBBBBBB InitDelta")
+		logging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
 	}
 
 	if len(candles) == 0 {
-		fmt.Println("Нет candles")
+		logging.MyLogger.InfoLog.Println("Нет candles")
 		return
 	}
 
 	// Сделаем небольшую погрешность , для возможности горячего перезапуска приложения
 	if candles[0].Time.Sub(ap.UpdateTime) > 10*time.Minute {
-		fmt.Println("Большая погрешность №1")
+		logging.MyLogger.InfoLog.Println("Большая погрешность, горячий перезапуск не удался")
 		return
 	}
 
@@ -258,6 +257,7 @@ func (ap *AsetsPrices) InitDelta() {
 					if len(candleMinute) > 0 {
 						// Большая погрешность дальше не заполняем  forming.DatasetCandle
 						if candleMinute[len(candleMinute)-1].Time.Sub(candle.Time) > 10*time.Minute {
+							logging.MyLogger.InfoLog.Println("Большая погрешность, при формировании candles (continue)")
 							continue
 						}
 					}
@@ -289,9 +289,8 @@ func (ap *AsetsPrices) UpdateDelta() error {
 	// более новый candle с базы данных
 
 	candles, err := database.SelectMarketStateTimev2(ap.database, ap.UpdateTime.Add(-1*time.Minute))
-	fmt.Println(len(candles))
 	if err != nil {
-		fmt.Println("Err")
+		logging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
 		return err
 	}
 
@@ -368,9 +367,7 @@ func (ap *AsetsPrices) UpdateDelta() error {
 	}
 
 	duration := time.Since(timeStart)
-
-	log.Println("Время выполнения UpdateDelta: ", duration)
-
+	logging.MyLogger.InfoLog.Println("Время выполнения UpdateDelta: ", duration)
 	return nil
 }
 
@@ -402,8 +399,7 @@ func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDelta,
 			clearChangeDelta = append(clearChangeDelta, changeDelta[i])
 		}
 		duration := time.Since(timeStart)
-
-		log.Println("Время выполнения GetDeltaPeriod: ", duration)
+		logging.MyLogger.InfoLog.Println("Время выполнения GetDeltaPeriod: ", duration)
 	}
 
 	return clearChangeDelta, nil
