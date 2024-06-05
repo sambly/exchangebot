@@ -66,8 +66,8 @@ func (d *DataFeedSubscription) Subscribe(pair string, consumer DataFeedConsumer)
 
 func (d *DataFeedSubscription) Connect(ctx context.Context) {
 	// Подписки на websocket
-	d.wg.Add(1)
 	for _, pair := range d.Pairs {
+		d.wg.Add(1)
 		cmarket, cerr := d.exchange.MarketsSubscription(ctx, pair, d.wg)
 		d.MarketsStatFeeds[pair] = &MarketsStatFeed{
 			Data: cmarket,
