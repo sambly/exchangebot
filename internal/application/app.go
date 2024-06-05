@@ -12,6 +12,8 @@ import (
 	"main/internal/prices"
 	"main/internal/service"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type Application struct {
@@ -61,21 +63,31 @@ func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings,
 
 func (app *Application) Run(ctx context.Context) error {
 
-	timeStart := time.Now()
-
 	logging.MyLogger.InfoLog.Println("Ожидание предварительной загрузки данных")
 
+	timeStart := time.Now()
+
+	shouldBreak := false
 	// Ожидание, пока текущее время не попадет в интервал от 10 до 50 секунд
 	for {
-		timeStart := time.Now()
-		seconds := timeStart.Second()
-		if seconds >= 10 && seconds <= 50 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			timeNow := time.Now()
+			seconds := timeNow.Second()
+			if seconds >= 10 && seconds <= 50 {
+				shouldBreak = true
+				break
+			}
+			time.Sleep(1 * time.Second) // Ждем одну секунду перед повторной проверкой
+		}
+		if shouldBreak {
 			break
 		}
-		time.Sleep(1 * time.Second) // Ждем одну секунду перед повторной проверкой
 	}
 
-	timeRounding := timeStart.Truncate(60 * time.Second)
+	timeRounding := time.Now().Truncate(60 * time.Second)
 
 	app.AssetsPrices.UpdateTime = timeRounding
 	app.AssetsPrices.InitChangePrices()
@@ -91,7 +103,11 @@ func (app *Application) Run(ctx context.Context) error {
 	logging.MyLogger.InfoLog.Println("Время выполнения предварительной загрузки данных: ", duration)
 	logging.MyLogger.InfoLog.Println("Время старта: ", timeStart)
 
-	go app.dataFeed.Start(true)
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		return app.dataFeed.Start(ctx)
+	})
 
 	//Для предварительного заполения цен всех пар, может сделать меньше время, просто добавляет погрешность для 10m
 	var tickerInterval_Init time.Duration = time.Second * 10 // Здесь выставить 40
@@ -111,6 +127,15 @@ func (app *Application) Run(ctx context.Context) error {
 
 	for {
 		select {
+		case <-ctx.Done():
+			// Останавливаем все тикеры при завершении контекста
+			ticker_Init.Stop()
+			ticker_3m.Stop()
+			ticker_15m.Stop()
+			ticker_1h.Stop()
+			ticker_4h.Stop()
+			return g.Wait()
+
 		case <-ticker_Init.C:
 			// app.AssetsPrices.UpdateChanges("")
 			ticker_Init.Stop()

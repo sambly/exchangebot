@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"main/internal/model"
@@ -170,11 +171,15 @@ func (b *Binance) CandlesSubscription(ctx context.Context, pair, period string) 
 	return ccandle, cerr
 }
 
-func (b *Binance) MarketsSubscription(ctx context.Context, pair string) (chan model.MarketsStat, chan error) {
+func (b *Binance) MarketsSubscription(ctx context.Context, pair string, wg *sync.WaitGroup) (chan model.MarketsStat, chan error) {
 	cmarket := make(chan model.MarketsStat)
 	cerr := make(chan error)
 
 	go func() {
+		defer close(cmarket)
+		defer close(cerr)
+		defer wg.Done()
+
 		ba := &backoff.Backoff{
 			Min: 100 * time.Millisecond,
 			Max: 1 * time.Second,
@@ -195,26 +200,52 @@ func (b *Binance) MarketsSubscription(ctx context.Context, pair string) (chan mo
 					Ch24:   ch24,
 					Volume: volume,
 				}
-
-				cmarket <- marketStat
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					select {
+					case cmarket <- marketStat:
+					case <-ctx.Done():
+						return
+					}
+				}
 
 			}, func(err error) {
-				cerr <- err
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					select {
+					case cerr <- err:
+					case <-ctx.Done():
+						return
+					}
+				}
 			})
 			if err != nil {
-				cerr <- err
-				close(cerr)
-				close(cmarket)
-				return
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					select {
+					case cerr <- err:
+					case <-ctx.Done():
+						return
+					}
+				}
 			}
 
 			select {
 			case <-ctx.Done():
-				close(cerr)
-				close(cmarket)
 				return
-			case <-done:
-				time.Sleep(ba.Duration())
+			default:
+				select {
+				case <-done:
+					time.Sleep(ba.Duration())
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}()

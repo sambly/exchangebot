@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"main/internal/model"
+	"sync"
 	"time"
 )
 
@@ -20,5 +21,5 @@ type Feeder interface {
 	GetAssetsSpot(ctx context.Context) ([]model.AssetData, error)
 	GetAssetsFlexible(ctx context.Context) ([]model.AssetData, error)
 	GetAssetsStaking(ctx context.Context) ([]model.AssetData, error)
-	MarketsSubscription(ctx context.Context, pair string) (chan model.MarketsStat, chan error)
+	MarketsSubscription(ctx context.Context, pair string, wg *sync.WaitGroup) (chan model.MarketsStat, chan error)
 }

@@ -34,6 +34,7 @@ type MarketsStatFeed struct {
 }
 
 type DataFeedSubscription struct {
+	wg                      *sync.WaitGroup
 	exchange                service.Exchange
 	Pairs                   []string
 	MarketsStatFeeds        map[string]*MarketsStatFeed
@@ -47,6 +48,7 @@ type DataFeedConsumer func(model.MarketsStat)
 
 func NewDataFeed(exchange service.Exchange, pairs []string) *DataFeedSubscription {
 	return &DataFeedSubscription{
+		wg:                      &sync.WaitGroup{},
 		exchange:                exchange,
 		Pairs:                   pairs,
 		MarketsStatFeeds:        make(map[string]*MarketsStatFeed),
@@ -57,16 +59,16 @@ func (d *DataFeedSubscription) Subscribe(pair string, consumer DataFeedConsumer)
 	if idx := slices.Index(d.Pairs, pair); idx == -1 {
 		d.Pairs = append(d.Pairs, pair)
 	}
-
-	//d.Pairs = append(d.Pairs, pair)
 	d.SubscriptionsByDataFeed[pair] = append(d.SubscriptionsByDataFeed[pair], Subscription{
 		consumer: consumer,
 	})
 }
 
-func (d *DataFeedSubscription) Connect() {
+func (d *DataFeedSubscription) Connect(ctx context.Context) {
+	// Подписки на websocket
+	d.wg.Add(1)
 	for _, pair := range d.Pairs {
-		cmarket, cerr := d.exchange.MarketsSubscription(context.Background(), pair)
+		cmarket, cerr := d.exchange.MarketsSubscription(ctx, pair, d.wg)
 		d.MarketsStatFeeds[pair] = &MarketsStatFeed{
 			Data: cmarket,
 			Err:  cerr,
@@ -74,32 +76,36 @@ func (d *DataFeedSubscription) Connect() {
 	}
 }
 
-func (d *DataFeedSubscription) Start(loadSync bool) {
-	d.Connect()
-	wg := new(sync.WaitGroup)
+func (d *DataFeedSubscription) Start(ctx context.Context) error {
+	d.Connect(ctx)
 	for key, feed := range d.MarketsStatFeeds {
-		wg.Add(1)
+		d.wg.Add(1)
 		go func(key string, feed *MarketsStatFeed) {
+			defer d.wg.Done()
 			for {
 				select {
+				case <-ctx.Done():
+					return
 				case cmarket, ok := <-feed.Data:
 					if !ok {
-						wg.Done()
+						logging.MyLogger.InfoLog.Println("stopping data feed:", key)
 						return
 					}
 					for _, subscription := range d.SubscriptionsByDataFeed[key] {
 						subscription.consumer(cmarket)
 					}
+
 				case err := <-feed.Err:
 					if err != nil {
-						logging.MyLogger.ErrorOut(fmt.Errorf("error MarketsStatFeed : %v", err))
-						fmt.Println(err)
+						logging.MyLogger.ErrorOut(fmt.Errorf("error ws cmarket: %v", err))
 					}
 				}
 			}
 		}(key, feed)
 	}
-	if loadSync {
-		wg.Wait()
-	}
+	// Завершение подписок по websocket
+	d.wg.Wait()
+	logging.MyLogger.InfoLog.Println("Все подписки завершены")
+	return nil
+
 }

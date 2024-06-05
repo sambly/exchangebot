@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"main/internal/application"
 	"main/internal/config"
@@ -41,7 +40,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Колличество пар:", len(pairs))
+	logging.MyLogger.InfoLog.Println("Колличество пар : ", len(pairs))
 
 	periods := map[string]time.Duration{
 		"1m":  time.Second * 60,
