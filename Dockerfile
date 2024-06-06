@@ -60,7 +60,7 @@ COPY --from=builder /app/frontend/dist ./dist
 COPY --from=builder /app/configs ./configs
 
 # Создание точки монтирования для логов
-VOLUME /log
+VOLUME /app/log
 
 # Указать порт, если требуется
 EXPOSE 80

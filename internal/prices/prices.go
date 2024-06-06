@@ -161,7 +161,7 @@ func (ap *AsetsPrices) InitChangePrices() {
 						if len(forming.DatasetCandle) > 0 {
 							// Большая погрешность дальше не заполняем  forming.DatasetCandle
 							if forming.DatasetCandle[len(forming.DatasetCandle)-1].Time.Sub(candle.Time) > 10*time.Minute {
-								logging.MyLogger.InfoLog.Println("Большая погрешность, при формировании candles (continue)")
+								//logging.MyLogger.InfoLog.Println("Большая погрешность, при формировании candles (continue)")
 								continue
 							}
 						}
@@ -257,7 +257,7 @@ func (ap *AsetsPrices) InitDelta() {
 					if len(candleMinute) > 0 {
 						// Большая погрешность дальше не заполняем  forming.DatasetCandle
 						if candleMinute[len(candleMinute)-1].Time.Sub(candle.Time) > 10*time.Minute {
-							logging.MyLogger.InfoLog.Println("Большая погрешность, при формировании candles (continue)")
+							//logging.MyLogger.InfoLog.Println("Большая погрешность, при формировании candles (continue)")
 							continue
 						}
 					}
