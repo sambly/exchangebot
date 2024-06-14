@@ -21,8 +21,7 @@ $(function () {
 
     //#############################################################################  webSocket #############################################################################
 
-    var Url = "ws://localhost:444/trade/ws";
-    //var Url = "wss://bt-scada.ru/trade/ws";
+    var Url = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/trade/ws";
     var socket = new WebSocket(Url);
     socket.onopen = function () {
         console.log("connected ws");
