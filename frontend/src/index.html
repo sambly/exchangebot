@@ -15,74 +15,70 @@
 
   <div class="container-fluid">
 
+    <div class="mt-3">
+      <div id="header_trades" class="d-flex">
 
-   
-    <div class="row mt-3">
-   
-      <div class="col-3">
+        <div class="col-12 col-md-3">
 
-        <div class=" d-flex gap-3">
-          <div class="d-flex gap-1">24часа:<div class="text-primary" id="ch24-top" style="font-weight: bold; "></div>
+          <div class=" d-flex gap-3">
+            <div class="d-flex gap-1">24часа:<div class="text-primary" id="ch24-top" style="font-weight: bold; "></div>
+            </div>
+            <div class="d-flex gap-1">Объем:<div class="text-primary" id="volume-top" style="font-weight: bold; "></div>
+            </div>
           </div>
-          <div class="d-flex gap-1">Объем:<div class="text-primary" id="volume-top" style="font-weight: bold; "></div>
+
+          <div class="row mt-3">
+            <div class="col-6">
+              <input class="form-control" list="pairslistOptions" id="pairs" placeholder="Pair to search...">
+              <datalist id="pairslistOptions">
+              </datalist>
+            </div>
           </div>
         </div>
 
-        <div class="row mt-3">
-          <div class="col-6">
-            <input class="form-control" list="pairslistOptions" id="pairs" placeholder="Pair to search...">
-            <datalist id="pairslistOptions">
-            </datalist>
-          </div>
-        </div>
+        <div class="col-12 col-md-6">
 
-        <div class="button-control mt-3">
-          <button type="button" class="btnMenu btn btn-secondary active" id="btn-price">Цена</button>
-          <button type="button" class="btnMenu btn btn-secondary" id="btn-volume">Объем </button>
-          <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" id="btn-update-data">Обновить </button>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="input-group">
+                <div class="input-group-prepend">
+                  <span class="input-group-text">Объем</span>
+                </div>
+                <input type="number" class="form-control" id="minVolume" placeholder="min">
+                <input type="number" class="form-control" id="maxVolume" placeholder="max">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="input-group">
+                <div class="input-group-prepend">
+                  <span class="input-group-text">Ch1d</span>
+                </div>
+                <input type="number" class="form-control" id="minCh1d" placeholder="min">
+                <input type="number" class="form-control" id="maxCh1d" placeholder="max">
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="button-control mt-3">
+                <button type="button" class="btnFilter btn btn-secondary" id="btn-apply-filter">Применить</button>
+                <button type="button" class="btnFilter btn btn-secondary" id="btn-reset-filter">Сбросить </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
-      <div class="col-9">
-
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <div class="input-group">
-              <div class="input-group-prepend">
-                <span class="input-group-text">Объем</span>
-              </div>
-              <input type="number" class="form-control" id="minVolume" placeholder="min">
-              <input type="number" class="form-control" id="maxVolume" placeholder="max">
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="input-group">
-              <div class="input-group-prepend">
-                <span class="input-group-text">Ch1d</span>
-              </div>
-              <input type="number" class="form-control" id="minCh1d" placeholder="min">
-              <input type="number" class="form-control" id="maxCh1d" placeholder="max">
-            </div>
-          </div>
-
-          <div class="row mb-3">
-            <div class="button-control mt-3">
-              <button type="button" class="btnFilter btn btn-secondary" id="btn-apply-filter">Применить</button>
-              <button type="button" class="btnFilter btn btn-secondary" id="btn-reset-filter">Сбросить </button>
-            </div>
-          </div>
-
-
-        </div>
-
+      <div class="button-control">
+        <button type="button" class="btnMenu btn btn-secondary active" id="btn-price">Цена</button>
+        <button type="button" class="btnMenu btn btn-secondary" id="btn-volume">Объем </button>
+        <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" id="btn-update-data">Обновить </button>
       </div>
 
     </div>
 
-
-
     <div class="mt-3">
-      <div class="d-flex" id="trades">
+      <div id="trades"  class="d-flex" >
         <div class="col-12 col-md-3 px-2">
           <div class="bg-light border border rounded-3 border-bottom-0 border-start-0 border-end-0">
             <div id="list">

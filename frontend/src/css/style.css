@@ -315,3 +315,6 @@ tbody td {
   cursor: pointer; /* Делает курсор указателем при наведении */
 }
 
+.button-control .btn {
+  width: 100px;
+}

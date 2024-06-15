@@ -343,26 +343,39 @@ function size_conversion() {
         $('.btn').removeClass('btn-sm');
         $("#trades").removeAttr("class");
         $('#trades').addClass('d-flex flex-column gap-4 justify-content-between');
+        $("#header_trades").removeAttr("class");
+        $('#header_trades').addClass('d-flex flex-column gap-4 justify-content-between');
+
     } else if (windowWidth >= 576 && windowWidth < 768) {                                  // class sm
         $('.btn').removeClass('btn-sm');
         $("#trades").removeAttr("class");
         $('#trades').addClass('d-flex flex-column gap-4 justify-content-between');
+        $("#header_trades").removeAttr("class");
+        $('#header_trades').addClass('d-flex flex-column gap-4 justify-content-between');
     } else if (windowWidth >= 768 && windowWidth < 992) {                                  // class md
         $('.btn').addClass('btn-sm');
         $("#trades").removeAttr("class");
-        $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between');
+        $('#trades').addClass('d-flex');
+        $("#header_trades").removeAttr("class");
+        $('#header_trades').addClass('d-flex gap-2 align-items-start');
     } else if (windowWidth >= 992 && windowWidth < 1200) {                                 // class lg
         $('.btn').addClass('btn-sm');
         $("#trades").removeAttr("class");
         $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between');
+        $("#header_trades").removeAttr("class");
+        $('#header_trades').addClass('d-flex gap-2 align-items-start');
     } else if (windowWidth >= 1200 && windowWidth <= 1432) {                                 // class xl
         $('.btn').addClass('btn-sm');
         $("#trades").removeAttr("class");
         $('#trades').addClass('d-flex gap-2 align-items-start justify-content-between');
+        $("#header_trades").removeAttr("class");
+        $('#header_trades').addClass('d-flex gap-2 align-items-start');
     } else if (windowWidth > 1432) {                                                        // class xxl
         $('.btn').removeClass('btn-sm');
         $("#trades").removeAttr("class");
         $('#trades').addClass('d-flex align-items-start justify-content-between');
+        $("#header_trades").removeAttr("class");
+        $('#header_trades').addClass('d-flex gap-2 align-items-start');
     }
 }
 
