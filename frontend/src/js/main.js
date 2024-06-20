@@ -851,31 +851,10 @@ function forming_tickers_list() {
 
     const btnPairsFavorite = document.querySelector("#btnFavoritePairs");
 
-    var marketsStat;
-    var changePrices;
-    $.ajax({
-        url: 'getChPrice',
-        async: false,
-        method: 'GET',
-        cache: false,
-        contentType: 'application/json; charset=utf-8',
-        processData: false,
-        success: function (response) {
-            marketsStat = response.MarketsStat;
-            changePrices = response.ChangePrices;
-        },
-        error: function (response) {
-        },
-
-    });
+    var { marketsStat, changePrices } = fetchChangePrices();
 
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
-
-    // Фильтры 
-    let minVolume = localStorage.getItem('minVolume');
-    let maxVolume = localStorage.getItem('maxVolume');
-    let minCh1d = localStorage.getItem('minCh1d');
-    let maxCh1d = localStorage.getItem('maxCh1d');
+    let filterPairs = JSON.parse(localStorage.getItem('filterPairs')) || [];
     
     for (let pair in changePrices) {
 
@@ -884,15 +863,7 @@ function forming_tickers_list() {
             continue;
         }
         // Фильтры
-        // Объем
-        let volume = marketsStat[pair].Volume;
-        let ch1d = changePrices[pair][heads[5]]['СhangePercent'];
-       
-        if ((minVolume != null && volume <= Number(minVolume)) || (maxVolume != null && volume >= Number(maxVolume))) {
-            continue;
-        }
-        // Ch1d
-        if ((minCh1d != null && ch1d <= Number(minCh1d)) || (maxCh1d != null && ch1d >= Number(maxCh1d))) {   
+        if (!filterPairs.includes(pair)) {
             continue;
         }
         
@@ -1017,6 +988,7 @@ function forming_tickers_list_volume() {
     });
 
     let favoritePairs = JSON.parse(localStorage.getItem('favoritePairs')) || [];
+    let filterPairs = JSON.parse(localStorage.getItem('filterPairs')) || [];
 
     let frame;
     document.querySelectorAll('.btnFrame').forEach(function (element) {
@@ -1030,7 +1002,12 @@ function forming_tickers_list_volume() {
 
     for (let pair in deltaFast) {
 
+        // Избранные пары
         if (btnPairsFavorite.classList.contains("active") && !favoritePairs.includes(pair)) {
+            continue;
+        }
+        // Фильтры
+        if (!filterPairs.includes(pair)) {
             continue;
         }
 
@@ -1265,4 +1242,68 @@ function get_response_message(response, reload) {
         return true
     }
     return false
+}
+
+
+
+function fetchChangePrices() {
+
+    var start = performance.now();
+    var marketsStat;
+    var changePrices;
+
+    $.ajax({
+        url: 'getChPrice',
+        async: false,
+        method: 'GET',
+        cache: false,
+        contentType: 'application/json; charset=utf-8',
+        processData: false,
+        success: function (response) {
+            marketsStat = response.MarketsStat;
+            changePrices = response.ChangePrices;
+        },
+        error: function (response) {
+            // Обработка ошибки при необходимости
+        }
+    });
+    // Обновления списка отфильтрованных пар
+    filters_get_pairs(marketsStat,changePrices)
+
+    // Расчет времени выполнения 
+    var end = performance.now();
+    var time = end - start;
+    console.log('Время выполнения fetchChangePrices = ' + time);
+
+    return { marketsStat: marketsStat, changePrices: changePrices };
+}
+
+
+function filters_get_pairs(marketsStat,changePrices){
+
+    const heads = ['1m', '3m', '15m', '1h', '4h', '1d'];
+    let pairs = [];
+
+   // Фильтры 
+   let minVolume = localStorage.getItem('minVolume');
+   let maxVolume = localStorage.getItem('maxVolume');
+   let minCh1d = localStorage.getItem('minCh1d');
+   let maxCh1d = localStorage.getItem('maxCh1d'); 
+
+   for (let pair in changePrices) {
+    
+        let volume = marketsStat[pair].Volume;
+        let ch1d = changePrices[pair][heads[5]]['СhangePercent'];
+
+        if ((minVolume != null && volume <= Number(minVolume)) || (maxVolume != null && volume >= Number(maxVolume))) {
+            continue;
+        }
+        // Ch1d
+        if ((minCh1d != null && ch1d <= Number(minCh1d)) || (maxCh1d != null && ch1d >= Number(maxCh1d))) {   
+            continue;
+        }
+
+        pairs.push(pair)
+   }
+   localStorage.setItem('filterPairs', JSON.stringify(pairs));
 }
