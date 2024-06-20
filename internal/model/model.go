@@ -3,6 +3,7 @@ package model
 import "time"
 
 type Settings struct {
+	ServerName     string
 	Pairs          []string
 	Timeframe      string
 	ChangePeriods  map[string]time.Duration

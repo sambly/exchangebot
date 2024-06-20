@@ -52,6 +52,7 @@ func main() {
 	}
 
 	settings := model.Settings{
+		ServerName:     config.ServerName,
 		Pairs:          pairs,
 		Timeframe:      "1m",
 		ChangePeriods:  periods,

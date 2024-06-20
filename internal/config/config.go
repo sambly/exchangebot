@@ -10,22 +10,27 @@ import (
 
 type Config struct {
 
+	// config app
+	ServerName string
+
 	// Web
 	Production                    bool
 	InProductionOnlyApp           bool
 	InProductionWithFrontedNgingx bool
 	HttpPortProduction            string
 	HostWeb                       string
+	// Authentication Web basic
+	UsernameAuth string
+	PasswordAuth string
 
 	// Exchange
 	ApiKey    string
 	SecretKey string
+
 	// TLG
 	TlgToken string
 	TlgUser  string
-	// Authentication Web basic
-	UsernameAuth string
-	PasswordAuth string
+
 	// DB
 	NameDb     string
 	PasswordDb string
@@ -75,6 +80,11 @@ func NewConfig() (*Config, error) {
 		if !exists {
 			return nil, fmt.Errorf("no .env str DB_HOST_Local  found")
 		}
+	}
+
+	serverName, exists := os.LookupEnv("serverName")
+	if !exists {
+		return nil, fmt.Errorf("no .env str serverName  found")
 	}
 
 	// Web
@@ -156,21 +166,28 @@ func NewConfig() (*Config, error) {
 
 	c := &Config{
 
+		// config app
+		ServerName: serverName,
+
+		// Web
 		Production:                    production,
 		InProductionOnlyApp:           inProductionOnlyApp,
 		InProductionWithFrontedNgingx: inProductionWithFrontedNgingx,
 		HttpPortProduction:            httpPortProduction,
 		HostWeb:                       hostWeb,
-
-		ApiKey:    apiKey,
-		SecretKey: secretKey,
-
-		TlgToken: tlgToken,
-		TlgUser:  tlgUser,
-
+		// Authentication Web basic
 		UsernameAuth: usernameAuth,
 		PasswordAuth: passwordAuth,
 
+		// Exchange
+		ApiKey:    apiKey,
+		SecretKey: secretKey,
+
+		// TLG
+		TlgToken: tlgToken,
+		TlgUser:  tlgUser,
+
+		// DB
 		NameDb:     nameDb,
 		PasswordDb: passwordDb,
 		HostDb:     hostDb,

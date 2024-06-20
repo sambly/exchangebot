@@ -23,6 +23,7 @@ type AsetsPrices struct {
 
 	UpdateTime time.Time
 
+	// Актуальные данные для каждой пары. Price, 24ch, Volume
 	MarketsStatMu sync.RWMutex
 	MarketsStat   map[string]*model.MarketsStat
 
@@ -120,7 +121,7 @@ func (ap *AsetsPrices) OnMarket(ms model.MarketsStat) {
 
 func (ap *AsetsPrices) InitChangePrices() {
 
-	// Определить масимальное время из периода для запроса в бд
+	// Максимальный заданный период для запроса в бд
 	var max time.Duration
 	for _, dur := range ap.Periods {
 		if dur > max {

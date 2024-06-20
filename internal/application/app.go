@@ -17,10 +17,11 @@ import (
 )
 
 type Application struct {
-	settings model.Settings
+	Settings model.Settings
+	database *sql.DB
+
 	exchange service.Exchange
 	dataFeed *exchange.DataFeedSubscription
-	database *sql.DB
 
 	Account         *account.Account
 	AssetsPrices    *prices.AsetsPrices
@@ -44,7 +45,7 @@ func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings,
 	}
 
 	app := &Application{
-		settings: settings,
+		Settings: settings,
 		exchange: exch,
 		dataFeed: exchange.NewDataFeed(exch, settings.Pairs),
 		database: db,
@@ -93,7 +94,7 @@ func (app *Application) Run(ctx context.Context) error {
 	app.AssetsPrices.InitChangePrices()
 	app.AssetsPrices.InitDelta()
 
-	for _, pair := range app.settings.Pairs {
+	for _, pair := range app.Settings.Pairs {
 		app.dataFeed.Subscribe(pair, app.AssetsPrices.OnMarket)
 		app.dataFeed.Subscribe(pair, app.OrderController.OnMarket)
 	}

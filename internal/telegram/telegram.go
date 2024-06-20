@@ -99,11 +99,11 @@ func NewTelegram(app *application.Application, tlgToken, tlgUser string, notific
 
 func (t Telegram) Start(ctx context.Context) error {
 	go t.client.Start()
-	_, err := t.client.Send(&tele.User{ID: t.tlgUser}, "Bot initialized.", t.defaultMenu)
+	_, err := t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Bot initialized. Server name - %s", t.app.Settings.ServerName), t.defaultMenu)
 	if err != nil {
 		return err
 	}
-	logging.MyLogger.InfoLog.Println("Telegram started")
+	logging.MyLogger.InfoLog.Printf("Telegram started. Server name - %s", t.app.Settings.ServerName)
 
 	go func(message chan string) {
 		for {
@@ -123,8 +123,12 @@ func (t Telegram) Start(ctx context.Context) error {
 	}(t.Messages.Message)
 
 	<-ctx.Done()
+	_, err = t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName), t.defaultMenu)
+	if err != nil {
+		return err
+	}
 	t.client.Stop()
-	logging.MyLogger.InfoLog.Println("Telegram stopped gracefully")
+	logging.MyLogger.InfoLog.Printf("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName)
 	return nil
 }
 
