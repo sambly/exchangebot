@@ -88,7 +88,7 @@ func (app *Application) Run(ctx context.Context) error {
 		}
 	}
 
-	timeRounding := time.Now().Truncate(60 * time.Second)
+	timeRounding := time.Now().Truncate(time.Minute)
 
 	app.AssetsPrices.UpdateTime = timeRounding
 	app.AssetsPrices.InitChangePrices()

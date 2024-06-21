@@ -50,18 +50,6 @@ type MarketsStat struct {
 	Volume float64
 }
 
-type ChangeData struct {
-	LastPrice           float64
-	LastVolume          float64
-	СhangePercent       float64
-	ChangePercentVolume float64
-}
-type DatasetCandle struct {
-	Price  float64
-	Volume float64
-	Time   time.Time
-}
-
 type Candle struct {
 	Pair                 string
 	Time                 time.Time

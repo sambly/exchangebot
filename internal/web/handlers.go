@@ -227,24 +227,3 @@ func (web *Web) getChDelta(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(mapsJson)
 }
-
-func (web *Web) exp(w http.ResponseWriter, r *http.Request) {
-
-	bodyByte, err := io.ReadAll(r.Body)
-	if err != nil {
-		web.logError(err)
-	}
-
-	maps := map[string]interface{}{
-		"ChangePricesForing": web.App.AssetsPrices.FormingChangePrices[string(bodyByte)]["ch12h"],
-		"ChangePrices":       web.App.AssetsPrices.ChangePrices[string(bodyByte)]["ch12h"],
-	}
-
-	mapsJson, err := json.Marshal(maps)
-	if err != nil {
-		web.logError(err)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(mapsJson)
-}
