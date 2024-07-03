@@ -78,7 +78,7 @@ type Candle struct {
 	Metadata map[string]float64
 }
 
-type ChangeDelta struct {
+type ChangeDeltaForCandle struct {
 	Time      time.Time
 	Volume    float64
 	VolumeBuy float64
@@ -92,15 +92,6 @@ type ChangeDelta struct {
 	High  float64
 	Low   float64
 	Close float64
-}
-
-type DeltaFast struct {
-	Volume    float64
-	VolumeBuy float64
-	VolumeAsk float64
-	Trades    float64
-	TradesBuy float64
-	TradesAsk float64
 }
 
 type Deal struct {

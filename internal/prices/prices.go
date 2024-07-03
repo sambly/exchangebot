@@ -13,14 +13,33 @@ import (
 )
 
 type ChangePrices struct {
-	LastPrice           float64
-	СhangePercent       float64
-	DatasetChangePrices []DatasetChangePrices
-	DatasetFil          bool
+	LastPrice     float64
+	СhangePercent float64
 }
+
+type ChangePricesDataset struct {
+	dataset []DatasetChangePrices
+	fill    bool
+}
+
 type DatasetChangePrices struct {
 	Price float64
 	Time  time.Time
+}
+
+type ChangeDelta struct {
+	Time      time.Time
+	Volume    float64
+	VolumeBuy float64
+	VolumeAsk float64
+	Trades    float64
+	TradesBuy float64
+	TradesAsk float64
+}
+
+type ChangeDeltaDataset struct {
+	dataset []ChangeDelta
+	fill    bool
 }
 
 type AsetsPrices struct {
@@ -38,47 +57,49 @@ type AsetsPrices struct {
 	MarketsStatMu sync.RWMutex
 	MarketsStat   map[string]*model.MarketsStat
 
-	ChangePricesMu sync.RWMutex
-	ChangePrices   map[string]map[string]*ChangePrices
+	ChangePricesMu      sync.RWMutex
+	ChangePrices        map[string]map[string]*ChangePrices
+	ChangePricesDataset map[string]map[string]*ChangePricesDataset
 
-	FormingChangeDelta map[string]map[string]*ChangeDeltaForming
-	DeltaFastMu        sync.RWMutex
-	DeltaFast          map[string]map[string]*model.DeltaFast
-}
-
-type ChangeDeltaForming struct {
-	ChangeDeltaMinute []model.ChangeDelta
-	Fill              bool
+	ChangeDeltaMu      sync.RWMutex
+	ChangeDelta        map[string]map[string]*ChangeDelta
+	ChangeDeltaDataset map[string]map[string]*ChangeDeltaDataset
 }
 
 func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time.Duration, weightProcents map[string]float64, db *sql.DB, notification *notification.Notification) *AsetsPrices {
 	asetsPrices := &AsetsPrices{
-		Pairs:              pairs,
-		Periods:            periodsChange,
-		PeriodsDelta:       periodsDelta,
-		WeightProcents:     weightProcents,
-		MarketsStat:        make(map[string]*model.MarketsStat),
-		ChangePrices:       make(map[string]map[string]*ChangePrices),
-		FormingChangeDelta: make(map[string]map[string]*ChangeDeltaForming),
-		DeltaFast:          make(map[string]map[string]*model.DeltaFast),
-		database:           db,
-		Notification:       notification,
+		Pairs:          pairs,
+		Periods:        periodsChange,
+		PeriodsDelta:   periodsDelta,
+		WeightProcents: weightProcents,
+
+		MarketsStat: make(map[string]*model.MarketsStat),
+
+		ChangePrices:        make(map[string]map[string]*ChangePrices),
+		ChangePricesDataset: make(map[string]map[string]*ChangePricesDataset),
+
+		ChangeDelta:        make(map[string]map[string]*ChangeDelta),
+		ChangeDeltaDataset: make(map[string]map[string]*ChangeDeltaDataset),
+
+		database:     db,
+		Notification: notification,
 	}
 
 	for _, pair := range pairs {
 		asetsPrices.MarketsStat[pair] = &model.MarketsStat{Pair: pair}
 
 		asetsPrices.ChangePrices[pair] = map[string]*ChangePrices{}
-
-		asetsPrices.FormingChangeDelta[pair] = map[string]*ChangeDeltaForming{}
-		asetsPrices.DeltaFast[pair] = map[string]*model.DeltaFast{}
+		asetsPrices.ChangePricesDataset[pair] = map[string]*ChangePricesDataset{}
+		asetsPrices.ChangeDelta[pair] = map[string]*ChangeDelta{}
+		asetsPrices.ChangeDeltaDataset[pair] = map[string]*ChangeDeltaDataset{}
 
 		for period := range periodsChange {
 			asetsPrices.ChangePrices[pair][period] = &ChangePrices{}
+			asetsPrices.ChangePricesDataset[pair][period] = &ChangePricesDataset{}
 		}
 		for period := range periodsDelta {
-			asetsPrices.FormingChangeDelta[pair][period] = &ChangeDeltaForming{}
-			asetsPrices.DeltaFast[pair][period] = &model.DeltaFast{}
+			asetsPrices.ChangeDelta[pair][period] = &ChangeDelta{}
+			asetsPrices.ChangeDeltaDataset[pair][period] = &ChangeDeltaDataset{}
 		}
 	}
 	return asetsPrices
@@ -104,13 +125,13 @@ func (ap *AsetsPrices) OnMarket(ms model.MarketsStat) {
 		go func() {
 			// За это время ждем пока остальные пары обновят цену, не точное решение...
 			time.Sleep(1 * time.Second)
-			ap.UpdateChanges()
+			ap.UpdateChangePrices()
 		}()
 
 		go func() {
 			// Ожидание пока данные запишутся в базу данных, потом мы считаем новые значения
 			time.Sleep(10 * time.Second)
-			if err := ap.UpdateDelta(); err != nil {
+			if err := ap.UpdateChangeDelta(); err != nil {
 				logging.MyLogger.ErrorOut(fmt.Errorf("error in updateDelta: %v", err))
 			}
 		}()
@@ -137,7 +158,7 @@ func (ap *AsetsPrices) InitChangePrices() {
 	}
 
 	if len(candles) == 0 {
-		logging.MyLogger.InfoLog.Println("Нет candles")
+		logging.MyLogger.InfoLog.Println("Нет свечей")
 		return
 	}
 
@@ -156,33 +177,36 @@ func (ap *AsetsPrices) InitChangePrices() {
 
 		for period, periodValue := range ap.Periods {
 
-			data := ap.ChangePrices[candle.Pair][period]
-			if !data.DatasetFil {
+			data := ap.ChangePricesDataset[candle.Pair][period]
 
-				dataset := DatasetChangePrices{
+			if !data.fill {
+
+				item := DatasetChangePrices{
 					Price: candle.Close,
 					Time:  candle.Time,
 				}
 
-				if len(data.DatasetChangePrices) == int(periodValue.Minutes()-1) {
+				if len(data.dataset) == int(periodValue.Minutes()-1) {
 
-					data.DatasetChangePrices = append(data.DatasetChangePrices, dataset)
-					data.LastPrice = data.DatasetChangePrices[len(data.DatasetChangePrices)-1].Price
-					data.DatasetFil = true
+					data.dataset = append(data.dataset, item)
+					ap.ChangePrices[candle.Pair][period].LastPrice = data.dataset[len(data.dataset)-1].Price
+					ap.ChangePricesDataset[candle.Pair][period].fill = true
+					ap.ChangePricesDataset[candle.Pair][period].dataset = data.dataset
+
 				} else {
 
-					// Большая погрешность дальше не заполняем  forming.DatasetCandle
-					if len(data.DatasetChangePrices) > 0 && data.DatasetChangePrices[len(data.DatasetChangePrices)-1].Time.Sub(candle.Time) > 10*time.Minute {
+					// Большая погрешность дальше не заполняем  DatasetChangePrices
+					if len(data.dataset) > 0 && data.dataset[len(data.dataset)-1].Time.Sub(candle.Time) > 10*time.Minute {
 						continue
 					}
-					data.DatasetChangePrices = append(data.DatasetChangePrices, dataset)
+					ap.ChangePricesDataset[candle.Pair][period].dataset = append(data.dataset, item)
 				}
 			}
 		}
 	}
 }
 
-func (ap *AsetsPrices) InitDelta() {
+func (ap *AsetsPrices) InitChangeDelta() {
 
 	// Максимальный заданный период для запроса в бд
 	var max time.Duration
@@ -200,7 +224,7 @@ func (ap *AsetsPrices) InitDelta() {
 	}
 
 	if len(candles) == 0 {
-		logging.MyLogger.InfoLog.Println("Нет candles")
+		logging.MyLogger.InfoLog.Println("Нет свечей")
 		return
 	}
 
@@ -218,38 +242,34 @@ func (ap *AsetsPrices) InitDelta() {
 		}
 		for period, periodValue := range ap.Periods {
 
-			candleMinute := ap.FormingChangeDelta[candle.Pair][period].ChangeDeltaMinute
-			fill := ap.FormingChangeDelta[candle.Pair][period].Fill
+			data := ap.ChangeDeltaDataset[candle.Pair][period]
 
-			if !fill {
+			if !data.fill {
 
-				if len(candleMinute) > 0 {
-					// Большая погрешность дальше не заполняем  forming.DatasetCandle
-					if candleMinute[len(candleMinute)-1].Time.Sub(candle.Time) > 10*time.Minute {
-						//logging.MyLogger.InfoLog.Println("Большая погрешность, при формировании candles (continue)")
-						continue
-					}
+				// Большая погрешность дальше не заполняем  DatasetChangeDelta
+				if len(data.dataset) > 0 && data.dataset[len(data.dataset)-1].Time.Sub(candle.Time) > 10*time.Minute {
+					continue
 				}
 
-				chDelta := model.ChangeDelta{
+				item := ChangeDelta{
 					Time:      candle.Time,
 					Volume:    candle.Volume,
 					VolumeBuy: candle.ActiveBuyVolume,
 					VolumeAsk: candle.ActiveAskVolume,
-					Trades:    candle.AmountTrade,
-					TradesBuy: candle.AmountTradeBuy,
-					TradesAsk: candle.AmountTradeAsk,
+					Trades:    float64(candle.AmountTrade),
+					TradesBuy: float64(candle.AmountTradeBuy),
+					TradesAsk: float64(candle.AmountTradeAsk),
 				}
 
-				candleMinute = append(candleMinute, chDelta)
-				ap.FormingChangeDelta[candle.Pair][period].ChangeDeltaMinute = candleMinute
-				ap.FormingChangeDelta[candle.Pair][period].Fill = len(candleMinute) == int(periodValue.Minutes()*2)
+				data.dataset = append(data.dataset, item)
+				ap.ChangeDeltaDataset[candle.Pair][period].dataset = data.dataset
+				ap.ChangeDeltaDataset[candle.Pair][period].fill = len(data.dataset) == int(periodValue.Minutes()*2)
 			}
 		}
 	}
 }
 
-func (ap *AsetsPrices) UpdateChanges() {
+func (ap *AsetsPrices) UpdateChangePrices() {
 	ap.MarketsStatMu.RLock()
 	defer ap.MarketsStatMu.RUnlock()
 	ap.ChangePricesMu.Lock()
@@ -260,37 +280,38 @@ func (ap *AsetsPrices) UpdateChanges() {
 	for _, pair := range ap.Pairs {
 		for period, periodValue := range ap.Periods {
 
-			data := ap.ChangePrices[pair][period]
+			data := ap.ChangePricesDataset[pair][period]
 
-			dataset := DatasetChangePrices{
+			item := DatasetChangePrices{
 				Price: ap.MarketsStat[pair].Price,
 				Time:  ap.MarketsStat[pair].Time,
 			}
 
-			if !data.DatasetFil {
-				if len(data.DatasetChangePrices) == int(periodValue.Minutes()-1) {
-
-					data.DatasetChangePrices = append(data.DatasetChangePrices, dataset)
-					data.LastPrice = data.DatasetChangePrices[len(data.DatasetChangePrices)-1].Price
-					data.DatasetFil = true
+			if !data.fill {
+				if len(data.dataset) == int(periodValue.Minutes()-1) {
+					data.dataset = append(data.dataset, item)
+					ap.ChangePrices[pair][period].LastPrice = data.dataset[len(data.dataset)-1].Price
+					ap.ChangePricesDataset[pair][period].fill = true
+					ap.ChangePricesDataset[pair][period].dataset = data.dataset
 				} else {
-					data.DatasetChangePrices = append(data.DatasetChangePrices, dataset)
+					ap.ChangePricesDataset[pair][period].dataset = append(data.dataset, item)
 				}
 			} else {
 
-				data.СhangePercent = check_values_dividing(ap.MarketsStat[pair].Price, data.LastPrice)
+				ap.ChangePrices[pair][period].СhangePercent = check_values_dividing(ap.MarketsStat[pair].Price, ap.ChangePrices[pair][period].LastPrice)
 
 				// Отправка сообщения об изменении цены
-				if data.СhangePercent >= ap.WeightProcents[period] {
-					ap.Notification.NotificationWeightPercent(pair, period, data.СhangePercent)
+				if ap.ChangePrices[pair][period].СhangePercent >= ap.WeightProcents[period] {
+					ap.Notification.NotificationWeightPercent(pair, period, ap.ChangePrices[pair][period].СhangePercent)
 				}
 
 				// Помещаем dataset в самое начало
-				data.DatasetChangePrices = append([]DatasetChangePrices{dataset}, data.DatasetChangePrices...)
+				data.dataset = append([]DatasetChangePrices{item}, data.dataset...)
 
 				// Удаляем последний элемент
-				data.DatasetChangePrices = data.DatasetChangePrices[:len(data.DatasetChangePrices)-1]
-				data.LastPrice = data.DatasetChangePrices[len(data.DatasetChangePrices)-1].Price
+				data.dataset = data.dataset[:len(data.dataset)-1]
+				ap.ChangePrices[pair][period].LastPrice = data.dataset[len(data.dataset)-1].Price
+				ap.ChangePricesDataset[pair][period].dataset = data.dataset
 			}
 		}
 	}
@@ -298,12 +319,9 @@ func (ap *AsetsPrices) UpdateChanges() {
 	logging.MyLogger.InfoLog.Println("Время выполнения UpdateChanges: ", duration)
 }
 
-func (ap *AsetsPrices) UpdateDelta() error {
+func (ap *AsetsPrices) UpdateChangeDelta() error {
 
 	timeStart := time.Now()
-
-	// TODO Надо сделать проверку на то , что дейсвтительно мы получили
-	// более новый candle с базы данных
 
 	candles, err := database.SelectMarketStateTimev2(ap.database, ap.UpdateTime.Add(-1*time.Minute))
 	if err != nil {
@@ -311,8 +329,8 @@ func (ap *AsetsPrices) UpdateDelta() error {
 		return err
 	}
 
-	ap.DeltaFastMu.Lock()
-	defer ap.DeltaFastMu.Unlock()
+	ap.ChangeDeltaMu.Lock()
+	defer ap.ChangeDeltaMu.Unlock()
 
 	for _, candle := range candles {
 
@@ -322,74 +340,100 @@ func (ap *AsetsPrices) UpdateDelta() error {
 
 		for period, periodValue := range ap.PeriodsDelta {
 
-			candleMinute := ap.FormingChangeDelta[candle.Pair][period].ChangeDeltaMinute
-			deltaFast := ap.DeltaFast[candle.Pair][period]
-			fill := ap.FormingChangeDelta[candle.Pair][period].Fill
+			data := ap.ChangeDeltaDataset[candle.Pair][period]
 
-			chDelta := model.ChangeDelta{
+			item := ChangeDelta{
 				Time:      candle.Time,
 				Volume:    candle.Volume,
 				VolumeBuy: candle.ActiveBuyVolume,
 				VolumeAsk: candle.ActiveAskVolume,
-				Trades:    candle.AmountTrade,
-				TradesBuy: candle.AmountTradeBuy,
-				TradesAsk: candle.AmountTradeAsk,
+				Trades:    float64(candle.AmountTrade),
+				TradesBuy: float64(candle.AmountTradeBuy),
+				TradesAsk: float64(candle.AmountTradeAsk),
 			}
 
-			if !fill {
-				candleMinute = append(candleMinute, chDelta)
-				ap.FormingChangeDelta[candle.Pair][period].ChangeDeltaMinute = candleMinute
-				ap.FormingChangeDelta[candle.Pair][period].Fill = len(candleMinute) == int(periodValue.Minutes()*2)
+			if !data.fill {
+				data.dataset = append(data.dataset, item)
+				ap.ChangeDeltaDataset[candle.Pair][period].dataset = data.dataset
+				ap.ChangeDeltaDataset[candle.Pair][period].fill = len(data.dataset) == int(periodValue.Minutes()*2)
 			} else {
-				candleMinute = append([]model.ChangeDelta{chDelta}, candleMinute...)
-				candleMinute = candleMinute[:len(candleMinute)-1]
+				data.dataset = append([]ChangeDelta{item}, data.dataset...)
+				data.dataset = data.dataset[:len(data.dataset)-1]
 
-				ap.FormingChangeDelta[candle.Pair][period].ChangeDeltaMinute = candleMinute
+				ap.ChangeDeltaDataset[candle.Pair][period].dataset = data.dataset
 
-				chDeltaFirst := model.ChangeDelta{}
-				chDeltaLast := model.ChangeDelta{}
+				itemFirst := ChangeDelta{}
+				itemLast := ChangeDelta{}
 
-				for index, item := range candleMinute {
+				for index, item := range data.dataset {
 
-					if index < len(candleMinute)/2 {
-						chDeltaFirst.Time = item.Time
-						chDeltaFirst.Volume += item.Volume
-						chDeltaFirst.VolumeBuy += item.VolumeBuy
-						chDeltaFirst.VolumeAsk += item.VolumeAsk
-						chDeltaFirst.Trades += item.Trades
-						chDeltaFirst.TradesBuy += item.TradesBuy
-						chDeltaFirst.TradesAsk += item.TradesAsk
+					if index < len(data.dataset)/2 {
+						itemFirst.Time = item.Time
+						itemFirst.Volume += item.Volume
+						itemFirst.VolumeBuy += item.VolumeBuy
+						itemFirst.VolumeAsk += item.VolumeAsk
+						itemFirst.Trades += item.Trades
+						itemFirst.TradesBuy += item.TradesBuy
+						itemFirst.TradesAsk += item.TradesAsk
 					}
 
-					if index >= len(candleMinute)/2 {
-						chDeltaLast.Time = item.Time
-						chDeltaLast.Volume += item.Volume
-						chDeltaLast.VolumeBuy += item.VolumeBuy
-						chDeltaLast.VolumeAsk += item.VolumeAsk
-						chDeltaLast.Trades += item.Trades
-						chDeltaLast.TradesBuy += item.TradesBuy
-						chDeltaLast.TradesAsk += item.TradesAsk
+					if index >= len(data.dataset)/2 {
+						itemLast.Time = item.Time
+						itemLast.Volume += item.Volume
+						itemLast.VolumeBuy += item.VolumeBuy
+						itemLast.VolumeAsk += item.VolumeAsk
+						itemLast.Trades += item.Trades
+						itemLast.TradesBuy += item.TradesBuy
+						itemLast.TradesAsk += item.TradesAsk
 					}
 				}
 
-				deltaFast.Volume = check_values_dividing(chDeltaFirst.Volume, chDeltaLast.Volume)
-				deltaFast.VolumeBuy = check_values_dividing(chDeltaFirst.VolumeBuy, chDeltaLast.VolumeBuy)
-				deltaFast.VolumeAsk = check_values_dividing(chDeltaFirst.VolumeAsk, chDeltaLast.VolumeAsk)
+				ap.ChangeDelta[candle.Pair][period].Volume = check_values_dividing(itemFirst.Volume, itemLast.Volume)
+				ap.ChangeDelta[candle.Pair][period].VolumeBuy = check_values_dividing(itemFirst.VolumeBuy, itemLast.VolumeBuy)
+				ap.ChangeDelta[candle.Pair][period].VolumeAsk = check_values_dividing(itemFirst.VolumeAsk, itemLast.VolumeAsk)
 
-				deltaFast.Trades = check_values_dividing(float64(chDeltaFirst.Trades), float64(chDeltaLast.Trades))
-				deltaFast.TradesBuy = check_values_dividing(float64(chDeltaFirst.TradesBuy), float64(chDeltaLast.TradesBuy))
-				deltaFast.TradesAsk = check_values_dividing(float64(chDeltaFirst.TradesAsk), float64(chDeltaLast.TradesAsk))
+				ap.ChangeDelta[candle.Pair][period].Trades = check_values_dividing(float64(itemFirst.Trades), float64(itemLast.Trades))
+				ap.ChangeDelta[candle.Pair][period].TradesBuy = check_values_dividing(float64(itemFirst.TradesBuy), float64(itemLast.TradesBuy))
+				ap.ChangeDelta[candle.Pair][period].TradesAsk = check_values_dividing(float64(itemFirst.TradesAsk), float64(itemLast.TradesAsk))
 
 			}
 		}
 	}
 
 	duration := time.Since(timeStart)
-	logging.MyLogger.InfoLog.Println("Время выполнения UpdateDelta: ", duration)
+	logging.MyLogger.InfoLog.Println("Время выполнения UpdateChangeDelta: ", duration)
 	return nil
 }
 
-func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDelta, error) {
+func (ap *AsetsPrices) GetAllChPrice() map[string]map[string]*ChangePrices {
+	ap.ChangePricesMu.RLock()
+	defer ap.ChangePricesMu.RUnlock()
+
+	return ap.ChangePrices
+}
+
+func (ap *AsetsPrices) GetAllChDelta() map[string]map[string]*ChangeDelta {
+	ap.ChangeDeltaMu.RLock()
+	defer ap.ChangeDeltaMu.RUnlock()
+
+	return ap.ChangeDelta
+}
+
+func (ap *AsetsPrices) GetAllMarketsStat() map[string]*model.MarketsStat {
+	ap.MarketsStatMu.RLock()
+	defer ap.MarketsStatMu.RUnlock()
+
+	return ap.MarketsStat
+}
+
+func (ap *AsetsPrices) GetMarketsStatForPair(pair string) *model.MarketsStat {
+	ap.MarketsStatMu.RLock()
+	defer ap.MarketsStatMu.RUnlock()
+
+	return ap.MarketsStat[pair]
+}
+
+func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDeltaForCandle, error) {
 
 	timeStart := time.Now()
 
@@ -398,7 +442,7 @@ func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDelta,
 		return nil, err
 	}
 
-	clearChangeDelta := []model.ChangeDelta{}
+	clearChangeDelta := []model.ChangeDeltaForCandle{}
 
 	if len(changeDelta) > 0 {
 		clearChangeDelta = append(clearChangeDelta, changeDelta[0])

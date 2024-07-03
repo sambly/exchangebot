@@ -400,8 +400,8 @@ func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]model.Candle
 	return candles, nil
 }
 
-func SelectDeltaPeriod(db *sql.DB, pair string, period string) ([]model.ChangeDelta, error) {
-	candles := []model.ChangeDelta{}
+func SelectDeltaPeriod(db *sql.DB, pair string, period string) ([]model.ChangeDeltaForCandle, error) {
+	candles := []model.ChangeDeltaForCandle{}
 
 	maping := map[string]string{
 		"1m":  "ch1m",
@@ -429,7 +429,7 @@ func SelectDeltaPeriod(db *sql.DB, pair string, period string) ([]model.ChangeDe
 	defer rows.Close()
 
 	for rows.Next() {
-		var changeDelta model.ChangeDelta
+		var changeDelta model.ChangeDeltaForCandle
 		if err := rows.Scan(
 			&changeDelta.Time,
 			&changeDelta.Volume,

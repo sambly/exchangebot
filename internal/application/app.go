@@ -92,7 +92,7 @@ func (app *Application) Run(ctx context.Context) error {
 
 	app.AssetsPrices.UpdateTime = timeRounding
 	app.AssetsPrices.InitChangePrices()
-	app.AssetsPrices.InitDelta()
+	app.AssetsPrices.InitChangeDelta()
 
 	for _, pair := range app.Settings.Pairs {
 		app.dataFeed.Subscribe(pair, app.AssetsPrices.OnMarket)

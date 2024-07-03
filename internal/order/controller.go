@@ -85,7 +85,7 @@ func (c *Controller) CreateOrderMarket(deal model.Deal, size float64) (*model.Or
 
 	mkStat := c.assetsPrices.MarketsStat[pair]
 	chData := c.assetsPrices.ChangePrices[pair]
-	dFast := c.assetsPrices.DeltaFast[pair]
+	dFast := c.assetsPrices.ChangeDelta[pair]
 
 	mkStatJson, err := json.Marshal(mkStat)
 	if err != nil {

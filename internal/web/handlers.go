@@ -2,7 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"main/internal/model"
 	"net/http"
@@ -20,11 +19,8 @@ var upgrader = websocket.Upgrader{
 
 func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 
-	web.App.AssetsPrices.MarketsStatMu.RLock()
-	defer web.App.AssetsPrices.MarketsStatMu.RUnlock()
-
 	maps := map[string]interface{}{
-		"MarketsStat": web.App.AssetsPrices.MarketsStat,
+		"MarketsStat": web.App.AssetsPrices.GetAllMarketsStat(),
 	}
 
 	mapsJson, err := json.Marshal(maps)
@@ -48,12 +44,9 @@ func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
 		web.logError(err)
 	}
 
-	web.App.AssetsPrices.MarketsStatMu.RLock()
-	defer web.App.AssetsPrices.MarketsStatMu.RUnlock()
-
 	maps := map[string]interface{}{
 		"Pairs":          web.App.AssetsPrices.Pairs,
-		"MarketsStat":    web.App.AssetsPrices.MarketsStat,
+		"MarketsStat":    web.App.AssetsPrices.GetAllMarketsStat(),
 		"OrdersActive":   web.App.PaperWallet.GetOrdersActive(),
 		"OrdersHistory":  web.App.PaperWallet.GetOrdersHistory(),
 		"OptionStrategy": option,
@@ -61,7 +54,6 @@ func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
 
 	mapsJson, err := json.Marshal(maps)
 	if err != nil {
-		fmt.Println("ERROR1")
 		web.logError(err)
 	}
 
@@ -95,11 +87,10 @@ func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
 		web.logError(err)
 	}
 
-	web.App.AssetsPrices.MarketsStatMu.RLock()
-	defer web.App.AssetsPrices.MarketsStatMu.RUnlock()
+	pair := string(bodyByte)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(web.App.AssetsPrices.MarketsStat[string(bodyByte)]) // string(bodyByte)  - pair
+	json.NewEncoder(w).Encode(web.App.AssetsPrices.GetMarketsStatForPair(pair))
 }
 
 func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
@@ -190,15 +181,9 @@ func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 
 func (web *Web) getChPrice(w http.ResponseWriter, r *http.Request) {
 
-	web.App.AssetsPrices.MarketsStatMu.RLock()
-	defer web.App.AssetsPrices.MarketsStatMu.RUnlock()
-
-	web.App.AssetsPrices.ChangePricesMu.RLock()
-	defer web.App.AssetsPrices.ChangePricesMu.RUnlock()
-
 	maps := map[string]interface{}{
-		"MarketsStat":  web.App.AssetsPrices.MarketsStat,
-		"ChangePrices": web.App.AssetsPrices.ChangePrices,
+		"MarketsStat":  web.App.AssetsPrices.GetAllMarketsStat(),
+		"ChangePrices": web.App.AssetsPrices.GetAllChPrice(),
 	}
 
 	mapsJson, err := json.Marshal(maps)
@@ -212,11 +197,8 @@ func (web *Web) getChPrice(w http.ResponseWriter, r *http.Request) {
 
 func (web *Web) getChDelta(w http.ResponseWriter, r *http.Request) {
 
-	web.App.AssetsPrices.DeltaFastMu.RLock()
-	defer web.App.AssetsPrices.DeltaFastMu.RUnlock()
-
 	maps := map[string]interface{}{
-		"DeltaFast": web.App.AssetsPrices.DeltaFast,
+		"DeltaFast": web.App.AssetsPrices.GetAllChDelta(),
 	}
 
 	mapsJson, err := json.Marshal(maps)
