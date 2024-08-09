@@ -19,7 +19,7 @@ COPY ./frontend ./
 RUN yarn build
 
 # Этап сборки Go-приложения
-FROM golang:1.21-alpine3.18 AS builder
+FROM golang:1.22.5-alpine AS builder
 
 # Установка необходимого для сборки
 RUN apk add --no-cache git
@@ -35,18 +35,25 @@ COPY --from=frontend /app/frontend/dist ./frontend/dist
 
 # Копируем остальные файлы проекта
 COPY internal ./internal
-COPY main.go embed.go ./
+
+COPY cmd ./cmd
+
+COPY embed.go ./
 
 COPY ./configs ./configs
 
 RUN go mod tidy
-RUN go build -o exchangebot .
+RUN go build -o exchangebot ./cmd
 
 # Финальный образ для запуска
 FROM alpine:3.18
 
 # Установка зависимостей для запуска Go сервера
 RUN apk add --no-cache ca-certificates
+
+RUN apk add --no-cache ca-certificates tzdata \
+    && ln -sf /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
+    && echo "Europe/Moscow" > /etc/timezone
 
 # Устанавливаем рабочую директорию в контейнере
 WORKDIR /app

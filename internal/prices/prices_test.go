@@ -3,11 +3,12 @@ package prices
 import (
 	"context"
 	"flag"
-	"main/internal/config"
-	"main/internal/database"
-	"main/internal/exchange"
 	"testing"
 	"time"
+
+	"github.com/sambly/exchangeBot/internal/config"
+	"github.com/sambly/exchangeBot/internal/database"
+	"github.com/sambly/exchangeBot/internal/exchange"
 )
 
 func TestUpdateDeltaFullData(t *testing.T) {

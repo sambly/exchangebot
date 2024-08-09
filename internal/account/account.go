@@ -2,11 +2,12 @@ package account
 
 import (
 	"context"
-	"main/internal/model"
-	"main/internal/notification"
-	"main/internal/prices"
-	"main/internal/service"
 	"sync"
+
+	"github.com/sambly/exchangeBot/internal/model"
+	"github.com/sambly/exchangeBot/internal/notification"
+	"github.com/sambly/exchangeBot/internal/prices"
+	"github.com/sambly/exchangeBot/internal/service"
 
 	"golang.org/x/exp/slices"
 )

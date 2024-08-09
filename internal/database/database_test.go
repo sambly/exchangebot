@@ -1,10 +1,11 @@
 package database
 
 import (
-	"main/internal/config"
-	"main/internal/model"
 	"testing"
 	"time"
+
+	"github.com/sambly/exchangeBot/internal/config"
+	"github.com/sambly/exchangeBot/internal/model"
 )
 
 func TestSelectCandlesTable(t *testing.T) {

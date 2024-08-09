@@ -2,9 +2,10 @@ package service
 
 import (
 	"context"
-	"main/internal/model"
 	"sync"
 	"time"
+
+	"github.com/sambly/exchangeBot/internal/model"
 )
 
 type Exchange interface {

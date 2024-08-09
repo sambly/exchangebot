@@ -3,13 +3,14 @@ package prices
 import (
 	"database/sql"
 	"fmt"
-	"main/internal/database"
-	"main/internal/logging"
-	"main/internal/model"
-	"main/internal/notification"
 	"slices"
 	"sync"
 	"time"
+
+	"github.com/sambly/exchangeBot/internal/database"
+	"github.com/sambly/exchangeBot/internal/logging"
+	"github.com/sambly/exchangeBot/internal/model"
+	"github.com/sambly/exchangeBot/internal/notification"
 )
 
 type ChangePrices struct {

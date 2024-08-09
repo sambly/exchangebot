@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"main/internal/logging"
-	"main/internal/model"
-	"main/internal/service"
 	"sync"
+
+	"github.com/sambly/exchangeBot/internal/logging"
+	"github.com/sambly/exchangeBot/internal/model"
+	"github.com/sambly/exchangeBot/internal/service"
 
 	"golang.org/x/exp/slices"
 )

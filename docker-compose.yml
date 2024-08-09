@@ -6,9 +6,11 @@ services:
     volumes:
       - ./log:/log
     ports:
-      - "80:80"  # Проброс порта 80 в контейнере на порт 8080 на хосте
+      - "8080:80"  # Проброс порта 80 в контейнере на порт 8080 на хосте
     environment:
       ENVIRONMENT: docker
+
+      serverName: ${serverName} 
 
       production: ${production}
       inProductionOnlyApp: ${inProductionOnlyApp}

@@ -4,12 +4,13 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"main/internal/application"
-	"main/internal/config"
-	"main/internal/logging"
-	"main/internal/notification"
 	"net/http"
 	"time"
+
+	"github.com/sambly/exchangeBot/internal/application"
+	"github.com/sambly/exchangeBot/internal/config"
+	"github.com/sambly/exchangeBot/internal/logging"
+	"github.com/sambly/exchangeBot/internal/notification"
 
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/acme/autocert"

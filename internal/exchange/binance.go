@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"main/internal/model"
+	"github.com/sambly/exchangeBot/internal/model"
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/jpillora/backoff"

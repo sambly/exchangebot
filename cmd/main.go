@@ -3,20 +3,21 @@ package main
 import (
 	"context"
 	"log"
-	"main/internal/application"
-	"main/internal/config"
-	"main/internal/database"
-	"main/internal/exchange"
-	"main/internal/logging"
-	"main/internal/model"
-	"main/internal/notification"
-	"main/internal/telegram"
-	"main/internal/web"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/sambly/exchangeBot"
+	"github.com/sambly/exchangeBot/internal/application"
+	"github.com/sambly/exchangeBot/internal/config"
+	"github.com/sambly/exchangeBot/internal/database"
+	"github.com/sambly/exchangeBot/internal/exchange"
+	"github.com/sambly/exchangeBot/internal/logging"
+	"github.com/sambly/exchangeBot/internal/model"
+	"github.com/sambly/exchangeBot/internal/notification"
+	"github.com/sambly/exchangeBot/internal/telegram"
+	"github.com/sambly/exchangeBot/internal/web"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -96,7 +97,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	web := web.NewWeb(app, socketsMessage, config, Content)
+	web := web.NewWeb(app, socketsMessage, config, exchangeBot.Content)
 
 	g.Go(func() error {
 		return appTelegram.Start(gCtx)

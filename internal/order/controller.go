@@ -5,13 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"main/internal/database"
-	"main/internal/exchange"
-	"main/internal/logging"
-	"main/internal/model"
-	"main/internal/notification"
-	"main/internal/prices"
 	"sync"
+
+	"github.com/sambly/exchangeBot/internal/database"
+	"github.com/sambly/exchangeBot/internal/exchange"
+	"github.com/sambly/exchangeBot/internal/logging"
+	"github.com/sambly/exchangeBot/internal/model"
+	"github.com/sambly/exchangeBot/internal/notification"
+	"github.com/sambly/exchangeBot/internal/prices"
 )
 
 type Status string

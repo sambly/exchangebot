@@ -3,10 +3,11 @@ package web
 import (
 	"encoding/json"
 	"io"
-	"main/internal/model"
 	"net/http"
 	"os"
 	"strconv"
+
+	"github.com/sambly/exchangeBot/internal/model"
 
 	"github.com/gorilla/websocket"
 )

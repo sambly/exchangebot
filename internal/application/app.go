@@ -3,15 +3,16 @@ package application
 import (
 	"context"
 	"database/sql"
-	"main/internal/account"
-	"main/internal/exchange"
-	"main/internal/logging"
-	"main/internal/model"
-	"main/internal/notification"
-	"main/internal/order"
-	"main/internal/prices"
-	"main/internal/service"
 	"time"
+
+	"github.com/sambly/exchangeBot/internal/account"
+	"github.com/sambly/exchangeBot/internal/exchange"
+	"github.com/sambly/exchangeBot/internal/logging"
+	"github.com/sambly/exchangeBot/internal/model"
+	"github.com/sambly/exchangeBot/internal/notification"
+	"github.com/sambly/exchangeBot/internal/order"
+	"github.com/sambly/exchangeBot/internal/prices"
+	"github.com/sambly/exchangeBot/internal/service"
 
 	"golang.org/x/sync/errgroup"
 )

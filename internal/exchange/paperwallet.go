@@ -3,8 +3,9 @@ package exchange
 import (
 	"context"
 	"fmt"
-	"main/internal/model"
 	"sync"
+
+	"github.com/sambly/exchangeBot/internal/model"
 )
 
 type PaperWallet struct {
