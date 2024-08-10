@@ -36,6 +36,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
 
+      grpc_Host_Docker: ${grpc_Host_Docker}
       grpc_Host_Local: ${grpc_Host_Local}
       grpc_Port: ${grpc_Port}
 
