@@ -4,28 +4,27 @@ import (
 	"context"
 	"sync"
 
-	"github.com/sambly/exchangeBot/internal/model"
 	"github.com/sambly/exchangeBot/internal/notification"
 	"github.com/sambly/exchangeBot/internal/prices"
-	"github.com/sambly/exchangeBot/internal/service"
-
+	"github.com/sambly/exchangeService/pkg/exchange"
+	exModel "github.com/sambly/exchangeService/pkg/model"
 	"golang.org/x/exp/slices"
 )
 
 type Account struct {
 	sync.Mutex
-	exchange     service.Exchange
+	exchange     exchange.Exchange
 	Notification *notification.Notification
 	AssetPrices  *prices.AsetsPrices
-	AssetsKey    []string                // пары к USDT которые есть на на Spot, Flexible, Staking
-	Assets       map[string]*model.Asset // Сруктура пары к USDT
+	AssetsKey    []string                  // пары к USDT которые есть на на Spot, Flexible, Staking
+	Assets       map[string]*exModel.Asset // Сруктура пары к USDT
 }
 
-func NewAccount(exchange service.Exchange, assetPrices *prices.AsetsPrices, notification *notification.Notification) (*Account, error) {
+func NewAccount(exchange exchange.Exchange, assetPrices *prices.AsetsPrices, notification *notification.Notification) (*Account, error) {
 	acc := Account{
 		exchange:     exchange,
 		AssetsKey:    make([]string, 0),
-		Assets:       make(map[string]*model.Asset),
+		Assets:       make(map[string]*exModel.Asset),
 		AssetPrices:  assetPrices,
 		Notification: notification,
 	}
@@ -73,7 +72,7 @@ func (acc *Account) UpdateAssets() (err error) {
 	return nil
 }
 
-func (acc *Account) feederAssets(data []model.AssetData, typeData string) {
+func (acc *Account) feederAssets(data []exModel.AssetData, typeData string) {
 
 	for _, value := range data {
 
@@ -82,20 +81,20 @@ func (acc *Account) feederAssets(data []model.AssetData, typeData string) {
 			acc.AssetsKey = append(acc.AssetsKey, valueAsset)
 		}
 		if _, ok := acc.Assets[valueAsset]; !ok {
-			acc.Assets[valueAsset] = &model.Asset{Name: valueAsset}
+			acc.Assets[valueAsset] = &exModel.Asset{Name: valueAsset}
 		}
 		acc.Assets[valueAsset].On = true
 
 		if _, ok := acc.AssetPrices.MarketsStat[valueAsset]; ok {
 			acc.Assets[valueAsset].Price = acc.AssetPrices.MarketsStat[valueAsset].Price
 		}
-		assetData := &model.AssetData{
+		assetData := &exModel.AssetData{
 			AssetBase: valueAsset,
 			Amount:    value.Amount,
 			FullPrice: acc.Assets[valueAsset].Price * value.Amount,
 		}
 		if acc.Assets[valueAsset].CommonData == nil {
-			acc.Assets[valueAsset].CommonData = &model.AssetData{AssetBase: valueAsset, Amount: 0, FullPrice: 0}
+			acc.Assets[valueAsset].CommonData = &exModel.AssetData{AssetBase: valueAsset, Amount: 0, FullPrice: 0}
 		}
 
 		if typeData == "AssetSpot" {

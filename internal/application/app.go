@@ -6,13 +6,12 @@ import (
 	"time"
 
 	"github.com/sambly/exchangeBot/internal/account"
-	"github.com/sambly/exchangeBot/internal/exchange"
-	"github.com/sambly/exchangeBot/internal/logging"
 	"github.com/sambly/exchangeBot/internal/model"
 	"github.com/sambly/exchangeBot/internal/notification"
 	"github.com/sambly/exchangeBot/internal/order"
 	"github.com/sambly/exchangeBot/internal/prices"
-	"github.com/sambly/exchangeBot/internal/service"
+	"github.com/sambly/exchangeService/pkg/exchange"
+	exModel "github.com/sambly/exchangeService/pkg/model"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -21,8 +20,8 @@ type Application struct {
 	Settings model.Settings
 	database *sql.DB
 
-	exchange service.Exchange
-	dataFeed *exchange.DataFeedSubscription
+	exchange exchange.Exchange
+	dataFeed exchange.RouterDataFeed
 
 	Account         *account.Account
 	AssetsPrices    *prices.AsetsPrices
@@ -32,7 +31,7 @@ type Application struct {
 	BaseAmountAsset float64
 }
 
-func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings, db *sql.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage) (*Application, error) {
+func NewApp(ctx context.Context, exch exchange.Exchange, dataFeed exchange.RouterDataFeed, settings model.Settings, db *sql.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage) (*Application, error) {
 
 	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, settings.WeightProcents, db, notification)
 	account, err := account.NewAccount(exch, assetsPrices, notification)
@@ -48,7 +47,7 @@ func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings,
 	app := &Application{
 		Settings: settings,
 		exchange: exch,
-		dataFeed: exchange.NewDataFeed(exch, settings.Pairs),
+		dataFeed: dataFeed,
 		database: db,
 
 		AssetsPrices:    assetsPrices,
@@ -65,7 +64,8 @@ func NewApp(ctx context.Context, exch service.Exchange, settings model.Settings,
 
 func (app *Application) Run(ctx context.Context) error {
 
-	logging.MyLogger.InfoLog.Println("Ожидание предварительной загрузки данных")
+	// TODO
+	//logging.MyLogger.InfoLog.Println("Ожидание предварительной загрузки данных")
 
 	timeStart := time.Now()
 
@@ -96,19 +96,37 @@ func (app *Application) Run(ctx context.Context) error {
 	app.AssetsPrices.InitChangeDelta()
 
 	for _, pair := range app.Settings.Pairs {
-		app.dataFeed.Subscribe(pair, app.AssetsPrices.OnMarket)
-		app.dataFeed.Subscribe(pair, app.OrderController.OnMarket)
+
+		app.dataFeed.SubscribeTrade(ctx, pair, "exchangeBot")
+		err := app.dataFeed.SubscribeObserverMarkets(ctx, "exchangeBot", pair, func(market exModel.MarketsStat) {
+			app.AssetsPrices.OnMarket(market)
+		})
+		if err != nil {
+			// TODO
+			// appLogger.Errorf("error SubscribeObserverMarket: %v", err)
+		}
+		err = app.dataFeed.SubscribeObserverMarkets(ctx, "exchangeBot", pair, func(market exModel.MarketsStat) {
+			app.OrderController.OnMarket(market)
+		})
+		if err != nil {
+			// TODO
+			// appLogger.Errorf("error SubscribeObserverMarket: %v", err)
+		}
+
 	}
 
 	duration := time.Since(timeStart)
 
-	logging.MyLogger.InfoLog.Println("Время выполнения предварительной загрузки данных: ", duration)
-	logging.MyLogger.InfoLog.Println("Время старта: ", timeStart)
+	_ = duration
+
+	// TODO
+	//logging.MyLogger.InfoLog.Println("Время выполнения предварительной загрузки данных: ", duration)
+	//logging.MyLogger.InfoLog.Println("Время старта: ", timeStart)
 
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return app.dataFeed.Start(ctx)
+		return app.dataFeed.StartMarketsStatFeeder(ctx)
 	})
 
 	//Для предварительного заполения цен всех пар, может сделать меньше время, просто добавляет погрешность для 10m

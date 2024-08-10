@@ -2,11 +2,15 @@ version: '3.8'
 
 services:
   exchange_app:
-    build: .
-    volumes:
-      - ./log:/log
+    build:
+      context: .
+      args:
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
+        ENVIRONMENT: docker
     ports:
-      - "8080:80"  # Проброс порта 80 в контейнере на порт 8080 на хосте
+      - "8080:80" 
+    volumes:
+      - ./log:/app/log 
     environment:
       ENVIRONMENT: docker
 
@@ -31,6 +35,13 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
+
+      grpc_Host_Local: ${grpc_Host_Local}
+      grpc_Port: ${grpc_Port}
+
+      productionLog: ${productionLog}
+      debugLog: ${debugLog}
+
     depends_on:
       - mysql
 

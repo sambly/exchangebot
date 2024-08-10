@@ -3,13 +3,11 @@ package web
 import (
 	"context"
 	"embed"
-	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/sambly/exchangeBot/internal/application"
 	"github.com/sambly/exchangeBot/internal/config"
-	"github.com/sambly/exchangeBot/internal/logging"
 	"github.com/sambly/exchangeBot/internal/notification"
 
 	"github.com/gorilla/websocket"
@@ -48,13 +46,13 @@ func (c *Sockets) SendDataRun(ctx context.Context) {
 				for conn := range c.clients {
 					err := conn.WriteMessage(websocket.TextMessage, mes)
 					if err != nil {
-						logging.MyLogger.ErrorOut(fmt.Errorf("error writing message to websocket: %v", err))
+						// TODOlogging.MyLogger.ErrorOut(fmt.Errorf("error writing message to websocket: %v", err))
 						conn.Close()
 						delete(c.clients, conn)
 					}
 				}
 			case <-ctx.Done():
-				logging.MyLogger.InfoLog.Println("Shutting down socket message processing")
+				// TODOlogging.MyLogger.InfoLog.Println("Shutting down socket message processing")
 				return
 			}
 		}
@@ -106,23 +104,23 @@ func (w *Web) Run(ctx context.Context) error {
 		// Завершение работы сервера
 		stopErr := w.stop()
 		if stopErr != nil {
-			logging.MyLogger.ErrorOut(fmt.Errorf("ошибка при завершении работы HTTP-сервера: %v", stopErr))
+			// TODOlogging.MyLogger.ErrorOut(fmt.Errorf("ошибка при завершении работы HTTP-сервера: %v", stopErr))
 			err = stopErr
 		}
 	case serverErr := <-serverErrChan:
 		if serverErr != nil {
-			logging.MyLogger.ErrorOut(fmt.Errorf("произошла ошибка во время работы сервера: %v", err))
+			// TODOlogging.MyLogger.ErrorOut(fmt.Errorf("произошла ошибка во время работы сервера: %v", err))
 			err = serverErr
 		}
 	}
-	logging.MyLogger.InfoLog.Println("HTTP сервер завершен")
+	// TODOlogging.MyLogger.InfoLog.Println("HTTP сервер завершен")
 
 	return err
 }
 
 func (w *Web) runProductionServer() error {
 
-	logging.MyLogger.InfoLog.Println("Запуск сервера: production")
+	// TODOlogging.MyLogger.InfoLog.Println("Запуск сервера: production")
 
 	certManager := &autocert.Manager{
 		Cache:      autocert.DirCache("certs"),
@@ -145,7 +143,7 @@ func (w *Web) runProductionServer() error {
 
 func (w *Web) runNginxServer() error {
 
-	logging.MyLogger.InfoLog.Println("Запуск сервера: inProductionWithFrontedNgingx")
+	// TODOlogging.MyLogger.InfoLog.Println("Запуск сервера: inProductionWithFrontedNgingx")
 
 	srv := &http.Server{
 		Addr:    ":" + w.productionPort,
@@ -157,7 +155,7 @@ func (w *Web) runNginxServer() error {
 
 func (w *Web) runLocalServer() error {
 
-	logging.MyLogger.InfoLog.Println("Запуск сервера: local")
+	// TODOlogging.MyLogger.InfoLog.Println("Запуск сервера: local")
 
 	srv := &http.Server{
 		Addr:    ":80",
@@ -171,7 +169,7 @@ func (w *Web) stop() error {
 	ctxShutdown, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()
 	if err := w.server.Shutdown(ctxShutdown); err != nil {
-		logging.MyLogger.ErrorOut(fmt.Errorf("ошибка при завершении работы HTTP-сервера: %v", err))
+		// TODOlogging.MyLogger.ErrorOut(fmt.Errorf("ошибка при завершении работы HTTP-сервера: %v", err))
 		return err
 	}
 	return nil

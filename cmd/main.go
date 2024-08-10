@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -12,24 +13,31 @@ import (
 	"github.com/sambly/exchangeBot/internal/application"
 	"github.com/sambly/exchangeBot/internal/config"
 	"github.com/sambly/exchangeBot/internal/database"
-	"github.com/sambly/exchangeBot/internal/exchange"
-	"github.com/sambly/exchangeBot/internal/logging"
+	"github.com/sambly/exchangeBot/internal/logger"
 	"github.com/sambly/exchangeBot/internal/model"
 	"github.com/sambly/exchangeBot/internal/notification"
 	"github.com/sambly/exchangeBot/internal/telegram"
 	"github.com/sambly/exchangeBot/internal/web"
+	"github.com/sambly/exchangeService/pkg/exchange"
+	"github.com/sambly/exchangeService/pkg/logadapter"
 	"golang.org/x/sync/errgroup"
 )
 
 func main() {
 
-	logging.InitLogger()
-	logging.MyLogger.InfoLog.Println("Запуск приложения")
-
 	config, err := config.NewConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
+	logger.InitLogger(config.DebugLog, config.Production)
+
+	mainLogger := logger.AddFields(map[string]interface{}{
+		"package": "main",
+		"module":  "main",
+	})
+
+	mainLogger.Info("запуск приложения exchangebot-app")
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(config.ApiKey, config.SecretKey))
@@ -40,8 +48,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	logging.MyLogger.InfoLog.Println("Колличество пар : ", len(pairs))
 
 	periods := map[string]time.Duration{
 		"1m":  time.Second * 60,
@@ -79,11 +85,22 @@ func main() {
 	notify := &notification.Notification{Message: make(chan string)}
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
-	g, gCtx := errgroup.WithContext(ctx)
+	c, conn, err := exchange.NewClientGrpc(fmt.Sprintf("%s:%s", config.GrpcHost, config.GrpcPort))
+	if err != nil {
+		mainLogger.Fatalf("did not connect to grpc: %v", err)
+	}
+
+	defer conn.Close()
+
+	dataFeed := exchange.NewDataFeed(
+		c,
+		logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()),
+	)
 
 	app, err := application.NewApp(
 		ctx,
 		binance,
+		dataFeed,
 		settings,
 		db,
 		notify,
@@ -99,6 +116,8 @@ func main() {
 	}
 	web := web.NewWeb(app, socketsMessage, config, exchangeBot.Content)
 
+	g, gCtx := errgroup.WithContext(ctx)
+
 	g.Go(func() error {
 		return appTelegram.Start(gCtx)
 	})
@@ -111,8 +130,8 @@ func main() {
 		return app.Run(gCtx)
 	})
 	if err := g.Wait(); err != nil && gCtx.Err() != context.Canceled {
-		log.Fatalf("Приложение завершено с ошибкой: %v", err)
+		mainLogger.Fatalf("приложение exchangebot-app завершено с ошибкой: %v", err)
 	} else {
-		logging.MyLogger.InfoLog.Println("Приложение завершено")
+		mainLogger.Info("приложение exchangebot-app завершено")
 	}
 }

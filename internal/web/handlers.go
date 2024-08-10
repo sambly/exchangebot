@@ -7,9 +7,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/sambly/exchangeBot/internal/model"
-
 	"github.com/gorilla/websocket"
+	exModel "github.com/sambly/exchangeService/pkg/model"
 )
 
 var upgrader = websocket.Upgrader{
@@ -98,7 +97,7 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 
 	bodyByte, _ := io.ReadAll(r.Body)
 
-	deal := model.Deal{}
+	deal := exModel.Deal{}
 
 	if err := json.Unmarshal(bodyByte, &deal); err != nil {
 		web.logError(err)
@@ -136,9 +135,9 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 func (web *Web) closeAllDeal(w http.ResponseWriter, r *http.Request) {
 
 	// Делаем глубокую копию OrdersActive
-	OrdersActiveCopy := make(map[string][]*model.Order)
+	OrdersActiveCopy := make(map[string][]*exModel.Order)
 	for key, value := range web.App.PaperWallet.OrdersActive {
-		OrdersActiveCopy[key] = make([]*model.Order, len(value))
+		OrdersActiveCopy[key] = make([]*exModel.Order, len(value))
 		for i, order := range value {
 			// Делаем копию каждого элемента
 			orderCopy := *order

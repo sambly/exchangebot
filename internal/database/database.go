@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sambly/exchangeBot/internal/model"
+	"github.com/sambly/exchangeService/pkg/model"
+	exModel "github.com/sambly/exchangeService/pkg/model"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -52,7 +53,7 @@ func DbConnection(dbname, hostname, port, username, password string) (*sql.DB, e
 	return db, nil
 }
 
-func InsertCandlesTables(db *sql.DB, candle model.Candle) error {
+func InsertCandlesTables(db *sql.DB, candle exModel.Candle) error {
 
 	query := "INSERT INTO candles (Time,Pair,Open,Close,High,Low,Volume) VALUES (?,?,?,?,?,?,?)"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
@@ -84,7 +85,7 @@ func InsertCandlesTables(db *sql.DB, candle model.Candle) error {
 	return nil
 }
 
-func SelectCandlesTable(db *sql.DB) ([]model.Candle, error) {
+func SelectCandlesTable(db *sql.DB) ([]exModel.Candle, error) {
 
 	query := "select Time,Pair,Open,Close,Low,High,Volume,QuoteVolume,AmountTrade,AmountTradeBuy,ActiveBuyVolume from candlesch1m;"
 
@@ -101,9 +102,9 @@ func SelectCandlesTable(db *sql.DB) ([]model.Candle, error) {
 	}
 	defer rows.Close()
 
-	candles := []model.Candle{}
+	candles := []exModel.Candle{}
 	for rows.Next() {
-		candle := model.Candle{}
+		candle := exModel.Candle{}
 		if err := rows.Scan(
 			&candle.Time,
 			&candle.Pair,
@@ -159,9 +160,9 @@ func CreateOrdersTable(db *sql.DB) error {
 	return nil
 }
 
-func Orders(db *sql.DB) ([]*model.Order, error) {
+func Orders(db *sql.DB) ([]*exModel.Order, error) {
 
-	orders := []*model.Order{}
+	orders := []*exModel.Order{}
 
 	query := "select * from orders;"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
@@ -178,7 +179,7 @@ func Orders(db *sql.DB) ([]*model.Order, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var order model.Order
+		var order exModel.Order
 		if err := rows.Scan(
 			&order.ID,
 			&order.TimeCreated,
@@ -202,7 +203,7 @@ func Orders(db *sql.DB) ([]*model.Order, error) {
 	return orders, nil
 }
 
-func CreateOrder(db *sql.DB, order *model.Order) (int64, error) {
+func CreateOrder(db *sql.DB, order *exModel.Order) (int64, error) {
 
 	query := "INSERT INTO orders (TimeCreated,Time,Pair,Side,Type,Status,PriceCreated,Price,Quantity,Profit) VALUES (?,?,?,?,?,?,?,?,?,?)"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
@@ -241,7 +242,7 @@ func CreateOrder(db *sql.DB, order *model.Order) (int64, error) {
 	return id, nil
 }
 
-func ClosePosition(db *sql.DB, order *model.Order, id int64) error {
+func ClosePosition(db *sql.DB, order *exModel.Order, id int64) error {
 
 	query := "UPDATE orders SET Time=?,Status=?,Price=?,Profit=? WHERE ID=?"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
@@ -329,9 +330,9 @@ func InsertOrdersInfoTable(db *sql.DB, idOrder int64, frame, strategy, comment s
 	return nil
 }
 
-func SelectMarketStateTime(db *sql.DB, pair string, timeRounding time.Time) (model.Candle, error) {
+func SelectMarketStateTime(db *sql.DB, pair string, timeRounding time.Time) (exModel.Candle, error) {
 
-	candle := model.Candle{}
+	candle := exModel.Candle{}
 
 	query := "select Close,Volume from candles WHERE Pair = ? and Time = ?;"
 
@@ -359,8 +360,8 @@ func SelectMarketStateTime(db *sql.DB, pair string, timeRounding time.Time) (mod
 
 }
 
-func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]model.Candle, error) {
-	candles := []model.Candle{}
+func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]exModel.Candle, error) {
+	candles := []exModel.Candle{}
 
 	query := "SELECT Time, Pair, Close, Volume,ActiveBuyVolume,AmountTrade,AmountTradeBuy FROM candlesch1m WHERE Time >= ? ORDER BY Time DESC;"
 
@@ -379,7 +380,7 @@ func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]model.Candle
 	defer rows.Close()
 
 	for rows.Next() {
-		var candle model.Candle
+		var candle exModel.Candle
 		if err := rows.Scan(&candle.Time,
 			&candle.Pair,
 			&candle.Close,
@@ -401,8 +402,8 @@ func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]model.Candle
 	return candles, nil
 }
 
-func SelectDeltaPeriod(db *sql.DB, pair string, period string) ([]model.ChangeDeltaForCandle, error) {
-	candles := []model.ChangeDeltaForCandle{}
+func SelectDeltaPeriod(db *sql.DB, pair string, period string) ([]exModel.ChangeDeltaForCandle, error) {
+	candles := []exModel.ChangeDeltaForCandle{}
 
 	maping := map[string]string{
 		"1m":  "ch1m",

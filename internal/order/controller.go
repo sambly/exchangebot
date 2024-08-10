@@ -4,15 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"sync"
 
 	"github.com/sambly/exchangeBot/internal/database"
-	"github.com/sambly/exchangeBot/internal/exchange"
-	"github.com/sambly/exchangeBot/internal/logging"
-	"github.com/sambly/exchangeBot/internal/model"
 	"github.com/sambly/exchangeBot/internal/notification"
 	"github.com/sambly/exchangeBot/internal/prices"
+	"github.com/sambly/exchangeService/pkg/exchange"
+	exModel "github.com/sambly/exchangeService/pkg/model"
 )
 
 type Status string
@@ -43,12 +41,12 @@ func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, so
 	}
 	countOrdersActive := 0
 	for _, order := range orders {
-		if order.Status == model.OrderStatusTypeActive {
+		if order.Status == exModel.OrderStatusTypeActive {
 			ex.AddOrderActive(order)
 			countOrdersActive += 1
 		}
 
-		if order.Status == model.OrderStatusTypeClose {
+		if order.Status == exModel.OrderStatusTypeClose {
 			ex.AddOrderHistory(order)
 		}
 
@@ -59,18 +57,18 @@ func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, so
 
 }
 
-func (c *Controller) CreateOrderMarket(deal model.Deal, size float64) (*model.Order, error) {
+func (c *Controller) CreateOrderMarket(deal exModel.Deal, size float64) (*exModel.Order, error) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
 	pair := deal.Pair
 
-	var sideType model.SideType
+	var sideType exModel.SideType
 	if deal.SideType == "buy" {
-		sideType = model.SideTypeBuy
+		sideType = exModel.SideTypeBuy
 	}
 	if deal.SideType == "sell" {
-		sideType = model.SideTypeSell
+		sideType = exModel.SideTypeSell
 	}
 
 	order, err := c.exchange.CreateOrderMarket(sideType, pair, size)
@@ -90,20 +88,24 @@ func (c *Controller) CreateOrderMarket(deal model.Deal, size float64) (*model.Or
 
 	mkStatJson, err := json.Marshal(mkStat)
 	if err != nil {
-		logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal mkStatJson : %v", err))
+		//TODO
+		//logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal mkStatJson : %v", err))
 	}
 	chDataJson, err := json.Marshal(chData)
 	if err != nil {
-		logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal chDataJson : %v", err))
+		//TODO
+		//logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal chDataJson : %v", err))
 	}
 	dFastJson, err := json.Marshal(dFast)
 	if err != nil {
-		logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal dFastJson : %v", err))
+		//TODO
+		//logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal dFastJson : %v", err))
 	}
 
 	err = database.InsertOrdersInfoTable(c.database, id, deal.Frame, deal.Strategy, deal.Comment, mkStatJson, chDataJson, dFastJson)
 	if err != nil {
-		logging.MyLogger.ErrorOut(fmt.Errorf("error when create order and add insertinfotables : %v", err))
+		//TODO
+		//logging.MyLogger.ErrorOut(fmt.Errorf("error when create order and add insertinfotables : %v", err))
 	}
 
 	return order, err
@@ -125,7 +127,8 @@ func (c *Controller) ClosePosition(id int64) error {
 	return nil
 }
 
-func (c *Controller) OnMarket(ms model.MarketsStat) {
+// TODO добавить ctx
+func (c *Controller) OnMarket(ms exModel.MarketsStat) {
 
 	// Обновление ордеров
 
@@ -133,10 +136,10 @@ func (c *Controller) OnMarket(ms model.MarketsStat) {
 
 		for _, order := range c.exchange.OrdersActive[ms.Pair] {
 			order.Price = ms.Price
-			if order.Side == model.SideTypeBuy {
+			if order.Side == exModel.SideTypeBuy {
 				order.Profit = (ms.Price / order.PriceCreated * 100) - 100
 			}
-			if order.Side == model.SideTypeSell {
+			if order.Side == exModel.SideTypeSell {
 				order.Profit = (order.PriceCreated / ms.Price * 100) - 100
 			}
 			// Обновления цены webSocket

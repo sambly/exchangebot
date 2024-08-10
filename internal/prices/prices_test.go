@@ -8,7 +8,7 @@ import (
 
 	"github.com/sambly/exchangeBot/internal/config"
 	"github.com/sambly/exchangeBot/internal/database"
-	"github.com/sambly/exchangeBot/internal/exchange"
+	"github.com/sambly/exchangeService/pkg/exchange"
 )
 
 func TestUpdateDeltaFullData(t *testing.T) {

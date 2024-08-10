@@ -37,6 +37,14 @@ type Config struct {
 	HostDb     string
 	PortDb     string
 	UserDb     string
+
+	// Log
+	DebugLog      bool
+	ProductionLog bool
+
+	// GRPC
+	GrpcHost string
+	GrpcPort string
 }
 
 func loadEnv(projectDirName string) error {
@@ -62,13 +70,21 @@ func NewConfig() (*Config, error) {
 	inProductionOnlyApp := false
 	inProductionWithFrontedNgingx := false
 
+	productionLog := false
+	debugLog := false
+
 	var hostDb string
+	var hostGrpc string
 
 	if os.Getenv("ENVIRONMENT") == "docker" {
 		var exists bool
 		hostDb, exists = os.LookupEnv("DB_HOST_Docker")
 		if !exists {
 			return nil, fmt.Errorf("no .env str DB_HOST_Docker  found")
+		}
+		hostGrpc, exists = os.LookupEnv("grpc_Host_Docker")
+		if !exists {
+			return nil, fmt.Errorf("no .env str grpc_Host_Docker  found")
 		}
 
 	} else {
@@ -79,6 +95,11 @@ func NewConfig() (*Config, error) {
 		hostDb, exists = os.LookupEnv("DB_HOST_Local")
 		if !exists {
 			return nil, fmt.Errorf("no .env str DB_HOST_Local  found")
+		}
+
+		hostGrpc, exists = os.LookupEnv("grpc_Host_Local")
+		if !exists {
+			return nil, fmt.Errorf("no .env str grpc_Host_Local  found")
 		}
 	}
 
@@ -164,6 +185,27 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("no .env str DB_USER found")
 	}
 
+	productionLogString, exists := os.LookupEnv("productionLog")
+	if !exists {
+		return nil, fmt.Errorf("no .env str productionLog found")
+	}
+	if productionLogString == "true" {
+		productionLog = true
+	}
+
+	debugLogString, exists := os.LookupEnv("debugLog")
+	if !exists {
+		return nil, fmt.Errorf("no .env str debugLog found")
+	}
+	if debugLogString == "true" {
+		debugLog = true
+	}
+
+	grpcPort, exists := os.LookupEnv("grpc_Port")
+	if !exists {
+		return nil, fmt.Errorf("no .env str grpc_Port  found")
+	}
+
 	c := &Config{
 
 		// config app
@@ -193,6 +235,14 @@ func NewConfig() (*Config, error) {
 		HostDb:     hostDb,
 		PortDb:     portDb,
 		UserDb:     userDb,
+
+		// Log
+		ProductionLog: productionLog,
+		DebugLog:      debugLog,
+
+		// GRPC
+		GrpcHost: hostGrpc,
+		GrpcPort: grpcPort,
 	}
 	return c, nil
 }

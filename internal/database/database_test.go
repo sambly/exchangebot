@@ -5,7 +5,8 @@ import (
 	"time"
 
 	"github.com/sambly/exchangeBot/internal/config"
-	"github.com/sambly/exchangeBot/internal/model"
+
+	exModel "github.com/sambly/exchangeService/pkg/model"
 )
 
 func TestSelectCandlesTable(t *testing.T) {
@@ -46,7 +47,7 @@ func TestCreateOrder(t *testing.T) {
 	}
 
 	var time time.Time
-	order := &model.Order{
+	order := &exModel.Order{
 		TimeCreated: time,
 		Time:        time,
 		Pair:        "BTCUSDT",

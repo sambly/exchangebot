@@ -2,15 +2,14 @@ package prices
 
 import (
 	"database/sql"
-	"fmt"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/sambly/exchangeBot/internal/database"
-	"github.com/sambly/exchangeBot/internal/logging"
-	"github.com/sambly/exchangeBot/internal/model"
 	"github.com/sambly/exchangeBot/internal/notification"
+
+	exModel "github.com/sambly/exchangeService/pkg/model"
 )
 
 type ChangePrices struct {
@@ -56,7 +55,7 @@ type AsetsPrices struct {
 
 	// Актуальные данные для каждой пары. Price, 24ch, Volume
 	MarketsStatMu sync.RWMutex
-	MarketsStat   map[string]*model.MarketsStat
+	MarketsStat   map[string]*exModel.MarketsStat
 
 	ChangePricesMu      sync.RWMutex
 	ChangePrices        map[string]map[string]*ChangePrices
@@ -74,7 +73,7 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 		PeriodsDelta:   periodsDelta,
 		WeightProcents: weightProcents,
 
-		MarketsStat: make(map[string]*model.MarketsStat),
+		MarketsStat: make(map[string]*exModel.MarketsStat),
 
 		ChangePrices:        make(map[string]map[string]*ChangePrices),
 		ChangePricesDataset: make(map[string]map[string]*ChangePricesDataset),
@@ -87,7 +86,7 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 	}
 
 	for _, pair := range pairs {
-		asetsPrices.MarketsStat[pair] = &model.MarketsStat{Pair: pair}
+		asetsPrices.MarketsStat[pair] = &exModel.MarketsStat{Pair: pair}
 
 		asetsPrices.ChangePrices[pair] = map[string]*ChangePrices{}
 		asetsPrices.ChangePricesDataset[pair] = map[string]*ChangePricesDataset{}
@@ -106,13 +105,14 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 	return asetsPrices
 }
 
-func (ap *AsetsPrices) OnMarket(ms model.MarketsStat) {
+// TODO Добавить ctx возможно
+func (ap *AsetsPrices) OnMarket(ms exModel.MarketsStat) {
 
 	ap.MarketsStatMu.Lock()
 	defer ap.MarketsStatMu.Unlock()
 
 	if _, ok := ap.MarketsStat[ms.Pair]; !ok {
-		ap.MarketsStat[ms.Pair] = &model.MarketsStat{}
+		ap.MarketsStat[ms.Pair] = &exModel.MarketsStat{}
 	}
 	ap.MarketsStat[ms.Pair].Pair = ms.Pair
 	ap.MarketsStat[ms.Pair].Price = ms.Price
@@ -133,7 +133,8 @@ func (ap *AsetsPrices) OnMarket(ms model.MarketsStat) {
 			// Ожидание пока данные запишутся в базу данных, потом мы считаем новые значения
 			time.Sleep(10 * time.Second)
 			if err := ap.UpdateChangeDelta(); err != nil {
-				logging.MyLogger.ErrorOut(fmt.Errorf("error in updateDelta: %v", err))
+				// TODO
+				//logging.MyLogger.ErrorOut(fmt.Errorf("error in updateDelta: %v", err))
 			}
 		}()
 	}
@@ -154,19 +155,19 @@ func (ap *AsetsPrices) InitChangePrices() {
 
 	candles, err := database.SelectMarketStateTimev2(ap.database, timeRoundingMax)
 	if err != nil {
-		logging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
+		//logging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
 		return
 	}
 
 	if len(candles) == 0 {
-		logging.MyLogger.InfoLog.Println("Нет свечей")
+		// TODO logging.MyLogger.InfoLog.Println("Нет свечей")
 		return
 	}
 
 	// candles[0] -самый актуальный candle
 	// сравнение времени candle с текущим временем
 	if candles[0].Time.Sub(ap.UpdateTime) > 10*time.Minute {
-		logging.MyLogger.InfoLog.Println("В базе данных отсутствуют данные за период, горячий перезапуск не удался")
+		// TODO logging.MyLogger.InfoLog.Println("В базе данных отсутствуют данные за период, горячий перезапуск не удался")
 		return
 	}
 
@@ -220,19 +221,19 @@ func (ap *AsetsPrices) InitChangeDelta() {
 	timeRoundingMax := ap.UpdateTime.Add(-max * 2)
 	candles, err := database.SelectMarketStateTimev2(ap.database, timeRoundingMax)
 	if err != nil {
-		logging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
+		// TODOlogging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
 		return
 	}
 
 	if len(candles) == 0 {
-		logging.MyLogger.InfoLog.Println("Нет свечей")
+		// TODOlogging.MyLogger.InfoLog.Println("Нет свечей")
 		return
 	}
 
 	// candles[0] -самый актуальный candle
 	// сравнение времени candle с текущим временем
 	if candles[0].Time.Sub(ap.UpdateTime) > 10*time.Minute {
-		logging.MyLogger.InfoLog.Println("В базе данных отсутствуют данные за период, горячий перезапуск не удался")
+		// TODOlogging.MyLogger.InfoLog.Println("В базе данных отсутствуют данные за период, горячий перезапуск не удался")
 		return
 	}
 
@@ -317,7 +318,8 @@ func (ap *AsetsPrices) UpdateChangePrices() {
 		}
 	}
 	duration := time.Since(timeStart)
-	logging.MyLogger.InfoLog.Println("Время выполнения UpdateChanges: ", duration)
+	_ = duration
+	// TODOlogging.MyLogger.InfoLog.Println("Время выполнения UpdateChanges: ", duration)
 }
 
 func (ap *AsetsPrices) UpdateChangeDelta() error {
@@ -326,7 +328,7 @@ func (ap *AsetsPrices) UpdateChangeDelta() error {
 
 	candles, err := database.SelectMarketStateTimev2(ap.database, ap.UpdateTime.Add(-1*time.Minute))
 	if err != nil {
-		logging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
+		// TODOlogging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
 		return err
 	}
 
@@ -402,7 +404,8 @@ func (ap *AsetsPrices) UpdateChangeDelta() error {
 	}
 
 	duration := time.Since(timeStart)
-	logging.MyLogger.InfoLog.Println("Время выполнения UpdateChangeDelta: ", duration)
+	_ = duration
+	// TODOlogging.MyLogger.InfoLog.Println("Время выполнения UpdateChangeDelta: ", duration)
 	return nil
 }
 
@@ -420,21 +423,21 @@ func (ap *AsetsPrices) GetAllChDelta() map[string]map[string]*ChangeDelta {
 	return ap.ChangeDelta
 }
 
-func (ap *AsetsPrices) GetAllMarketsStat() map[string]*model.MarketsStat {
+func (ap *AsetsPrices) GetAllMarketsStat() map[string]*exModel.MarketsStat {
 	ap.MarketsStatMu.RLock()
 	defer ap.MarketsStatMu.RUnlock()
 
 	return ap.MarketsStat
 }
 
-func (ap *AsetsPrices) GetMarketsStatForPair(pair string) *model.MarketsStat {
+func (ap *AsetsPrices) GetMarketsStatForPair(pair string) *exModel.MarketsStat {
 	ap.MarketsStatMu.RLock()
 	defer ap.MarketsStatMu.RUnlock()
 
 	return ap.MarketsStat[pair]
 }
 
-func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDeltaForCandle, error) {
+func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]exModel.ChangeDeltaForCandle, error) {
 
 	timeStart := time.Now()
 
@@ -443,7 +446,7 @@ func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDeltaF
 		return nil, err
 	}
 
-	clearChangeDelta := []model.ChangeDeltaForCandle{}
+	clearChangeDelta := []exModel.ChangeDeltaForCandle{}
 
 	if len(changeDelta) > 0 {
 		clearChangeDelta = append(clearChangeDelta, changeDelta[0])
@@ -462,7 +465,8 @@ func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDeltaF
 			clearChangeDelta = append(clearChangeDelta, changeDelta[i])
 		}
 		duration := time.Since(timeStart)
-		logging.MyLogger.InfoLog.Println("Время выполнения GetDeltaPeriod: ", duration)
+		_ = duration
+		// TODOlogging.MyLogger.InfoLog.Println("Время выполнения GetDeltaPeriod: ", duration)
 	}
 
 	return clearChangeDelta, nil
