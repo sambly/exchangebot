@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/sambly/exchangeBot/internal/database"
+	"github.com/sambly/exchangeBot/internal/logger"
 	"github.com/sambly/exchangeBot/internal/notification"
 	"github.com/sambly/exchangeBot/internal/prices"
 	"github.com/sambly/exchangeService/pkg/exchange"
@@ -24,6 +25,8 @@ type Controller struct {
 	assetsPrices   *prices.AsetsPrices
 	socketsMessage *notification.SocketsMessage
 }
+
+var ctrLogger = logger.AddFieldsEmpty()
 
 func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, socketsMessage *notification.SocketsMessage, assetsPrices *prices.AsetsPrices) (*Controller, error) {
 
@@ -88,24 +91,20 @@ func (c *Controller) CreateOrderMarket(deal exModel.Deal, size float64) (*exMode
 
 	mkStatJson, err := json.Marshal(mkStat)
 	if err != nil {
-		//TODO
-		//logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal mkStatJson : %v", err))
+		ctrLogger.Errorf("error jsonmarshal mkStatJson : %v", err)
 	}
 	chDataJson, err := json.Marshal(chData)
 	if err != nil {
-		//TODO
-		//logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal chDataJson : %v", err))
+		ctrLogger.Errorf("error jsonmarshal chDataJson : %v", err)
 	}
 	dFastJson, err := json.Marshal(dFast)
 	if err != nil {
-		//TODO
-		//logging.MyLogger.ErrorOut(fmt.Errorf("error jsonmarshal dFastJson : %v", err))
+		ctrLogger.Errorf("error jsonmarshal dFastJson : %v", err)
 	}
 
 	err = database.InsertOrdersInfoTable(c.database, id, deal.Frame, deal.Strategy, deal.Comment, mkStatJson, chDataJson, dFastJson)
 	if err != nil {
-		//TODO
-		//logging.MyLogger.ErrorOut(fmt.Errorf("error when create order and add insertinfotables : %v", err))
+		ctrLogger.Errorf("error when create order and add insertinfotables : %v", err)
 	}
 
 	return order, err

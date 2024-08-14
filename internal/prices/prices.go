@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/sambly/exchangeBot/internal/database"
+	"github.com/sambly/exchangeBot/internal/logger"
 	"github.com/sambly/exchangeBot/internal/notification"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
@@ -65,6 +66,8 @@ type AsetsPrices struct {
 	ChangeDelta        map[string]map[string]*ChangeDelta
 	ChangeDeltaDataset map[string]map[string]*ChangeDeltaDataset
 }
+
+var pricesLogger = logger.AddFieldsEmpty()
 
 func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time.Duration, weightProcents map[string]float64, db *sql.DB, notification *notification.Notification) *AsetsPrices {
 	asetsPrices := &AsetsPrices{
@@ -133,8 +136,7 @@ func (ap *AsetsPrices) OnMarket(ms exModel.MarketsStat) {
 			// Ожидание пока данные запишутся в базу данных, потом мы считаем новые значения
 			time.Sleep(10 * time.Second)
 			if err := ap.UpdateChangeDelta(); err != nil {
-				// TODO
-				//logging.MyLogger.ErrorOut(fmt.Errorf("error in updateDelta: %v", err))
+				pricesLogger.Errorf("error in updateDelta: %v", err)
 			}
 		}()
 	}
@@ -155,19 +157,19 @@ func (ap *AsetsPrices) InitChangePrices() {
 
 	candles, err := database.SelectMarketStateTimev2(ap.database, timeRoundingMax)
 	if err != nil {
-		//logging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
+		pricesLogger.Errorf("error SelectMarketStateTimev2: %v", err)
 		return
 	}
 
 	if len(candles) == 0 {
-		// TODO logging.MyLogger.InfoLog.Println("Нет свечей")
+		pricesLogger.Info("Нет свечей")
 		return
 	}
 
 	// candles[0] -самый актуальный candle
 	// сравнение времени candle с текущим временем
 	if candles[0].Time.Sub(ap.UpdateTime) > 10*time.Minute {
-		// TODO logging.MyLogger.InfoLog.Println("В базе данных отсутствуют данные за период, горячий перезапуск не удался")
+		pricesLogger.Info("В базе данных отсутствуют данные за период, горячий перезапуск не удался")
 		return
 	}
 
@@ -221,19 +223,19 @@ func (ap *AsetsPrices) InitChangeDelta() {
 	timeRoundingMax := ap.UpdateTime.Add(-max * 2)
 	candles, err := database.SelectMarketStateTimev2(ap.database, timeRoundingMax)
 	if err != nil {
-		// TODOlogging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
+		pricesLogger.Errorf("error SelectMarketStateTimev2: %v", err)
 		return
 	}
 
 	if len(candles) == 0 {
-		// TODOlogging.MyLogger.InfoLog.Println("Нет свечей")
+		pricesLogger.Info("Нет свечей")
 		return
 	}
 
 	// candles[0] -самый актуальный candle
 	// сравнение времени candle с текущим временем
 	if candles[0].Time.Sub(ap.UpdateTime) > 10*time.Minute {
-		// TODOlogging.MyLogger.InfoLog.Println("В базе данных отсутствуют данные за период, горячий перезапуск не удался")
+		pricesLogger.Info("В базе данных отсутствуют данные за период, горячий перезапуск не удался")
 		return
 	}
 
@@ -318,8 +320,8 @@ func (ap *AsetsPrices) UpdateChangePrices() {
 		}
 	}
 	duration := time.Since(timeStart)
-	_ = duration
-	// TODOlogging.MyLogger.InfoLog.Println("Время выполнения UpdateChanges: ", duration)
+
+	pricesLogger.Infof("Время выполнения UpdateChanges: %v ", duration)
 }
 
 func (ap *AsetsPrices) UpdateChangeDelta() error {
@@ -328,7 +330,7 @@ func (ap *AsetsPrices) UpdateChangeDelta() error {
 
 	candles, err := database.SelectMarketStateTimev2(ap.database, ap.UpdateTime.Add(-1*time.Minute))
 	if err != nil {
-		// TODOlogging.MyLogger.ErrorOut(fmt.Errorf("error SelectMarketStateTimev2: %v", err))
+		pricesLogger.Errorf("error SelectMarketStateTimev2: %v", err)
 		return err
 	}
 
@@ -404,8 +406,8 @@ func (ap *AsetsPrices) UpdateChangeDelta() error {
 	}
 
 	duration := time.Since(timeStart)
-	_ = duration
-	// TODOlogging.MyLogger.InfoLog.Println("Время выполнения UpdateChangeDelta: ", duration)
+	pricesLogger.Infof("Время выполнения UpdateChangeDelta: %v ", duration)
+
 	return nil
 }
 
@@ -465,8 +467,7 @@ func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]exModel.ChangeDelt
 			clearChangeDelta = append(clearChangeDelta, changeDelta[i])
 		}
 		duration := time.Since(timeStart)
-		_ = duration
-		// TODOlogging.MyLogger.InfoLog.Println("Время выполнения GetDeltaPeriod: ", duration)
+		pricesLogger.Infof("Время выполнения GetDeltaPeriod: %v ", duration)
 	}
 
 	return clearChangeDelta, nil

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -29,12 +28,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	logger.InitLogger(config.DebugLog, config.Production)
 
-	mainLogger := logger.AddFields(map[string]interface{}{
-		"package": "main",
-		"module":  "main",
-	})
+	logger.InitLogger(config.DebugLog, config.ProductionLog)
+
+	mainLogger := logger.AddFieldsEmpty()
 
 	mainLogger.Info("запуск приложения exchangebot-app")
 
@@ -42,12 +39,14 @@ func main() {
 	defer stop()
 	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(config.ApiKey, config.SecretKey))
 	if err != nil {
-		log.Fatal(err)
+		mainLogger.Fatalf("failed to create exchange instance: %v", err)
 	}
 	pairs, err := binance.GetPairsToUSDT()
 	if err != nil {
-		log.Fatal(err)
+		mainLogger.Fatal(err)
 	}
+
+	mainLogger.Infof("колличество пар: %v", len(pairs))
 
 	periods := map[string]time.Duration{
 		"1m":  time.Second * 60,
@@ -68,32 +67,25 @@ func main() {
 	}
 	db, err := database.DbConnection(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
 	if err != nil {
-		log.Fatal(err)
+		mainLogger.Fatal(err)
 	}
 	defer db.Close()
 
 	err = database.CreateOrdersTable(db)
 	if err != nil {
-		log.Fatal(err)
+		mainLogger.Fatal(err)
 	}
 
 	err = database.CreateOrdersInfoTable(db)
 	if err != nil {
-		log.Fatal(err)
+		mainLogger.Fatal(err)
 	}
 
 	notify := &notification.Notification{Message: make(chan string)}
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
-	c, conn, err := exchange.NewClientGrpc(fmt.Sprintf("%s:%s", config.GrpcHost, config.GrpcPort))
-	if err != nil {
-		mainLogger.Fatalf("did not connect to grpc: %v", err)
-	}
-
-	defer conn.Close()
-
-	dataFeed := exchange.NewDataFeed(
-		c,
+	dataFeed := exchange.NewDataFeedWithExchange(
+		binance,
 		logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()),
 	)
 
@@ -107,12 +99,12 @@ func main() {
 		socketsMessage,
 	)
 	if err != nil {
-		log.Fatal(err)
+		mainLogger.Fatal(err)
 	}
 
 	appTelegram, err := telegram.NewTelegram(app, config.TlgToken, config.TlgUser, notify)
 	if err != nil {
-		log.Fatal(err)
+		mainLogger.Fatal(err)
 	}
 	web := web.NewWeb(app, socketsMessage, config, exchangeBot.Content)
 

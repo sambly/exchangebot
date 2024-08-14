@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sambly/exchangeBot/internal/application"
+	"github.com/sambly/exchangeBot/internal/logger"
 	"github.com/sambly/exchangeBot/internal/notification"
 
 	"golang.org/x/exp/slices"
@@ -23,6 +24,8 @@ type Telegram struct {
 	notificationEnable bool
 }
 
+var tlgLogger = logger.AddFieldsEmpty()
+
 func NewTelegram(app *application.Application, tlgToken, tlgUser string, notification *notification.Notification) (*Telegram, error) {
 
 	poller := &tele.LongPoller{Timeout: 10 * time.Second}
@@ -30,13 +33,13 @@ func NewTelegram(app *application.Application, tlgToken, tlgUser string, notific
 
 	userMiddleware := tele.NewMiddlewarePoller(poller, func(u *tele.Update) bool {
 		if u.Message == nil || u.Message.Sender == nil {
-			// TODOlogging.MyLogger.InfoLog.Println("No message")
+			tlgLogger.Debug("No message")
 			return false
 		}
 		if u.Message.Sender.ID == user {
 			return true
 		}
-		// TODOlogging.MyLogger.InfoLog.Println("Invalid user")
+		tlgLogger.Debug("Invalid user")
 		return false
 	})
 
@@ -103,7 +106,7 @@ func (t Telegram) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// TODOlogging.MyLogger.InfoLog.Printf("Telegram started. Server name - %s", t.app.Settings.ServerName)
+	tlgLogger.Infof("Telegram started. Server name - %s", t.app.Settings.ServerName)
 
 	go func(message chan string) {
 		for {
@@ -113,7 +116,7 @@ func (t Telegram) Start(ctx context.Context) error {
 				if t.notificationEnable {
 					_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, t.defaultMenu)
 					if err != nil {
-						// TODOlogging.MyLogger.ErrorOut(fmt.Errorf("error send message tlg: %v", err))
+						tlgLogger.Errorf("error send message tlg: %v", err)
 					}
 				}
 			case <-ctx.Done():
@@ -128,7 +131,8 @@ func (t Telegram) Start(ctx context.Context) error {
 		return err
 	}
 	t.client.Stop()
-	// TODOlogging.MyLogger.InfoLog.Printf("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName)
+
+	tlgLogger.Infof("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName)
 	return nil
 }
 
@@ -208,7 +212,7 @@ func (t Telegram) getPeriods(period string) []string {
 func (t Telegram) getAssets() []string {
 	err := t.app.Account.UpdateAssets()
 	if err != nil {
-		// TODOlogging.MyLogger.ErrorOut(fmt.Errorf("error tlg getAssets: %v", err))
+		tlgLogger.Errorf("error tlg getAssets: %v", err)
 	}
 	marketStat := t.app.AssetsPrices.MarketsStat
 	var out []string

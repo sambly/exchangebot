@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/sambly/exchangeBot/internal/account"
+	"github.com/sambly/exchangeBot/internal/logger"
 	"github.com/sambly/exchangeBot/internal/model"
 	"github.com/sambly/exchangeBot/internal/notification"
 	"github.com/sambly/exchangeBot/internal/order"
@@ -30,6 +31,8 @@ type Application struct {
 
 	BaseAmountAsset float64
 }
+
+var appLogger = logger.AddFieldsEmpty()
 
 func NewApp(ctx context.Context, exch exchange.Exchange, dataFeed exchange.RouterDataFeed, settings model.Settings, db *sql.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage) (*Application, error) {
 
@@ -64,8 +67,7 @@ func NewApp(ctx context.Context, exch exchange.Exchange, dataFeed exchange.Route
 
 func (app *Application) Run(ctx context.Context) error {
 
-	// TODO
-	//logging.MyLogger.InfoLog.Println("Ожидание предварительной загрузки данных")
+	appLogger.Info("Ожидание предварительной загрузки данных")
 
 	timeStart := time.Now()
 
@@ -97,31 +99,26 @@ func (app *Application) Run(ctx context.Context) error {
 
 	for _, pair := range app.Settings.Pairs {
 
-		app.dataFeed.SubscribeTrade(ctx, pair, "exchangeBot")
+		app.dataFeed.SubscribeMarketsStat(ctx, pair, "exchangeBot")
 		err := app.dataFeed.SubscribeObserverMarkets(ctx, "exchangeBot", pair, func(market exModel.MarketsStat) {
 			app.AssetsPrices.OnMarket(market)
 		})
 		if err != nil {
-			// TODO
-			// appLogger.Errorf("error SubscribeObserverMarket: %v", err)
+			appLogger.Errorf("error SubscribeObserverMarket: %v", err)
 		}
 		err = app.dataFeed.SubscribeObserverMarkets(ctx, "exchangeBot", pair, func(market exModel.MarketsStat) {
 			app.OrderController.OnMarket(market)
 		})
 		if err != nil {
-			// TODO
-			// appLogger.Errorf("error SubscribeObserverMarket: %v", err)
+			appLogger.Errorf("error SubscribeObserverMarket: %v", err)
 		}
 
 	}
 
 	duration := time.Since(timeStart)
 
-	_ = duration
-
-	// TODO
-	//logging.MyLogger.InfoLog.Println("Время выполнения предварительной загрузки данных: ", duration)
-	//logging.MyLogger.InfoLog.Println("Время старта: ", timeStart)
+	appLogger.Infof("Время выполнения предварительной загрузки данных: %v ", duration)
+	appLogger.Infof("Время старта: %v ", timeStart)
 
 	g, ctx := errgroup.WithContext(ctx)
 
