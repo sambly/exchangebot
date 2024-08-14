@@ -31,7 +31,9 @@ func main() {
 
 	logger.InitLogger(config.DebugLog, config.ProductionLog)
 
-	mainLogger := logger.AddFieldsEmpty()
+	mainLogger := logger.AddFields(map[string]interface{}{
+		"package": "main",
+	})
 
 	mainLogger.Info("запуск приложения exchangebot-app")
 

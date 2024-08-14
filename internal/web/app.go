@@ -38,7 +38,9 @@ type Sockets struct {
 	socketsMessage *notification.SocketsMessage
 }
 
-var appWebLogger = logger.AddFieldsEmpty()
+var appWebLogger = logger.AddFields(map[string]interface{}{
+	"package": "web",
+})
 
 func (c *Sockets) SendDataRun(ctx context.Context) {
 
@@ -147,7 +149,7 @@ func (w *Web) runProductionServer() error {
 
 func (w *Web) runNginxServer() error {
 
-	appWebLogger.Info("Запуск сервера: через proxy server")
+	appWebLogger.Infof("Запуск сервера: через proxy server, port:%s ", w.productionPort)
 
 	srv := &http.Server{
 		Addr:    ":" + w.productionPort,
