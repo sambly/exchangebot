@@ -5,7 +5,13 @@ export default {
   root: path.resolve(__dirname, 'src'),
   base:"/trade/",
   build: {
-    outDir: '../dist'
+    outDir: '../dist',
+    rollupOptions: {
+      input: {
+        // Указываем входной файл для Rollup
+        index: path.resolve(__dirname, 'src/index.html')
+      }
+    }
   },
   resolve: {
     alias: {

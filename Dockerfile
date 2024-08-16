@@ -55,7 +55,7 @@ COPY embed.go ./
 COPY ./configs ./configs
 
 RUN go mod tidy
-RUN go build -o exchangebot ./cmd/grpc
+RUN go build -o exchangebot ./cmd/exchange
 
 # Финальный образ для запуска
 FROM alpine:3.18
