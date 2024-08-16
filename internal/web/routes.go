@@ -21,7 +21,7 @@ func getFrontendAssets(production bool, content embed.FS) fs.FS {
 		return f
 	} else {
 
-		return os.DirFS("frontend/dist")
+		return os.DirFS("../../frontend/dist")
 	}
 }
 
