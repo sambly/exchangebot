@@ -19,10 +19,10 @@
 
       <div class="col-sm-auto bg-light sticky-top">
         <div class="d-flex flex-sm-column flex-row flex-nowrap bg-light align-items-center sticky-top">
-          <a href="javascript:void(0);" class="nav-link py-3 px-2" title="" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-original-title="Dashboard" onclick="location.reload();">
+          <a href="javascript:void(0);" class="nav-link py-3 px-2" nclick="location.reload();">
             <img src="./svg/house.svg"  style="width: 24px; height: 24px;">
           </a>
-          <a :href="import.meta.env.GRAFANA_URL" class="nav-link py-3 px-2" title="" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-original-title="Dashboard">
+          <a id="grafana-link" class="nav-link py-3 px-2">
             <img src="./svg/grafana.svg"  style="width: 24px; height: 24px;">
           </a>
         </div>
@@ -388,9 +388,6 @@
 
     </div>
   </div>
-
-
-
 
   <script type="module" src="./js/main.js"></script>
 

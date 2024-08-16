@@ -17,11 +17,8 @@ import { timeToLocal } from './help.js';
 $(function () {
 
     const grafanaUrl = import.meta.env.VITE_GRAFANA_URL;
-    console.log('Grafana URL:', grafanaUrl);
+    document.getElementById('grafana-link').href = grafanaUrl;
 
-    console.log(import.meta.env.BASE_URL);
-    console.log(import.meta.env.GRAFANA_URL);
-    console.log(import.meta.env.VITE_GRAFANA_URL);
     // Формирование страницы 
     forming_page();
 
