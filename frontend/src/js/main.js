@@ -19,7 +19,6 @@ $(function () {
     const grafanaUrl = import.meta.env.VITE_GRAFANA_URL;
     document.getElementById('grafana-link').href = grafanaUrl;
 
-    // Формирование страницы 
     forming_page();
 
     //#############################################################################  webSocket #############################################################################

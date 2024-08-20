@@ -1,16 +1,13 @@
-// const path = require('path')
+import { defineConfig } from 'vite';
 import path from 'path';
 
-export default {
-  root: path.resolve(__dirname, 'src'),
+export default defineConfig({
+  root: path.resolve(__dirname), 
   base:"/trade/",
   build: {
-    outDir: '../dist',
+    outDir: path.resolve(__dirname, 'dist'),
     rollupOptions: {
-      input: {
-        // Указываем входной файл для Rollup
-        index: path.resolve(__dirname, 'src/index.html')
-      }
+      input: path.resolve(__dirname, 'index.html'), 
     }
   },
   resolve: {
@@ -22,4 +19,4 @@ export default {
     port: 8080,
     hot: true
   }
-}
+});
