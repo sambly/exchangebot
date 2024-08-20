@@ -19,7 +19,7 @@ certs/*
 !certs/.gitkeep 
 
 .env
-
+*.bak
 
 # IDE
 .idea

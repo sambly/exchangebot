@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"embed"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -19,13 +20,13 @@ type Web struct {
 	server *http.Server
 	App    *application.Application
 	Sockets
-	content                       embed.FS
-	production                    bool
-	inProductionOnlyApp           bool
-	inProductionWithFrontedNgingx bool
-	productionPort                string
-	hostWeb                       string
-	auth                          auth
+	production   bool
+	proxy        bool
+	proxyPort    string
+	contentEmbed bool
+	content      embed.FS
+	hostWeb      string
+	auth         auth
 }
 
 type auth struct {
@@ -66,13 +67,13 @@ func (c *Sockets) SendDataRun(ctx context.Context) {
 
 func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, config *config.Config, content embed.FS) *Web {
 	web := &Web{
-		App:                           app,
-		content:                       content,
-		production:                    config.Production,
-		inProductionOnlyApp:           config.InProductionOnlyApp,
-		inProductionWithFrontedNgingx: config.InProductionWithFrontedNgingx,
-		productionPort:                config.HttpPortProduction,
-		hostWeb:                       config.HostWeb,
+		App:          app,
+		production:   config.Production,
+		proxy:        config.ProxyServer,
+		proxyPort:    config.ProxyPort,
+		contentEmbed: config.ContentEmbed,
+		content:      content,
+		hostWeb:      config.HostWeb,
 	}
 	web.Sockets = Sockets{
 		clients:        make(map[*websocket.Conn]bool),
@@ -93,10 +94,12 @@ func (w *Web) Run(ctx context.Context) error {
 
 	go func() {
 		var err error
-		if w.inProductionOnlyApp {
-			err = w.runProductionServer()
-		} else if w.inProductionWithFrontedNgingx {
-			err = w.runNginxServer()
+		if w.production {
+			if w.proxy {
+				err = w.runProductionServerProxy()
+			} else {
+				err = w.runProductionServer()
+			}
 		} else {
 			err = w.runLocalServer()
 		}
@@ -127,6 +130,7 @@ func (w *Web) Run(ctx context.Context) error {
 func (w *Web) runProductionServer() error {
 
 	appWebLogger.Info("Запуск сервера: production")
+	fmt.Println("Запуск сервера: production")
 
 	certManager := &autocert.Manager{
 		Cache:      autocert.DirCache("certs"),
@@ -147,12 +151,12 @@ func (w *Web) runProductionServer() error {
 	return srv.ListenAndServeTLS("", "")
 }
 
-func (w *Web) runNginxServer() error {
+func (w *Web) runProductionServerProxy() error {
 
-	appWebLogger.Infof("Запуск сервера: через proxy server, port:%s ", w.productionPort)
-
+	appWebLogger.Infof("Запуск сервера: через proxy server, port:%s ", w.proxyPort)
+	fmt.Printf("Запуск сервера: через proxy server, port:%s\n", w.proxyPort)
 	srv := &http.Server{
-		Addr:    ":" + w.productionPort,
+		Addr:    ":" + w.proxyPort,
 		Handler: w.routes(),
 	}
 	w.server = srv
@@ -162,6 +166,7 @@ func (w *Web) runNginxServer() error {
 func (w *Web) runLocalServer() error {
 
 	appWebLogger.Info("Запуск сервера: local")
+	fmt.Println("Запуск сервера: local")
 
 	srv := &http.Server{
 		Addr:    ":80",

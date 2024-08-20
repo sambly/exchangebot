@@ -7,42 +7,16 @@ services:
       args:
         GITHUB_TOKEN: ${GITHUB_TOKEN}
         ENVIRONMENT: docker
+        BUILD_TARGET: "exchange" 
     ports:
       - "8080:80" 
     volumes:
       - ./log:/app/log 
     environment:
       ENVIRONMENT: docker
-
-      serverName: ${serverName} 
-
-      production: ${production}
-      inProductionOnlyApp: ${inProductionOnlyApp}
-      inProductionWithFrontedNgingx: ${inProductionWithFrontedNgingx}
-      httpPortProduction: ${httpPortProduction}
-      hostWeb: ${hostWeb}
-      usernameAuth: ${usernameAuth}
-      passwordAuth: ${passwordAuth}
-
-      API_KEY: ${API_KEY}
-      API_SECRET: ${API_SECRET}
-
-      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
-      TELEGRAM_USER: ${TELEGRAM_USER}
-
-      DB_HOST_Docker: ${DB_HOST_Docker}
-      DB_PORT: ${DB_PORT}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-
-      grpc_Host_Docker: ${grpc_Host_Docker}
-      grpc_Host_Local: ${grpc_Host_Local}
-      grpc_Port: ${grpc_Port}
-
-      productionLog: ${productionLog}
-      debugLog: ${debugLog}
-
+      CONTENT_EMBED: true
+    env_file:
+      - .env
     depends_on:
       - mysql
 

@@ -55,7 +55,11 @@ COPY embed.go ./
 COPY ./configs ./configs
 
 RUN go mod tidy
-RUN go build -o exchangebot ./cmd/exchange
+
+#Default exchange
+ARG BUILD_TARGET=exchange
+
+RUN go build -o exchangebot ./cmd/$BUILD_TARGET
 
 # Финальный образ для запуска
 FROM alpine:3.18
@@ -72,9 +76,6 @@ WORKDIR /app
 
 # Копировать скомпилированное Go-приложение из builder этапа
 COPY --from=builder /app/exchangebot .
-
-# Копировать статические файлы фронтенда из builder этапа
-COPY --from=builder /app/frontend/dist ./dist
 
 COPY --from=builder /app/configs ./configs
 

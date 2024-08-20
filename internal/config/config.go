@@ -14,14 +14,15 @@ type Config struct {
 	ServerName string
 
 	// Web
-	Production                    bool
-	InProductionOnlyApp           bool
-	InProductionWithFrontedNgingx bool
-	HttpPortProduction            string
-	HostWeb                       string
+	Production  bool
+	ProxyServer bool
+	ProxyPort   string
+	HostWeb     string
 	// Authentication Web basic
 	UsernameAuth string
 	PasswordAuth string
+
+	ContentEmbed bool
 
 	// Exchange
 	ApiKey    string
@@ -63,13 +64,12 @@ func loadEnv(projectDirName string) error {
 func NewConfig() (*Config, error) {
 
 	//  production определяет как использовать статические файлы fs.Sub(fsys, "dist") os.DirFS("fronted/dist")
-	//	inProductionOnlyApp Работа сервера https/http при условии, при условии что только этот сервер запущен
-	// 	inProductionWithFrontedNgingx работа на локальном порту, Nginx шлет на этот порт
-	// 	inProductionOnlyApp = false  inProductionWithFrontedNgingx = false  локальная разработка для тестов порт 80
+	//	runProductionServer Работа сервера https/http при условии, при условии что только этот сервер запущен
+	// 	runProductionServerProxy работа на локальном порту
+	// 	not production  локальная разработка для тестов порт 80
 	production := false
-	inProductionOnlyApp := false
-	inProductionWithFrontedNgingx := false
-
+	proxyServer := false
+	contentEmbed := false
 	productionLog := false
 	debugLog := false
 
@@ -78,13 +78,13 @@ func NewConfig() (*Config, error) {
 
 	if os.Getenv("ENVIRONMENT") == "docker" {
 		var exists bool
-		hostDb, exists = os.LookupEnv("DB_HOST_Docker")
+		hostDb, exists = os.LookupEnv("DB_HOST_DOCKER")
 		if !exists {
-			return nil, fmt.Errorf("no .env str DB_HOST_Docker  found")
+			return nil, fmt.Errorf("no .env str DB_HOST_DOCKER  found")
 		}
-		hostGrpc, exists = os.LookupEnv("grpc_Host_Docker")
+		hostGrpc, exists = os.LookupEnv("GRPC_HOST_DOCKER")
 		if !exists {
-			return nil, fmt.Errorf("no .env str grpc_Host_Docker  found")
+			return nil, fmt.Errorf("no .env str GRPC_HOST_DOCKER  found")
 		}
 
 	} else {
@@ -92,61 +92,76 @@ func NewConfig() (*Config, error) {
 		if err := loadEnv("exchangeBot"); err != nil {
 			return nil, err
 		}
-		hostDb, exists = os.LookupEnv("DB_HOST_Local")
+		hostDb, exists = os.LookupEnv("DB_HOST_LOCAL")
 		if !exists {
-			return nil, fmt.Errorf("no .env str DB_HOST_Local  found")
+			return nil, fmt.Errorf("no .env str DB_HOST_LOCAL  found")
 		}
 
-		hostGrpc, exists = os.LookupEnv("grpc_Host_Local")
+		hostGrpc, exists = os.LookupEnv("GRPC_HOST_LOCAL")
 		if !exists {
-			return nil, fmt.Errorf("no .env str grpc_Host_Local  found")
+			return nil, fmt.Errorf("no .env str GRPC_HOST_LOCAL  found")
 		}
 	}
 
-	serverName, exists := os.LookupEnv("serverName")
+	serverName, exists := os.LookupEnv("SERVERNAME")
 	if !exists {
-		return nil, fmt.Errorf("no .env str serverName  found")
+		return nil, fmt.Errorf("no .env str SERVERNAME  found")
 	}
 
 	// Web
-	productionString, exists := os.LookupEnv("production")
+	productionString, exists := os.LookupEnv("PRODUCTION")
 	if !exists {
-		return nil, fmt.Errorf("no .env str production found")
+		return nil, fmt.Errorf("no .env str PRODUCTION found")
 	}
 	if productionString == "true" {
 		production = true
 	}
-	inProductionOnlyAppString, exists := os.LookupEnv("inProductionOnlyApp")
+
+	proxyServerString, exists := os.LookupEnv("PROXY_SERVER")
 	if !exists {
-		return nil, fmt.Errorf("no .env str inProductionOnlyApp found")
+		return nil, fmt.Errorf("no .env str PROXY_SERVER found")
 	}
-	if inProductionOnlyAppString == "true" {
-		inProductionOnlyApp = true
+	if proxyServerString == "true" {
+		proxyServer = true
 	}
-	inProductionWithFrontedNgingxString, exists := os.LookupEnv("inProductionWithFrontedNgingx")
+
+	contentEmbedString, exists := os.LookupEnv("CONTENT_EMBED")
 	if !exists {
-		return nil, fmt.Errorf("no .env str inProductionWithFrontedNgingx found")
+		return nil, fmt.Errorf("no .env str CONTENT_EMBED found")
 	}
-	if inProductionWithFrontedNgingxString == "true" {
-		inProductionWithFrontedNgingx = true
+	if contentEmbedString == "true" {
+		contentEmbed = true
 	}
-	httpPortProduction, exists := os.LookupEnv("httpPortProduction")
+
+	proxyPort, exists := os.LookupEnv("PROXY_PORT")
 	if !exists {
-		return nil, fmt.Errorf("no .env str httpPortProduction  found")
+		return nil, fmt.Errorf("no .env str PROXY_PORT  found")
 	}
-	hostWeb, exists := os.LookupEnv("hostWeb")
+
+	hostWeb, exists := os.LookupEnv("HOST_WEB")
 	if !exists {
-		return nil, fmt.Errorf("no .env str hostWeb  found")
+		return nil, fmt.Errorf("no .env str HOST_WEB  found")
+	}
+
+	// Authentication
+	usernameAuth, exists := os.LookupEnv("USERNAME_AUTH")
+	if !exists {
+		return nil, fmt.Errorf("no .env str USERNAME_AUTH  found")
+	}
+
+	passwordAuth, exists := os.LookupEnv("PASSWORD_AUTH")
+	if !exists {
+		return nil, fmt.Errorf("no .env str PASSWORD_AUTH  found")
 	}
 
 	// Exchange
-	apiKey, exists := os.LookupEnv("API_KEY")
+	apiKey, exists := os.LookupEnv("API_KEY_BINANCE")
 	if !exists {
-		return nil, fmt.Errorf("no .env str API_KEY found")
+		return nil, fmt.Errorf("no .env str API_KEY_BINANCE found")
 	}
-	secretKey, exists := os.LookupEnv("API_SECRET")
+	secretKey, exists := os.LookupEnv("API_SECRET_BINANCE")
 	if !exists {
-		return nil, fmt.Errorf("no .env str API_SECRET found")
+		return nil, fmt.Errorf("no .env str API_SECRET_BINANCE found")
 	}
 	// TLG
 	tlgToken, exists := os.LookupEnv("TELEGRAM_TOKEN")
@@ -157,15 +172,7 @@ func NewConfig() (*Config, error) {
 	if !exists {
 		return nil, fmt.Errorf("no .env str TELEGRAM_USER  found")
 	}
-	// Authentication
-	usernameAuth, exists := os.LookupEnv("usernameAuth")
-	if !exists {
-		return nil, fmt.Errorf("no .env str usernameAuth  found")
-	}
-	passwordAuth, exists := os.LookupEnv("passwordAuth")
-	if !exists {
-		return nil, fmt.Errorf("no .env str passwordAuth  found")
-	}
+
 	// DB
 	nameDb, exists := os.LookupEnv("DB_NAME")
 	if !exists {
@@ -185,25 +192,26 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("no .env str DB_USER found")
 	}
 
-	productionLogString, exists := os.LookupEnv("productionLog")
+	// LOG
+	productionLogString, exists := os.LookupEnv("PRODUCTION_LOG")
 	if !exists {
-		return nil, fmt.Errorf("no .env str productionLog found")
+		return nil, fmt.Errorf("no .env str PRODUCTION_LOG found")
 	}
 	if productionLogString == "true" {
 		productionLog = true
 	}
 
-	debugLogString, exists := os.LookupEnv("debugLog")
+	debugLogString, exists := os.LookupEnv("DEBUG_LOG")
 	if !exists {
-		return nil, fmt.Errorf("no .env str debugLog found")
+		return nil, fmt.Errorf("no .env str DEBUG_LOG found")
 	}
 	if debugLogString == "true" {
 		debugLog = true
 	}
 
-	grpcPort, exists := os.LookupEnv("grpc_Port")
+	grpcPort, exists := os.LookupEnv("GRPC_PORT")
 	if !exists {
-		return nil, fmt.Errorf("no .env str grpc_Port  found")
+		return nil, fmt.Errorf("no .env str GRPC_PORT  found")
 	}
 
 	c := &Config{
@@ -212,11 +220,12 @@ func NewConfig() (*Config, error) {
 		ServerName: serverName,
 
 		// Web
-		Production:                    production,
-		InProductionOnlyApp:           inProductionOnlyApp,
-		InProductionWithFrontedNgingx: inProductionWithFrontedNgingx,
-		HttpPortProduction:            httpPortProduction,
-		HostWeb:                       hostWeb,
+		Production:  production,
+		ProxyServer: proxyServer,
+		ProxyPort:   proxyPort,
+		HostWeb:     hostWeb,
+
+		ContentEmbed: contentEmbed,
 		// Authentication Web basic
 		UsernameAuth: usernameAuth,
 		PasswordAuth: passwordAuth,
