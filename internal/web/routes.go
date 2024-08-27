@@ -42,6 +42,8 @@ func (app *Web) routes() *http.ServeMux {
 
 	mux.HandleFunc("/trade/closeAllDeal", app.basicAuth(app.closeAllDeal))
 
+	mux.HandleFunc("/trade/grafana/", app.basicAuth(app.grafana))
+
 	fileServer := http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content)))
 
 	mux.HandleFunc("/trade/", app.basicAuth(http.StripPrefix("/trade", fileServer).ServeHTTP))

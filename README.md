@@ -17,3 +17,7 @@ yarn dev
 // backend
 
 для файла embed нужна директория frontend/dist  которая создается при yarn build 
+
+// make 
+перед push
+make lint (для проверки .env)

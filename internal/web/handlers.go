@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -208,4 +210,12 @@ func (web *Web) getChDelta(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(mapsJson)
+}
+
+func (web *Web) grafana(w http.ResponseWriter, r *http.Request) {
+
+	target := "http://grafana:3000/"
+	proxyUrl, _ := url.Parse(target)
+	proxy := httputil.NewSingleHostReverseProxy(proxyUrl)
+	proxy.ServeHTTP(w, r)
 }
