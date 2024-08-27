@@ -16,6 +16,7 @@ import (
 	"github.com/sambly/exchangeBot/internal/logger"
 	"github.com/sambly/exchangeBot/internal/model"
 	"github.com/sambly/exchangeBot/internal/notification"
+	"github.com/sambly/exchangeBot/internal/strategy"
 	"github.com/sambly/exchangeBot/internal/telegram"
 	"github.com/sambly/exchangeBot/internal/web"
 	"github.com/sambly/exchangeService/pkg/exchange"
@@ -59,6 +60,12 @@ func main() {
 		"1d":  time.Hour * 12,
 	}
 
+	periods_strategy := map[string]time.Duration{
+		"1h": time.Hour,
+		"4h": time.Hour * 4,
+		"1d": time.Hour * 12,
+	}
+
 	settings := model.Settings{
 		ServerName:     config.ServerName,
 		Pairs:          pairs,
@@ -98,6 +105,14 @@ func main() {
 		logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()),
 	)
 
+	strategy, err := strategy.NewControllerStrategy(
+		strategy.WithLocalExtremes(strategy.NewLocalExtremes(pairs, periods_strategy)),
+	)
+
+	if err != nil {
+		mainLogger.Fatal(err)
+	}
+
 	app, err := application.NewApp(
 		ctx,
 		binance,
@@ -106,6 +121,7 @@ func main() {
 		db,
 		notify,
 		socketsMessage,
+		strategy,
 	)
 	if err != nil {
 		mainLogger.Fatal(err)

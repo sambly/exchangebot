@@ -11,6 +11,7 @@ import (
 	"github.com/sambly/exchangeBot/internal/notification"
 	"github.com/sambly/exchangeBot/internal/order"
 	"github.com/sambly/exchangeBot/internal/prices"
+	"github.com/sambly/exchangeBot/internal/strategy"
 	"github.com/sambly/exchangeService/pkg/exchange"
 	exModel "github.com/sambly/exchangeService/pkg/model"
 
@@ -28,13 +29,14 @@ type Application struct {
 	AssetsPrices    *prices.AsetsPrices
 	OrderController *order.Controller
 	PaperWallet     *exchange.PaperWallet
+	Strategy        *strategy.ControllerStrategy
 
 	BaseAmountAsset float64
 }
 
 var appLogger = logger.AddFieldsEmpty()
 
-func NewApp(ctx context.Context, exch exchange.Exchange, dataFeed exchange.RouterDataFeed, settings model.Settings, db *sql.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage) (*Application, error) {
+func NewApp(ctx context.Context, exch exchange.Exchange, dataFeed exchange.RouterDataFeed, settings model.Settings, db *sql.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage, strategy *strategy.ControllerStrategy) (*Application, error) {
 
 	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, settings.WeightProcents, db, notification)
 	account, err := account.NewAccount(exch, assetsPrices, notification)
@@ -57,6 +59,7 @@ func NewApp(ctx context.Context, exch exchange.Exchange, dataFeed exchange.Route
 		Account:         account,
 		OrderController: orderController,
 		PaperWallet:     paperWallet,
+		Strategy:        strategy,
 		BaseAmountAsset: 1,
 	}
 
@@ -108,6 +111,12 @@ func (app *Application) Run(ctx context.Context) error {
 		}
 		err = app.dataFeed.SubscribeObserverMarkets(ctx, "exchangeBot", pair, func(market exModel.MarketsStat) {
 			app.OrderController.OnMarket(market)
+		})
+		if err != nil {
+			appLogger.Errorf("error SubscribeObserverMarket: %v", err)
+		}
+		err = app.dataFeed.SubscribeObserverMarkets(ctx, "exchangeBot", pair, func(market exModel.MarketsStat) {
+			app.Strategy.OnMarket(market)
 		})
 		if err != nil {
 			appLogger.Errorf("error SubscribeObserverMarket: %v", err)
