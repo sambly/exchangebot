@@ -7,6 +7,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gorilla/websocket"
@@ -36,8 +37,9 @@ func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
 
 func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
 
+	configPath := filepath.Join("..", "..", "configs", "strategy.json")
 	// Список стратегий
-	optionByte, err := os.ReadFile("../../configs/strategy.json")
+	optionByte, err := os.ReadFile(configPath)
 	if err != nil {
 		web.logError(err)
 	}
