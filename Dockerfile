@@ -39,7 +39,7 @@ ARG BUILD_TARGET=exchange
 # Установка переменных окружения
 ENV GOPRIVATE=github.com/sambly
 ENV GITHUB_TOKEN=${GITHUB_TOKEN}
-ENV ENVIRONMENT=${ENVIRONMENT}
+ENV ENVIRONMENT=docker
 
 # Настройка git с использованием переменной GITHUB_TOKEN
 RUN git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
