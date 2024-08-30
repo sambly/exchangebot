@@ -6,7 +6,7 @@ require (
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/joho/godotenv v1.5.1
-	github.com/sambly/exchangeService v0.0.0-20240828141205-cc387486da94
+	github.com/sambly/exchangeService v0.0.0-20240829115344-af80e1717539
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/crypto v0.26.0
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
