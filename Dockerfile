@@ -9,6 +9,12 @@ COPY ./frontend/package.json ./frontend/yarn.lock ./
 # Копирование vite.config.js в рабочую директорию
 COPY ./frontend/vite.config.js ./
 
+# # Установка переменных окружения как аргументов сборки
+ARG VITE_GRAFANA_URL
+
+# Экспорт аргумента как переменной окружения
+ENV VITE_GRAFANA_URL=${VITE_GRAFANA_URL}
+
 # Установить зависимости фронтенда
 RUN yarn install
 
