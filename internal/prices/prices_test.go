@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sambly/exchangeBot/internal/config"
-	"github.com/sambly/exchangeBot/internal/database"
 	"github.com/sambly/exchangeService/pkg/exchange"
+	"github.com/sambly/exchangebot/internal/config"
+	"github.com/sambly/exchangebot/internal/database"
 )
 
 func TestUpdateDeltaFullData(t *testing.T) {
 
-	flag.Set("test.timeout", "5m")
+	_ = flag.Set("test.timeout", "5m")
 
 	binance, err := exchange.NewBinance(context.Background())
 	if err != nil {
@@ -46,6 +46,6 @@ func TestUpdateDeltaFullData(t *testing.T) {
 
 	asetsPrices := NewAssetsPrices(pairs, periods, periods, nil, db, nil)
 
-	asetsPrices.UpdateChangeDelta()
+	_ = asetsPrices.UpdateChangeDelta()
 
 }

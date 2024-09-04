@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sambly/exchangeBot/internal/application"
-	"github.com/sambly/exchangeBot/internal/logger"
-	"github.com/sambly/exchangeBot/internal/notification"
+	"github.com/sambly/exchangebot/internal/application"
+	"github.com/sambly/exchangebot/internal/logger"
+	"github.com/sambly/exchangebot/internal/notification"
 
 	"golang.org/x/exp/slices"
 	tele "gopkg.in/telebot.v3"

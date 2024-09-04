@@ -25,7 +25,7 @@ type Config struct {
 	ContentEmbed bool
 
 	// Exchange
-	ApiKey    string
+	APIKey    string
 	SecretKey string
 
 	// TLG
@@ -49,7 +49,7 @@ type Config struct {
 }
 
 func loadEnv(projectDirName string) error {
-	//const projectDirName = "exchangeBot" // change to relevant project name
+	//const projectDirName = "exchangebot" // change to relevant project name
 
 	projectName := regexp.MustCompile(`^(.*` + projectDirName + `)`)
 	currentWorkDirectory, _ := os.Getwd()
@@ -89,7 +89,7 @@ func NewConfig() (*Config, error) {
 
 	} else {
 		var exists bool
-		if err := loadEnv("exchangeBot"); err != nil {
+		if err := loadEnv("exchangebot"); err != nil {
 			return nil, err
 		}
 		hostDb, exists = os.LookupEnv("DB_HOST_LOCAL")
@@ -231,7 +231,7 @@ func NewConfig() (*Config, error) {
 		PasswordAuth: passwordAuth,
 
 		// Exchange
-		ApiKey:    apiKey,
+		APIKey:    apiKey,
 		SecretKey: secretKey,
 
 		// TLG

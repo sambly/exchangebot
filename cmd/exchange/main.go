@@ -8,18 +8,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sambly/exchangeBot"
-	"github.com/sambly/exchangeBot/internal/application"
-	"github.com/sambly/exchangeBot/internal/config"
-	"github.com/sambly/exchangeBot/internal/database"
-	"github.com/sambly/exchangeBot/internal/logger"
-	"github.com/sambly/exchangeBot/internal/model"
-	"github.com/sambly/exchangeBot/internal/notification"
-	"github.com/sambly/exchangeBot/internal/strategy"
-	"github.com/sambly/exchangeBot/internal/telegram"
-	"github.com/sambly/exchangeBot/internal/web"
 	"github.com/sambly/exchangeService/pkg/exchange"
 	"github.com/sambly/exchangeService/pkg/logadapter"
+	"github.com/sambly/exchangebot"
+	"github.com/sambly/exchangebot/internal/application"
+	"github.com/sambly/exchangebot/internal/config"
+	"github.com/sambly/exchangebot/internal/database"
+	"github.com/sambly/exchangebot/internal/logger"
+	"github.com/sambly/exchangebot/internal/model"
+	"github.com/sambly/exchangebot/internal/notification"
+	"github.com/sambly/exchangebot/internal/strategy"
+	"github.com/sambly/exchangebot/internal/telegram"
+	"github.com/sambly/exchangebot/internal/web"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -40,7 +40,7 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(config.ApiKey, config.SecretKey))
+	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(config.APIKey, config.SecretKey))
 	if err != nil {
 		mainLogger.Fatalf("failed to create exchange instance: %v", err)
 	}
@@ -60,7 +60,7 @@ func main() {
 		"1d":  time.Hour * 12,
 	}
 
-	periods_strategy := map[string]time.Duration{
+	periodsStrategy := map[string]time.Duration{
 		"1h": time.Hour,
 		"4h": time.Hour * 4,
 		"1d": time.Hour * 12,
@@ -99,7 +99,7 @@ func main() {
 	)
 
 	strategy, err := strategy.NewControllerStrategy(
-		strategy.WithLocalExtremes(strategy.NewLocalExtremes(pairs, periods_strategy)),
+		strategy.WithLocalExtremes(strategy.NewLocalExtremes(pairs, periodsStrategy)),
 	)
 
 	if err != nil {
@@ -124,7 +124,7 @@ func main() {
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
-	web := web.NewWeb(app, socketsMessage, config, exchangeBot.Content)
+	web := web.NewWeb(app, socketsMessage, config, exchangebot.Content)
 
 	g, gCtx := errgroup.WithContext(ctx)
 

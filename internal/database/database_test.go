@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sambly/exchangeBot/internal/config"
+	"github.com/sambly/exchangebot/internal/config"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
 )

@@ -5,15 +5,15 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/sambly/exchangeBot/internal/account"
-	"github.com/sambly/exchangeBot/internal/logger"
-	"github.com/sambly/exchangeBot/internal/model"
-	"github.com/sambly/exchangeBot/internal/notification"
-	"github.com/sambly/exchangeBot/internal/order"
-	"github.com/sambly/exchangeBot/internal/prices"
-	"github.com/sambly/exchangeBot/internal/strategy"
 	"github.com/sambly/exchangeService/pkg/exchange"
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/account"
+	"github.com/sambly/exchangebot/internal/logger"
+	"github.com/sambly/exchangebot/internal/model"
+	"github.com/sambly/exchangebot/internal/notification"
+	"github.com/sambly/exchangebot/internal/order"
+	"github.com/sambly/exchangebot/internal/prices"
+	"github.com/sambly/exchangebot/internal/strategy"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -102,20 +102,20 @@ func (app *Application) Run(ctx context.Context) error {
 
 	for _, pair := range app.Settings.Pairs {
 
-		app.dataFeed.SubscribeMarketsStat(ctx, pair, "exchangeBot")
-		err := app.dataFeed.SubscribeObserverMarkets(ctx, "exchangeBot", pair, func(market exModel.MarketsStat) {
+		app.dataFeed.SubscribeMarketsStat(ctx, pair, "exchangebot")
+		err := app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
 			app.AssetsPrices.OnMarket(market)
 		})
 		if err != nil {
 			appLogger.Errorf("error SubscribeObserverMarket: %v", err)
 		}
-		err = app.dataFeed.SubscribeObserverMarkets(ctx, "exchangeBot", pair, func(market exModel.MarketsStat) {
+		err = app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
 			app.OrderController.OnMarket(market)
 		})
 		if err != nil {
 			appLogger.Errorf("error SubscribeObserverMarket: %v", err)
 		}
-		err = app.dataFeed.SubscribeObserverMarkets(ctx, "exchangeBot", pair, func(market exModel.MarketsStat) {
+		err = app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
 			app.Strategy.OnMarket(market)
 		})
 		if err != nil {
@@ -136,43 +136,43 @@ func (app *Application) Run(ctx context.Context) error {
 	})
 
 	//Для предварительного заполения цен всех пар, может сделать меньше время, просто добавляет погрешность для 10m
-	var tickerInterval_Init time.Duration = time.Second * 10 // Здесь выставить 40
-	ticker_Init := time.NewTicker(tickerInterval_Init)
+	tickerIntervalInit := time.Second * 10 // Здесь выставить 40
+	tickerInit := time.NewTicker(tickerIntervalInit)
 
-	var tickerInterval_3m time.Duration = time.Second * 60 * 3
-	ticker_3m := time.NewTicker(tickerInterval_3m)
+	tickerInterval3m := time.Second * 60 * 3
+	ticker3m := time.NewTicker(tickerInterval3m)
 
-	var tickerInterval_15m time.Duration = time.Second * 60 * 15
-	ticker_15m := time.NewTicker(tickerInterval_15m)
+	tickerInterval15m := time.Second * 60 * 15
+	ticker15m := time.NewTicker(tickerInterval15m)
 
-	var tickerInterval_1h time.Duration = time.Second * 60 * 60
-	ticker_1h := time.NewTicker(tickerInterval_1h)
+	tickerInterval1h := time.Second * 60 * 60
+	ticker1h := time.NewTicker(tickerInterval1h)
 
-	var tickerInterval_4h time.Duration = time.Second * 60 * 60 * 4
-	ticker_4h := time.NewTicker(tickerInterval_4h)
+	tickerInterval4h := time.Second * 60 * 60 * 4
+	ticker4h := time.NewTicker(tickerInterval4h)
 
 	for {
 		select {
 		case <-ctx.Done():
 			// Останавливаем все тикеры при завершении контекста
-			ticker_Init.Stop()
-			ticker_3m.Stop()
-			ticker_15m.Stop()
-			ticker_1h.Stop()
-			ticker_4h.Stop()
+			tickerInit.Stop()
+			ticker3m.Stop()
+			ticker15m.Stop()
+			ticker1h.Stop()
+			ticker4h.Stop()
 			return g.Wait()
 
-		case <-ticker_Init.C:
+		case <-tickerInit.C:
 			// app.AssetsPrices.UpdateChanges("")
-			ticker_Init.Stop()
+			tickerInit.Stop()
 
-		case <-ticker_3m.C:
+		case <-ticker3m.C:
 			// app.AssetsPrices.UpdateChanges("ch3m")
 
-		case <-ticker_15m.C:
+		case <-ticker15m.C:
 			// app.AssetsPrices.UpdateChanges("ch15m")
 
-		case <-ticker_1h.C:
+		case <-ticker1h.C:
 			// app.AssetsPrices.UpdateChanges("ch1h")
 			// err := app.Account.UpdateAssets()
 			// if err != nil {
@@ -180,7 +180,7 @@ func (app *Application) Run(ctx context.Context) error {
 			// 	return err
 			// }
 
-		case <-ticker_4h.C:
+		case <-ticker4h.C:
 			// app.AssetsPrices.UpdateChanges("ch4h")
 			// err := app.Account.UpdateAssets()
 			// if err != nil {

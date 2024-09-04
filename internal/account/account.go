@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
-	"github.com/sambly/exchangeBot/internal/notification"
-	"github.com/sambly/exchangeBot/internal/prices"
 	"github.com/sambly/exchangeService/pkg/exchange"
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/notification"
+	"github.com/sambly/exchangebot/internal/prices"
 	"golang.org/x/exp/slices"
 )
 

@@ -1,4 +1,4 @@
-package exchangeBot
+package exchangebot
 
 import "embed"
 

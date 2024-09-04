@@ -1,4 +1,4 @@
-module github.com/sambly/exchangeBot
+module github.com/sambly/exchangebot
 
 go 1.22.5
 

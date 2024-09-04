@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sambly/exchangeBot/internal/application"
-	"github.com/sambly/exchangeBot/internal/config"
-	"github.com/sambly/exchangeBot/internal/logger"
-	"github.com/sambly/exchangeBot/internal/notification"
+	"github.com/sambly/exchangebot/internal/application"
+	"github.com/sambly/exchangebot/internal/config"
+	"github.com/sambly/exchangebot/internal/logger"
+	"github.com/sambly/exchangebot/internal/notification"
 
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/acme/autocert"

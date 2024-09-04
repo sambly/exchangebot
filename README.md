@@ -11,7 +11,7 @@ Set the "project name" to "fronted"
 Set the "web framework" to "vanilf js"
 
 // установить зависимости  
-exchangeBot\frontend\yarn install 
+exchangebot\frontend\yarn install 
 // построить проект
 yarn build 
 // или запустить сервер с hot    

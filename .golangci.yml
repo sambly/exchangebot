@@ -1,0 +1,17 @@
+run:
+  timeout: 1m
+
+linters:
+  enable:
+    - gofmt
+    - gosimple
+    - revive
+    - copyloopvar
+    - unparam
+
+linters-settings:
+issues:
+  exclude-rules:
+  exclude-dirs:
+    - log
+    - frontend

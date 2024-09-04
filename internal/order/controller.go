@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/sambly/exchangeBot/internal/database"
-	"github.com/sambly/exchangeBot/internal/logger"
-	"github.com/sambly/exchangeBot/internal/notification"
-	"github.com/sambly/exchangeBot/internal/prices"
 	"github.com/sambly/exchangeService/pkg/exchange"
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/database"
+	"github.com/sambly/exchangebot/internal/logger"
+	"github.com/sambly/exchangebot/internal/notification"
+	"github.com/sambly/exchangebot/internal/prices"
 )
 
 type Status string
@@ -46,7 +46,7 @@ func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, so
 	for _, order := range orders {
 		if order.Status == exModel.OrderStatusTypeActive {
 			ex.AddOrderActive(order)
-			countOrdersActive += 1
+			countOrdersActive++
 		}
 
 		if order.Status == exModel.OrderStatusTypeClose {
@@ -89,20 +89,20 @@ func (c *Controller) CreateOrderMarket(deal exModel.Deal, size float64) (*exMode
 	chData := c.assetsPrices.ChangePrices[pair]
 	dFast := c.assetsPrices.ChangeDelta[pair]
 
-	mkStatJson, err := json.Marshal(mkStat)
+	mkStatJSON, err := json.Marshal(mkStat)
 	if err != nil {
-		ctrLogger.Errorf("error jsonmarshal mkStatJson : %v", err)
+		ctrLogger.Errorf("error jsonmarshal mkStatJSON : %v", err)
 	}
-	chDataJson, err := json.Marshal(chData)
+	chDataJSON, err := json.Marshal(chData)
 	if err != nil {
-		ctrLogger.Errorf("error jsonmarshal chDataJson : %v", err)
+		ctrLogger.Errorf("error jsonmarshal chDataJSON : %v", err)
 	}
-	dFastJson, err := json.Marshal(dFast)
+	dFastJSON, err := json.Marshal(dFast)
 	if err != nil {
-		ctrLogger.Errorf("error jsonmarshal dFastJson : %v", err)
+		ctrLogger.Errorf("error jsonmarshal dFastJSON : %v", err)
 	}
 
-	err = database.InsertOrdersInfoTable(c.database, id, deal.Frame, deal.Strategy, deal.Comment, mkStatJson, chDataJson, dFastJson)
+	err = database.InsertOrdersInfoTable(c.database, id, deal.Frame, deal.Strategy, deal.Comment, mkStatJSON, chDataJSON, dFastJSON)
 	if err != nil {
 		ctrLogger.Errorf("error when create order and add insertinfotables : %v", err)
 	}

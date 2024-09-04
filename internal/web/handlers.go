@@ -15,27 +15,20 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
+	CheckOrigin: func(_ *http.Request) bool {
 		return true // Пропускаем любой запрос
 	},
 }
 
-func (web *Web) updateFull(w http.ResponseWriter, r *http.Request) {
+func (web *Web) updateFull(w http.ResponseWriter, _ *http.Request) {
 
 	maps := map[string]interface{}{
 		"MarketsStat": web.App.AssetsPrices.GetAllMarketsStat(),
 	}
-
-	mapsJson, err := json.Marshal(maps)
-	if err != nil {
-		web.logError(err)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(mapsJson)
+	web.jsonEncode(w, maps)
 }
 
-func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
+func (web *Web) formingPage(w http.ResponseWriter, _ *http.Request) {
 
 	configPath := filepath.Join("..", "..", "configs", "strategy.json")
 	// Список стратегий
@@ -56,13 +49,7 @@ func (web *Web) formingPage(w http.ResponseWriter, r *http.Request) {
 		"OptionStrategy": option,
 	}
 
-	mapsJson, err := json.Marshal(maps)
-	if err != nil {
-		web.logError(err)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(mapsJson)
+	web.jsonEncode(w, maps)
 }
 
 func (web *Web) getDeltaFast(w http.ResponseWriter, r *http.Request) {
@@ -80,8 +67,7 @@ func (web *Web) getDeltaFast(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		web.logError(err)
 	}
-
-	json.NewEncoder(w).Encode(candles)
+	web.jsonEncode(w, candles)
 }
 
 func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
@@ -90,11 +76,10 @@ func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		web.logError(err)
 	}
-
 	pair := string(bodyByte)
+	top := web.App.AssetsPrices.GetMarketsStatForPair(pair)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(web.App.AssetsPrices.GetMarketsStatForPair(pair))
+	web.jsonEncode(w, top)
 }
 
 func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
@@ -113,8 +98,10 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		web.logError(err)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(web.App.PaperWallet.GetOrdersActive())
+
+	orderActives := web.App.PaperWallet.GetOrdersActive()
+
+	web.jsonEncode(w, orderActives)
 }
 
 func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
@@ -125,18 +112,16 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 
 	id, _ := strconv.ParseInt(string(bodyByte), 10, 64)
 
-	err = web.App.OrderController.ClosePosition(id)
-	if err != nil {
+	if err := web.App.OrderController.ClosePosition(id); err != nil {
 		web.logError(err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
 	orders := map[string]interface{}{"OrdersActive": web.App.PaperWallet.GetOrdersActive(), "OrdersHistory": web.App.PaperWallet.GetOrdersHistory()}
-	json.NewEncoder(w).Encode(orders)
+
+	web.jsonEncode(w, orders)
 }
 
-func (web *Web) closeAllDeal(w http.ResponseWriter, r *http.Request) {
+func (web *Web) closeAllDeal(w http.ResponseWriter, _ *http.Request) {
 
 	// Делаем глубокую копию OrdersActive
 	OrdersActiveCopy := make(map[string][]*exModel.Order)
@@ -151,18 +136,14 @@ func (web *Web) closeAllDeal(w http.ResponseWriter, r *http.Request) {
 
 	for _, orders := range OrdersActiveCopy {
 		for _, order := range orders {
-			err := web.App.OrderController.ClosePosition(order.ID)
-			if err != nil {
+			if err := web.App.OrderController.ClosePosition(order.ID); err != nil {
 				web.logError(err)
 			}
 		}
-
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
 	orders := map[string]interface{}{"OrdersActive": web.App.PaperWallet.GetOrdersActive(), "OrdersHistory": web.App.PaperWallet.GetOrdersHistory()}
-	json.NewEncoder(w).Encode(orders)
+	web.jsonEncode(w, orders)
 }
 
 func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
@@ -177,47 +158,34 @@ func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for conn := range web.Sockets.clients {
-			conn.WriteMessage(websocket.TextMessage, []byte("Hello"))
+			if err := conn.WriteMessage(websocket.TextMessage, []byte("Hello")); err != nil {
+				web.logError(err)
+			}
 		}
-
 	}
 }
 
-func (web *Web) getChPrice(w http.ResponseWriter, r *http.Request) {
+func (web *Web) getChPrice(w http.ResponseWriter, _ *http.Request) {
 
 	maps := map[string]interface{}{
 		"MarketsStat":  web.App.AssetsPrices.GetAllMarketsStat(),
 		"ChangePrices": web.App.AssetsPrices.GetAllChPrice(),
 	}
-
-	mapsJson, err := json.Marshal(maps)
-	if err != nil {
-		web.logError(err)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(mapsJson)
+	web.jsonEncode(w, maps)
 }
 
-func (web *Web) getChDelta(w http.ResponseWriter, r *http.Request) {
+func (web *Web) getChDelta(w http.ResponseWriter, _ *http.Request) {
 
 	maps := map[string]interface{}{
 		"DeltaFast": web.App.AssetsPrices.GetAllChDelta(),
 	}
-
-	mapsJson, err := json.Marshal(maps)
-	if err != nil {
-		web.logError(err)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(mapsJson)
+	web.jsonEncode(w, maps)
 }
 
 func (web *Web) grafana(w http.ResponseWriter, r *http.Request) {
 
 	target := "http://grafana:3000/"
-	proxyUrl, _ := url.Parse(target)
-	proxy := httputil.NewSingleHostReverseProxy(proxyUrl)
+	proxyURL, _ := url.Parse(target)
+	proxy := httputil.NewSingleHostReverseProxy(proxyURL)
 	proxy.ServeHTTP(w, r)
 }

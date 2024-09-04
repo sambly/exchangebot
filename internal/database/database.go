@@ -9,7 +9,7 @@ import (
 	"github.com/sambly/exchangeService/pkg/model"
 	exModel "github.com/sambly/exchangeService/pkg/model"
 
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql" // init MySQL
 )
 
 func dsn(dbname, hostname, port, username, password string) string {

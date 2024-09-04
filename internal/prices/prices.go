@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sambly/exchangeBot/internal/database"
-	"github.com/sambly/exchangeBot/internal/logger"
-	"github.com/sambly/exchangeBot/internal/notification"
+	"github.com/sambly/exchangebot/internal/database"
+	"github.com/sambly/exchangebot/internal/logger"
+	"github.com/sambly/exchangebot/internal/notification"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
 )
@@ -302,7 +302,7 @@ func (ap *AsetsPrices) UpdateChangePrices() {
 				}
 			} else {
 
-				ap.ChangePrices[pair][period].СhangePercent = check_values_dividing(ap.MarketsStat[pair].Price, ap.ChangePrices[pair][period].LastPrice)
+				ap.ChangePrices[pair][period].СhangePercent = checkValuesDividing(ap.MarketsStat[pair].Price, ap.ChangePrices[pair][period].LastPrice)
 
 				// Отправка сообщения об изменении цены
 				if ap.ChangePrices[pair][period].СhangePercent >= ap.WeightProcents[period] {
@@ -393,13 +393,13 @@ func (ap *AsetsPrices) UpdateChangeDelta() error {
 					}
 				}
 
-				ap.ChangeDelta[candle.Pair][period].Volume = check_values_dividing(itemFirst.Volume, itemLast.Volume)
-				ap.ChangeDelta[candle.Pair][period].VolumeBuy = check_values_dividing(itemFirst.VolumeBuy, itemLast.VolumeBuy)
-				ap.ChangeDelta[candle.Pair][period].VolumeAsk = check_values_dividing(itemFirst.VolumeAsk, itemLast.VolumeAsk)
+				ap.ChangeDelta[candle.Pair][period].Volume = checkValuesDividing(itemFirst.Volume, itemLast.Volume)
+				ap.ChangeDelta[candle.Pair][period].VolumeBuy = checkValuesDividing(itemFirst.VolumeBuy, itemLast.VolumeBuy)
+				ap.ChangeDelta[candle.Pair][period].VolumeAsk = checkValuesDividing(itemFirst.VolumeAsk, itemLast.VolumeAsk)
 
-				ap.ChangeDelta[candle.Pair][period].Trades = check_values_dividing(float64(itemFirst.Trades), float64(itemLast.Trades))
-				ap.ChangeDelta[candle.Pair][period].TradesBuy = check_values_dividing(float64(itemFirst.TradesBuy), float64(itemLast.TradesBuy))
-				ap.ChangeDelta[candle.Pair][period].TradesAsk = check_values_dividing(float64(itemFirst.TradesAsk), float64(itemLast.TradesAsk))
+				ap.ChangeDelta[candle.Pair][period].Trades = checkValuesDividing(float64(itemFirst.Trades), float64(itemLast.Trades))
+				ap.ChangeDelta[candle.Pair][period].TradesBuy = checkValuesDividing(float64(itemFirst.TradesBuy), float64(itemLast.TradesBuy))
+				ap.ChangeDelta[candle.Pair][period].TradesAsk = checkValuesDividing(float64(itemFirst.TradesAsk), float64(itemLast.TradesAsk))
 
 			}
 		}
@@ -474,7 +474,7 @@ func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]exModel.ChangeDelt
 }
 
 // +inf/-inf/nan
-func check_values_dividing(numerator, denominator float64) float64 {
+func checkValuesDividing(numerator, denominator float64) float64 {
 	if numerator == 0.0 || denominator == 0.0 {
 		return 0
 	}

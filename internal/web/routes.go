@@ -19,10 +19,9 @@ func getFrontendAssets(production bool, content embed.FS) fs.FS {
 			fmt.Println(err)
 		}
 		return f
-	} else {
-
-		return os.DirFS("../../frontend/dist")
 	}
+	return os.DirFS("../../frontend/dist")
+
 }
 
 func (app *Web) routes() *http.ServeMux {
