@@ -103,24 +103,17 @@ func (app *Application) Run(ctx context.Context) error {
 	for _, pair := range app.Settings.Pairs {
 
 		app.dataFeed.SubscribeMarketsStat(ctx, pair, "exchangebot")
-		err := app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
+		app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
 			app.AssetsPrices.OnMarket(market)
 		})
-		if err != nil {
-			appLogger.Errorf("error SubscribeObserverMarket: %v", err)
-		}
-		err = app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
+
+		app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
 			app.OrderController.OnMarket(market)
 		})
-		if err != nil {
-			appLogger.Errorf("error SubscribeObserverMarket: %v", err)
-		}
-		err = app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
+
+		app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
 			app.Strategy.OnMarket(market)
 		})
-		if err != nil {
-			appLogger.Errorf("error SubscribeObserverMarket: %v", err)
-		}
 
 	}
 
