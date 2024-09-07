@@ -100,21 +100,24 @@ func (app *Application) Run(ctx context.Context) error {
 	app.AssetsPrices.InitChangePrices()
 	app.AssetsPrices.InitChangeDelta()
 
+	observers := []func(market exModel.MarketsStat){
+		func(market exModel.MarketsStat) {
+			app.AssetsPrices.OnMarket(market)
+		},
+		func(market exModel.MarketsStat) {
+			app.OrderController.OnMarket(market)
+		},
+		func(market exModel.MarketsStat) {
+			app.Strategy.OnMarket(market)
+		},
+	}
+
 	for _, pair := range app.Settings.Pairs {
 
 		app.dataFeed.SubscribeMarketsStat(ctx, pair, "exchangebot")
-		app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
-			app.AssetsPrices.OnMarket(market)
-		})
-
-		app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
-			app.OrderController.OnMarket(market)
-		})
-
-		app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, func(market exModel.MarketsStat) {
-			app.Strategy.OnMarket(market)
-		})
-
+		for _, observer := range observers {
+			app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, observer)
+		}
 	}
 
 	duration := time.Since(timeStart)

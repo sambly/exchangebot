@@ -108,7 +108,6 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 	return asetsPrices
 }
 
-// TODO Добавить ctx возможно
 func (ap *AsetsPrices) OnMarket(ms exModel.MarketsStat) {
 
 	ap.MarketsStatMu.Lock()
