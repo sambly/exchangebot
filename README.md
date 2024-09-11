@@ -17,6 +17,11 @@ yarn build
 // или запустить сервер с hot    
 yarn dev 
 
+
+yarn dev работает при установке  (env  CONTENT_EMBED=false)
+
+
+
 # Backend
 для файла embed нужна директория frontend/dist  которая создается при yarn build 
 
