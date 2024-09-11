@@ -49,9 +49,7 @@ func InitLogger(debug, production bool) {
 	if err != nil {
 		log.Fatalf("Failed to get current working directory: %v", err)
 	}
-
-	projectRoot := filepath.Join(wd, "../..")
-	logDir := filepath.Join(projectRoot, "log")
+	logDir := filepath.Join(wd, "log")
 
 	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
 		log.Fatalf("Failed to create log directory: %v", err)

@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -80,8 +79,6 @@ var rootCmd = &cobra.Command{
 	SilenceUsage: true,
 
 	Run: func(cmd *cobra.Command, args []string) {
-
-		fmt.Println("Helloo")
 
 		mainLogger := logger.AddFields(map[string]interface{}{
 			"package": "main",

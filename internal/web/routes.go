@@ -12,16 +12,17 @@ import (
 
 func getFrontendAssets(production bool, content embed.FS) fs.FS {
 
+	path := "frontend/dist"
+
 	if production {
 		fsys := fs.FS(content)
-		f, err := fs.Sub(fsys, "frontend/dist")
+		f, err := fs.Sub(fsys, path)
 		if err != nil {
 			fmt.Println(err)
 		}
 		return f
 	}
-	return os.DirFS("../../frontend/dist")
-
+	return os.DirFS(path)
 }
 
 func (app *Web) routes() *http.ServeMux {

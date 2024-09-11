@@ -34,7 +34,7 @@ func (web *Web) updateFull(w http.ResponseWriter, _ *http.Request) {
 
 func (web *Web) formingPage(w http.ResponseWriter, _ *http.Request) {
 
-	configPath := filepath.Join("..", "..", "configs", "strategy.json")
+	configPath := filepath.Join("configs", "strategy.json")
 	// Список стратегий
 	optionByte, err := os.ReadFile(configPath)
 	if err != nil {
