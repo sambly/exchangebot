@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
@@ -13,16 +15,20 @@ type Config struct {
 	// config app
 	ServerName string
 
+	// exchange or grpc
+	BuildTarget string
+
 	// Web
 	Production  bool
 	ProxyServer bool
 	ProxyPort   string
 	HostWeb     string
+
+	ContentEmbed bool
+
 	// Authentication Web basic
 	UsernameAuth string
 	PasswordAuth string
-
-	ContentEmbed bool
 
 	// Exchange
 	APIKey    string
@@ -46,6 +52,36 @@ type Config struct {
 	// GRPC
 	GrpcHost string
 	GrpcPort string
+}
+
+func (c Config) String() string {
+	var sb strings.Builder
+
+	sb.WriteString("Config:\n")
+	sb.WriteString(fmt.Sprintf("  ServerName:    %s\n", c.ServerName))
+	sb.WriteString(fmt.Sprintf("  BuildTarget:   %s\n", c.BuildTarget))
+	sb.WriteString(fmt.Sprintf("  Production:    %v\n", c.Production))
+	sb.WriteString(fmt.Sprintf("  ProxyServer:   %v\n", c.ProxyServer))
+	sb.WriteString(fmt.Sprintf("  ProxyPort:     %s\n", c.ProxyPort))
+	sb.WriteString(fmt.Sprintf("  HostWeb:       %s\n", c.HostWeb))
+	sb.WriteString(fmt.Sprintf("  ContentEmbed:  %v\n", c.ContentEmbed))
+	sb.WriteString(fmt.Sprintf("  UsernameAuth:  %s\n", c.UsernameAuth))
+	sb.WriteString(fmt.Sprintf("  PasswordAuth:  %s\n", c.PasswordAuth))
+	sb.WriteString(fmt.Sprintf("  APIKey:        %s\n", c.APIKey))
+	sb.WriteString(fmt.Sprintf("  SecretKey:     %s\n", c.SecretKey))
+	sb.WriteString(fmt.Sprintf("  TlgToken:      %s\n", c.TlgToken))
+	sb.WriteString(fmt.Sprintf("  TlgUser:       %s\n", c.TlgUser))
+	sb.WriteString(fmt.Sprintf("  NameDb:        %s\n", c.NameDb))
+	sb.WriteString(fmt.Sprintf("  PasswordDb:    %s\n", c.PasswordDb))
+	sb.WriteString(fmt.Sprintf("  HostDb:        %s\n", c.HostDb))
+	sb.WriteString(fmt.Sprintf("  PortDb:        %s\n", c.PortDb))
+	sb.WriteString(fmt.Sprintf("  UserDb:        %s\n", c.UserDb))
+	sb.WriteString(fmt.Sprintf("  DebugLog:      %v\n", c.DebugLog))
+	sb.WriteString(fmt.Sprintf("  ProductionLog: %v\n", c.ProductionLog))
+	sb.WriteString(fmt.Sprintf("  GrpcHost:      %s\n", c.GrpcHost))
+	sb.WriteString(fmt.Sprintf("  GrpcPort:      %s\n", c.GrpcPort))
+
+	return sb.String()
 }
 
 func loadEnv(projectDirName string) error {
@@ -254,4 +290,56 @@ func NewConfig() (*Config, error) {
 		GrpcPort: grpcPort,
 	}
 	return c, nil
+}
+
+func NewConfigV2() (*Config, error) {
+
+	// Загружаем значения из Viper
+	cfg := &Config{
+		ServerName: viper.GetString("server-name"),
+
+		BuildTarget: viper.GetString("build-target"),
+
+		Production:   viper.GetBool("production"),
+		ProxyServer:  viper.GetBool("proxy-server"),
+		ProxyPort:    viper.GetString("proxy-port"),
+		HostWeb:      viper.GetString("host-web"),
+		ContentEmbed: viper.GetBool("content-embed"),
+		UsernameAuth: viper.GetString("username-auth"),
+		PasswordAuth: viper.GetString("password-auth"),
+
+		APIKey:    viper.GetString("api-key-binance"),
+		SecretKey: viper.GetString(`api-secret-binance`),
+
+		TlgToken: viper.GetString("telegram-token"),
+		TlgUser:  viper.GetString("telegram-user"),
+
+		NameDb:     viper.GetString("db-name"),
+		PasswordDb: viper.GetString("db-password"),
+		HostDb:     "",
+		PortDb:     viper.GetString("db-port"),
+		UserDb:     viper.GetString("db-user"),
+
+		DebugLog:      viper.GetBool("debug-log"),
+		ProductionLog: viper.GetBool("production-log"),
+
+		GrpcHost: "",
+		GrpcPort: viper.GetString("grpc-port"),
+	}
+
+	if os.Getenv("ENVIRONMENT") == "docker" {
+		cfg.HostDb = viper.GetString("db-host-docker")
+		cfg.GrpcHost = viper.GetString("grpc-host-docker")
+	} else {
+		cfg.HostDb = viper.GetString("db-host-local")
+		cfg.GrpcHost = viper.GetString("grpc-host-local")
+	}
+
+	// Проверка обязательных параметров
+
+	// if cfg.APIKey == "" || cfg.SecretKey == "" {
+	// 	log.Fatal("APIKey and SecretKey are required")
+	// }
+
+	return cfg, nil
 }
