@@ -45,13 +45,15 @@ var RootCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		fmt.Println(cfg.String())
-
-		logger.InitLogger(cfg.DebugLog, cfg.ProductionLog)
-
 		mainLogger := logger.AddFields(map[string]interface{}{
 			"package": "main",
 		})
+
+		logger.InitLogger(cfg.DebugLog, cfg.ProductionLog)
+
+		if err := config.ReloadConfig("config.yaml", cfg); err != nil {
+			mainLogger.Fatal(err)
+		}
 
 		mainLogger.Info("запуск приложения exchangebot-app")
 
