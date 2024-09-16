@@ -112,13 +112,14 @@ func (w *Web) Run(ctx context.Context) error {
 		// Завершение работы сервера
 		stopErr := w.stop()
 		if stopErr != nil {
-			appWebLogger.Errorf("ошибка при завершении работы HTTP-сервера: %v", stopErr)
 			err = stopErr
+			appWebLogger.Errorf("ошибка при завершении работы HTTP-сервера: %v", stopErr)
+
 		}
 	case serverErr := <-serverErrChan:
 		if serverErr != nil {
-			appWebLogger.Errorf("произошла ошибка во время работы сервера: %v", err)
 			err = serverErr
+			appWebLogger.Errorf("произошла ошибка во время работы сервера: %v", err)
 		}
 	}
 
