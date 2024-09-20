@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"gopkg.in/yaml.v3"
 )
 
 var upgrader = websocket.Upgrader{
@@ -34,15 +35,15 @@ func (web *Web) updateFull(w http.ResponseWriter, _ *http.Request) {
 
 func (web *Web) formingPage(w http.ResponseWriter, _ *http.Request) {
 
-	configPath := filepath.Join("configs", "strategy.json")
+	configPath := filepath.Join("configs", "strategy.yaml")
 	// Список стратегий
 	optionByte, err := os.ReadFile(configPath)
 	if err != nil {
 		appWebLogger.Errorf("error readfile: %v", err)
 	}
 	var option map[string]interface{}
-	if err := json.Unmarshal(optionByte, &option); err != nil {
-		appWebLogger.Errorf("error json unmarshal: %v", err)
+	if err := yaml.Unmarshal(optionByte, &option); err != nil {
+		appWebLogger.Errorf("error yaml unmarshal: %v", err)
 	}
 
 	maps := map[string]interface{}{
