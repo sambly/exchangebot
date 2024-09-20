@@ -24,4 +24,6 @@ certs/*
 # IDE
 .idea
 
-config.yaml
+configs/*
+!configs/example/
+!configs/example/*

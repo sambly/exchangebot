@@ -18,6 +18,7 @@ import (
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/notification"
+	"github.com/sambly/exchangebot/internal/service"
 	"github.com/sambly/exchangebot/internal/strategy"
 	"github.com/sambly/exchangebot/internal/telegram"
 	"github.com/sambly/exchangebot/internal/web"
@@ -47,9 +48,17 @@ func main() {
 	if err != nil {
 		mainLogger.Fatalf("failed to create exchange instance: %v", err)
 	}
-	pairs, err := binance.GetPairsToUSDT()
-	if err != nil {
-		mainLogger.Fatal(err)
+	var pairs []string
+	if config.PairsFromFile {
+		pairs, err = service.GetPairsFile("configs/pairs.txt")
+		if err != nil {
+			mainLogger.Fatalf("failed get pairs from file: %v", err)
+		}
+	} else {
+		pairs, err = binance.GetPairsToUSDT()
+		if err != nil {
+			mainLogger.Fatal(err)
+		}
 	}
 
 	mainLogger.Infof("колличество пар: %v", len(pairs))

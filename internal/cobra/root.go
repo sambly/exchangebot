@@ -23,6 +23,7 @@ import (
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/notification"
+	"github.com/sambly/exchangebot/internal/service"
 	"github.com/sambly/exchangebot/internal/strategy"
 	"github.com/sambly/exchangebot/internal/telegram"
 	"github.com/sambly/exchangebot/internal/web"
@@ -32,7 +33,7 @@ import (
 )
 
 var cfg *config.Config
-var filename = "config.yaml"
+var filename = "configs/config_reload.yaml"
 
 var RootCmd = &cobra.Command{
 	Use:    "exchangebot",
@@ -44,6 +45,8 @@ var RootCmd = &cobra.Command{
 func init() {
 
 	RootCmd.PersistentFlags().String("exchange-type", "exchange", "select exchange type exchange or grpc")
+
+	RootCmd.PersistentFlags().Bool("pairs-from-file", false, "брать пары из файла")
 
 	// Web
 	RootCmd.PersistentFlags().Bool("production", false, "запуск сервера в режиме production, запуск возможен напрямую или через proxy")
@@ -132,9 +135,17 @@ func run(cmd *cobra.Command, args []string) error {
 		mainLogger.Fatalf("failed to create exchange instance: %v", err)
 	}
 
-	pairs, err := binance.GetPairsToUSDT()
-	if err != nil {
-		mainLogger.Fatal(err)
+	var pairs []string
+	if cfg.PairsFromFile {
+		pairs, err = service.GetPairsFile("configs/pairs.txt")
+		if err != nil {
+			mainLogger.Fatalf("failed get pairs from file: %v", err)
+		}
+	} else {
+		pairs, err = binance.GetPairsToUSDT()
+		if err != nil {
+			mainLogger.Fatal(err)
+		}
 	}
 
 	mainLogger.Infof("колличество пар: %v", len(pairs))

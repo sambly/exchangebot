@@ -19,6 +19,9 @@ type Config struct {
 	// exchange or grpc
 	ExchangeType string `yaml:"exchange-type" mapstructure:"exchange-type"`
 
+	// Чтение пар из файла
+	PairsFromFile bool `yaml:"pairs-from-file" mapstructure:"pairs-from-file"`
+
 	// Web
 	Production  bool   `yaml:"production" mapstructure:"production"`
 	ProxyServer bool   `yaml:"proxy-server" mapstructure:"proxy-server"`
@@ -61,6 +64,8 @@ func (c Config) String() string {
 	sb.WriteString("Config:\n")
 	sb.WriteString(fmt.Sprintf("  ServerName:    %s\n", c.ServerName))
 	sb.WriteString(fmt.Sprintf("  BuildTarget:   %s\n", c.BuildTarget))
+	sb.WriteString(fmt.Sprintf("  ExchangeType:  %s\n", c.ExchangeType))
+	sb.WriteString(fmt.Sprintf("  PairsFromFile: %v\n", c.PairsFromFile))
 	sb.WriteString(fmt.Sprintf("  Production:    %v\n", c.Production))
 	sb.WriteString(fmt.Sprintf("  ProxyServer:   %v\n", c.ProxyServer))
 	sb.WriteString(fmt.Sprintf("  ProxyPort:     %s\n", c.ProxyPort))
@@ -97,6 +102,7 @@ func NewConfig() (*Config, error) {
 	contentEmbed := false
 	productionLog := false
 	debugLog := false
+	pairsFromFile := false
 
 	var hostDb string
 	var hostGrpc string
@@ -142,6 +148,15 @@ func NewConfig() (*Config, error) {
 	}
 	if productionString == "true" {
 		production = true
+	}
+
+	// Web
+	pairsFromFileString, exists := os.LookupEnv("PAIRS_FROM_FILE")
+	if !exists {
+		return nil, fmt.Errorf("no .env str PAIRS_FROM_FILE found")
+	}
+	if pairsFromFileString == "true" {
+		pairsFromFile = true
 	}
 
 	proxyServerString, exists := os.LookupEnv("PROXY_SERVER")
@@ -253,6 +268,8 @@ func NewConfig() (*Config, error) {
 
 		ExchangeType: exchangeType,
 
+		PairsFromFile: pairsFromFile,
+
 		// Web
 		Production:  production,
 		ProxyServer: proxyServer,
@@ -300,6 +317,8 @@ func NewConfigV3() (*Config, error) {
 
 		ExchangeType: viper.GetString("exchange-type"),
 
+		PairsFromFile: viper.GetBool("pairs-from-file"),
+
 		Production:   viper.GetBool("production"),
 		ProxyServer:  viper.GetBool("proxy-server"),
 		ProxyPort:    viper.GetString("proxy-port"),
@@ -338,6 +357,7 @@ func NewConfigV3() (*Config, error) {
 	viper.Set("server-name", cfg.ServerName)
 	viper.Set("build-target", cfg.BuildTarget)
 	viper.Set("exchange-type", cfg.ExchangeType)
+	viper.Set("pairs-from-file", cfg.PairsFromFile)
 	viper.Set("production", cfg.Production)
 	viper.Set("proxy-server", cfg.ProxyServer)
 	viper.Set("proxy-port", cfg.ProxyPort)
