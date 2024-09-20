@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -11,47 +10,49 @@ import (
 )
 
 type Config struct {
-
 	// config app
-	ServerName string
+	ServerName string `yaml:"server-name" mapstructure:"server-name"`
+
+	// cobra or ncli
+	BuildTarget string `yaml:"build-target" mapstructure:"build-target"`
 
 	// exchange or grpc
-	BuildTarget string
+	ExchangeType string `yaml:"exchange-type" mapstructure:"exchange-type"`
 
 	// Web
-	Production  bool
-	ProxyServer bool
-	ProxyPort   string
-	HostWeb     string
+	Production  bool   `yaml:"production" mapstructure:"production"`
+	ProxyServer bool   `yaml:"proxy-server" mapstructure:"proxy-server"`
+	ProxyPort   string `yaml:"proxy-port" mapstructure:"proxy-port"`
+	HostWeb     string `yaml:"host-web" mapstructure:"host-web"`
 
-	ContentEmbed bool
+	ContentEmbed bool `yaml:"content-embed" mapstructure:"content-embed"`
 
 	// Authentication Web basic
-	UsernameAuth string
-	PasswordAuth string
+	UsernameAuth string `yaml:"username-auth" mapstructure:"username-auth"`
+	PasswordAuth string `yaml:"password-auth" mapstructure:"password-auth"`
 
 	// Exchange
-	APIKey    string
-	SecretKey string
+	APIKey    string `yaml:"api-key" mapstructure:"api-key"`
+	SecretKey string `yaml:"secret-key" mapstructure:"secret-key"`
 
 	// TLG
-	TlgToken string
-	TlgUser  string
+	TlgToken string `yaml:"tlg-token" mapstructure:"tlg-token"`
+	TlgUser  string `yaml:"tlg-user" mapstructure:"tlg-user"`
 
 	// DB
-	NameDb     string
-	PasswordDb string
-	HostDb     string
-	PortDb     string
-	UserDb     string
+	NameDb     string `yaml:"name-db" mapstructure:"name-db"`
+	PasswordDb string `yaml:"password-db" mapstructure:"password-db"`
+	HostDb     string `yaml:"host-db" mapstructure:"host-db"`
+	PortDb     string `yaml:"port-db" mapstructure:"port-db"`
+	UserDb     string `yaml:"user-db" mapstructure:"user-db"`
 
 	// Log
-	DebugLog      bool
-	ProductionLog bool
+	DebugLog      bool `yaml:"debug-log" mapstructure:"debug-log"`
+	ProductionLog bool `yaml:"production-log" mapstructure:"production-log"`
 
 	// GRPC
-	GrpcHost string
-	GrpcPort string
+	GrpcHost string `yaml:"grpc-host" mapstructure:"grpc-host"`
+	GrpcPort string `yaml:"grpc-port" mapstructure:"grpc-port"`
 }
 
 func (c Config) String() string {
@@ -80,21 +81,9 @@ func (c Config) String() string {
 	sb.WriteString(fmt.Sprintf("  ProductionLog: %v\n", c.ProductionLog))
 	sb.WriteString(fmt.Sprintf("  GrpcHost:      %s\n", c.GrpcHost))
 	sb.WriteString(fmt.Sprintf("  GrpcPort:      %s\n", c.GrpcPort))
+	sb.WriteString("  ---------------------------------------------------")
 
 	return sb.String()
-}
-
-func loadEnv(projectDirName string) error {
-	//const projectDirName = "exchangebot" // change to relevant project name
-
-	projectName := regexp.MustCompile(`^(.*` + projectDirName + `)`)
-	currentWorkDirectory, _ := os.Getwd()
-	rootPath := projectName.Find([]byte(currentWorkDirectory))
-	err := godotenv.Load(string(rootPath) + `/.env`)
-	if err != nil {
-		return fmt.Errorf("error loading .env file")
-	}
-	return nil
 }
 
 func NewConfig() (*Config, error) {
@@ -125,9 +114,11 @@ func NewConfig() (*Config, error) {
 
 	} else {
 		var exists bool
-		if err := loadEnv("exchangebot"); err != nil {
-			return nil, err
+
+		if err := godotenv.Load(".env"); err != nil {
+			return nil, fmt.Errorf("error loading .env file")
 		}
+
 		hostDb, exists = os.LookupEnv("DB_HOST_LOCAL")
 		if !exists {
 			return nil, fmt.Errorf("no .env str DB_HOST_LOCAL  found")
@@ -139,9 +130,9 @@ func NewConfig() (*Config, error) {
 		}
 	}
 
-	serverName, exists := os.LookupEnv("SERVERNAME")
+	serverName, exists := os.LookupEnv("SERVER_NAME")
 	if !exists {
-		return nil, fmt.Errorf("no .env str SERVERNAME  found")
+		return nil, fmt.Errorf("no .env str SERVER_NAME  found")
 	}
 
 	// Web
@@ -250,10 +241,17 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("no .env str GRPC_PORT  found")
 	}
 
+	exchangeType, exists := os.LookupEnv("EXCHANGE_TYPE")
+	if !exists {
+		return nil, fmt.Errorf("no .env str EXCHANGE_TYPE  found")
+	}
+
 	c := &Config{
 
 		// config app
 		ServerName: serverName,
+
+		ExchangeType: exchangeType,
 
 		// Web
 		Production:  production,
@@ -292,13 +290,15 @@ func NewConfig() (*Config, error) {
 	return c, nil
 }
 
-func NewConfigV2() (*Config, error) {
+func NewConfigV3() (*Config, error) {
 
 	// Загружаем значения из Viper
 	cfg := &Config{
 		ServerName: viper.GetString("server-name"),
 
 		BuildTarget: viper.GetString("build-target"),
+
+		ExchangeType: viper.GetString("exchange-type"),
 
 		Production:   viper.GetBool("production"),
 		ProxyServer:  viper.GetBool("proxy-server"),
@@ -309,7 +309,7 @@ func NewConfigV2() (*Config, error) {
 		PasswordAuth: viper.GetString("password-auth"),
 
 		APIKey:    viper.GetString("api-key-binance"),
-		SecretKey: viper.GetString(`api-secret-binance`),
+		SecretKey: viper.GetString("api-secret-binance"),
 
 		TlgToken: viper.GetString("telegram-token"),
 		TlgUser:  viper.GetString("telegram-user"),
@@ -335,11 +335,45 @@ func NewConfigV2() (*Config, error) {
 		cfg.GrpcHost = viper.GetString("grpc-host-local")
 	}
 
+	viper.Set("server-name", cfg.ServerName)
+	viper.Set("build-target", cfg.BuildTarget)
+	viper.Set("exchange-type", cfg.ExchangeType)
+	viper.Set("production", cfg.Production)
+	viper.Set("proxy-server", cfg.ProxyServer)
+	viper.Set("proxy-port", cfg.ProxyPort)
+	viper.Set("host-web", cfg.HostWeb)
+	viper.Set("content-embed", cfg.ContentEmbed)
+	viper.Set("username-auth", cfg.UsernameAuth)
+	viper.Set("password-auth", cfg.PasswordAuth)
+	viper.Set("api-key-binance", cfg.APIKey)
+	viper.Set("api-secret-binance", cfg.SecretKey)
+	viper.Set("telegram-token", cfg.TlgToken)
+	viper.Set("telegram-user", cfg.TlgUser)
+	viper.Set("db-name", cfg.NameDb)
+	viper.Set("db-password", cfg.PasswordDb)
+	viper.Set("db-host-docker", cfg.HostDb)
+	viper.Set("db-host-local", cfg.HostDb)
+	viper.Set("db-port", cfg.PortDb)
+	viper.Set("db-user", cfg.UserDb)
+	viper.Set("debug-log", cfg.DebugLog)
+	viper.Set("production-log", cfg.ProductionLog)
+	viper.Set("grpc-port", cfg.GrpcPort)
+	viper.Set("grpc-host-docker", cfg.GrpcHost)
+	viper.Set("grpc-host-local", cfg.GrpcHost)
+
 	// Проверка обязательных параметров
-
-	// if cfg.APIKey == "" || cfg.SecretKey == "" {
-	// 	log.Fatal("APIKey and SecretKey are required")
-	// }
-
+	if cfg.Production && cfg.HostWeb == "" {
+		return nil, fmt.Errorf("HostWeb are required ")
+	}
+	if cfg.ProxyServer && cfg.ProxyPort == "" {
+		return nil, fmt.Errorf("ProxyPort are required ")
+	}
+	if cfg.APIKey == "" || cfg.SecretKey == "" {
+		return nil, fmt.Errorf("APIKey and SecretKey are required")
+	}
+	if cfg.TlgToken == "" || cfg.TlgUser == "" {
+		return nil, fmt.Errorf("TlgToken and TlgUser are required")
+	}
 	return cfg, nil
+
 }

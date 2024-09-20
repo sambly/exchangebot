@@ -30,7 +30,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	logger.InitLogger(config.DebugLog, config.ProductionLog)
+
+	if err := logger.InitLogger(config.DebugLog, config.ProductionLog); err != nil {
+		log.Fatalf("failed to InitLogger: %v", err)
+	}
 
 	mainLogger := logger.AddFields(map[string]interface{}{
 		"package": "main",
@@ -93,17 +96,27 @@ func main() {
 	notify := &notification.Notification{Message: make(chan string)}
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
-	c, conn, err := exchange.NewClientGrpc(fmt.Sprintf("%s:%s", config.GrpcHost, config.GrpcPort))
-	if err != nil {
-		mainLogger.Fatalf("did not connect to grpc: %v", err)
+	var dataFeed exchange.RouterDataFeed
+
+	if config.ExchangeType == "exchange" {
+		dataFeed = exchange.NewDataFeedWithExchange(
+			binance,
+			logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()),
+		)
+	} else if config.ExchangeType == "grpc" {
+
+		c, conn, err := exchange.NewClientGrpc(fmt.Sprintf("%s:%s", config.GrpcHost, config.GrpcPort))
+		if err != nil {
+			mainLogger.Fatalf("did not connect to grpc: %v", err)
+		}
+
+		defer conn.Close()
+
+		dataFeed = exchange.NewDataFeed(
+			c,
+			logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()),
+		)
 	}
-
-	defer conn.Close()
-
-	dataFeed := exchange.NewDataFeed(
-		c,
-		logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()),
-	)
 
 	strategy, err := strategy.NewControllerStrategy(
 		strategy.WithLocalExtremes(strategy.NewLocalExtremes(pairs, periodsStrategy)),

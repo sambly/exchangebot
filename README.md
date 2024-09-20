@@ -56,3 +56,27 @@ docker-compose up -d
 
 // Удаление контейнеров 
 docker-compose down 
+
+# cobra 
+// Запуск в общем случае
+ go run ./cmd/cobra
+
+// Запуск со сборкой (windows)
+ go build -o exchangebot.exe ./cmd/cobra/main.go
+ // Запуск 
+ ./exchangebot.exe
+
+ //Глобальная установка (примерно) 
+ go install ./cmd/cobra
+
+// Применение команд на примере update 
+// windows (если запусккать просто через run )
+go run ./cmd/cobra update --production-log=true   
+
+// docker 
+/app # ./exchangebot update --debug-log=true
+
+
+
+
+

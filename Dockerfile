@@ -40,7 +40,7 @@ COPY go.mod go.sum ./
 # Установка переменных окружения как аргументов сборки
 ARG GITHUB_TOKEN
 ARG ENVIRONMENT
-ARG BUILD_TARGET=exchange
+ARG BUILD_TARGET=cobra
 
 # Установка переменных окружения
 ENV GOPRIVATE=github.com/sambly
@@ -61,9 +61,7 @@ COPY cmd ./cmd
 COPY embed.go ./
 COPY ./configs ./configs
 
-RUN go build -o ./cmd/exchange/exchangebot ./cmd/${BUILD_TARGET}
-
-
+RUN go build -o ./exchangebot ./cmd/${BUILD_TARGET}
 
 # Финальный образ для запуска
 FROM alpine:3.18
@@ -75,9 +73,10 @@ RUN apk add --no-cache ca-certificates tzdata \
     && ln -sf /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
     && echo "Europe/Moscow" > /etc/timezone
 
-WORKDIR /app/cmd/exchange
 
-COPY --from=builder /app/cmd/exchange/exchangebot .
+WORKDIR /app
+
+COPY --from=builder /app/exchangebot .
 COPY --from=builder /app/configs /app/configs
 
 VOLUME /app/log

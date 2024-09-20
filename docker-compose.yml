@@ -6,7 +6,7 @@ services:
       context: .
       args:
         GITHUB_TOKEN: ${GITHUB_TOKEN}
-        BUILD_TARGET: ${BUILD_TARGET:-exchange}
+        BUILD_TARGET: ${BUILD_TARGET:-ncli}
         VITE_GRAFANA_URL: ${VITE_GRAFANA_URL:-grafana}
     ports:
       - "${HOST_PORT:-8080}:${CONTAINER_PORT:-80}"
