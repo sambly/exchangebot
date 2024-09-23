@@ -4,7 +4,16 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+
+	"github.com/sambly/exchangeService/pkg/exchange"
 )
+
+func GetPairs(fromFile bool, exch exchange.Exchange) ([]string, error) {
+	if fromFile {
+		return GetPairsFile("configs/pairs.txt")
+	}
+	return exch.GetPairsToUSDT()
+}
 
 func GetPairsFile(fileName string) ([]string, error) {
 	var pairs []string

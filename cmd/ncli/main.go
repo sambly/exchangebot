@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -44,21 +43,15 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
 	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(config.APIKey, config.SecretKey))
 	if err != nil {
 		mainLogger.Fatalf("failed to create exchange instance: %v", err)
 	}
-	var pairs []string
-	if config.PairsFromFile {
-		pairs, err = service.GetPairsFile("configs/pairs.txt")
-		if err != nil {
-			mainLogger.Fatalf("failed get pairs from file: %v", err)
-		}
-	} else {
-		pairs, err = binance.GetPairsToUSDT()
-		if err != nil {
-			mainLogger.Fatal(err)
-		}
+
+	pairs, err := service.GetPairs(config.PairsFromFile, binance)
+	if err != nil {
+		mainLogger.Fatalf("failed get pairs: %v", err)
 	}
 
 	mainLogger.Infof("колличество пар: %v", len(pairs))
@@ -86,45 +79,27 @@ func main() {
 		DeltaPeriods:   periods,
 		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
 	}
-	db, err := database.DbConnection(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
+
+	db, err := database.DbInit(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
 	defer db.Close()
 
-	err = database.CreateOrdersTable(db)
-	if err != nil {
-		mainLogger.Fatal(err)
-	}
-
-	err = database.CreateOrdersInfoTable(db)
-	if err != nil {
-		mainLogger.Fatal(err)
-	}
-
 	notify := &notification.Notification{Message: make(chan string)}
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
-	var dataFeed exchange.RouterDataFeed
-
-	if config.ExchangeType == "exchange" {
-		dataFeed = exchange.NewDataFeedWithExchange(
-			binance,
-			logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()),
-		)
-	} else if config.ExchangeType == "grpc" {
-
-		c, conn, err := exchange.NewClientGrpc(fmt.Sprintf("%s:%s", config.GrpcHost, config.GrpcPort))
-		if err != nil {
-			mainLogger.Fatalf("did not connect to grpc: %v", err)
-		}
-
+	dataFeed, conn, err := exchange.InitDataFeed(ctx,
+		config.ExchangeType,
+		config.GrpcHost,
+		config.GrpcPort,
+		binance,
+		logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()))
+	if err != nil {
+		mainLogger.Fatalf("failed to initialize data feed: %v", err)
+	}
+	if conn != nil {
 		defer conn.Close()
-
-		dataFeed = exchange.NewDataFeed(
-			c,
-			logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()),
-		)
 	}
 
 	strategy, err := strategy.NewControllerStrategy(

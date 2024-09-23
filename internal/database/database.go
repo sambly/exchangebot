@@ -12,6 +12,47 @@ import (
 	_ "github.com/go-sql-driver/mysql" // init MySQL
 )
 
+type periods struct {
+	Name     string
+	Duration time.Duration
+}
+
+func DbInit(dbname, hostname, port, username, password string) (*sql.DB, error) {
+
+	db, err := DbConnection(dbname, hostname, port, username, password)
+	if err != nil {
+		return db, err
+	}
+
+	err = CreateOrdersTable(db)
+	if err != nil {
+		return db, err
+	}
+
+	err = CreateOrdersInfoTable(db)
+	if err != nil {
+		return db, err
+	}
+
+	periods := []periods{
+		{Name: "ch1m", Duration: time.Second * 60},
+		{Name: "ch3m", Duration: time.Minute * 3},
+		{Name: "ch15m", Duration: time.Minute * 15},
+		{Name: "ch1h", Duration: time.Hour},
+		{Name: "ch4h", Duration: time.Hour * 4},
+		{Name: "ch12h", Duration: time.Hour * 12},
+	}
+
+	for _, period := range periods {
+		err = CreateTableName(db, period.Name)
+		if err != nil {
+			return db, err
+		}
+	}
+
+	return db, nil
+}
+
 func dsn(dbname, hostname, port, username, password string) string {
 	loc := `&loc=Local`
 	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&%s", username, password, hostname, port, dbname, loc)
@@ -157,6 +198,45 @@ func CreateOrdersTable(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("error %s when getting rows affected", err)
 	}
+	return nil
+}
+
+func CreateTableName(db *sql.DB, tableName string) error {
+	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s(
+        Id int primary key auto_increment,
+        Time datetime,
+        Pair VARCHAR(20),
+        Open DOUBLE,
+        Close DOUBLE,
+        Low DOUBLE,
+        High DOUBLE,
+        Volume DOUBLE,
+        QuoteVolume DOUBLE,
+        AmountTrade INT,
+        AmountTradeBuy INT,
+        ActiveBuyVolume DOUBLE,
+        ActiveBuyQuoteVolume DOUBLE
+    )`, "candles"+tableName)
+
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancelfunc()
+	res, err := db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("error %s when creating %s table", err, "candles"+tableName)
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error %s when getting rows affected", err)
+	}
+
+	if rowsAffected > 0 {
+		indexQuery := fmt.Sprintf(`CREATE INDEX idx_pair ON %s (Pair)`, "candles"+tableName)
+		_, err = db.ExecContext(ctx, indexQuery)
+		if err != nil {
+			return fmt.Errorf("error %s when creating index on %s table", err, "candles"+tableName)
+		}
+	}
+
 	return nil
 }
 
@@ -357,7 +437,6 @@ func SelectMarketStateTime(db *sql.DB, pair string, timeRounding time.Time) (exM
 	}
 
 	return candle, nil
-
 }
 
 func SelectMarketStateTimev2(db *sql.DB, timeRounding time.Time) ([]exModel.Candle, error) {
@@ -454,5 +533,4 @@ func SelectDeltaPeriod(db *sql.DB, pair string, period string) ([]exModel.Change
 	}
 
 	return candles, nil
-
 }
