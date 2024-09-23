@@ -5,7 +5,6 @@ package cobra
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -135,17 +134,9 @@ func run(cmd *cobra.Command, args []string) error {
 		mainLogger.Fatalf("failed to create exchange instance: %v", err)
 	}
 
-	var pairs []string
-	if cfg.PairsFromFile {
-		pairs, err = service.GetPairsFile("configs/pairs.txt")
-		if err != nil {
-			mainLogger.Fatalf("failed get pairs from file: %v", err)
-		}
-	} else {
-		pairs, err = binance.GetPairsToUSDT()
-		if err != nil {
-			mainLogger.Fatal(err)
-		}
+	pairs, err := service.GetPairs(cfg.PairsFromFile, binance)
+	if err != nil {
+		mainLogger.Fatalf("failed get pairs: %v", err)
 	}
 
 	mainLogger.Infof("колличество пар: %v", len(pairs))
@@ -173,45 +164,27 @@ func run(cmd *cobra.Command, args []string) error {
 		DeltaPeriods:   periods,
 		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
 	}
-	db, err := database.DbConnection(cfg.NameDb, cfg.HostDb, cfg.PortDb, cfg.UserDb, cfg.PasswordDb)
+
+	db, err := database.DbInit(cfg.NameDb, cfg.HostDb, cfg.PortDb, cfg.UserDb, cfg.PasswordDb)
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
 	defer db.Close()
 
-	err = database.CreateOrdersTable(db)
-	if err != nil {
-		mainLogger.Fatal(err)
-	}
-
-	err = database.CreateOrdersInfoTable(db)
-	if err != nil {
-		mainLogger.Fatal(err)
-	}
-
 	notify := &notification.Notification{Message: make(chan string)}
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
-	var dataFeed exchange.RouterDataFeed
-
-	if cfg.ExchangeType == "exchange" {
-		dataFeed = exchange.NewDataFeedWithExchange(
-			binance,
-			logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()),
-		)
-	} else if cfg.ExchangeType == "grpc" {
-
-		c, conn, err := exchange.NewClientGrpc(fmt.Sprintf("%s:%s", cfg.GrpcHost, cfg.GrpcPort))
-		if err != nil {
-			mainLogger.Fatalf("did not connect to grpc: %v", err)
-		}
-
+	dataFeed, conn, err := exchange.InitDataFeed(ctx,
+		cfg.ExchangeType,
+		cfg.GrpcHost,
+		cfg.GrpcPort,
+		binance,
+		logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()))
+	if err != nil {
+		mainLogger.Fatalf("failed to initialize data feed: %v", err)
+	}
+	if conn != nil {
 		defer conn.Close()
-
-		dataFeed = exchange.NewDataFeed(
-			c,
-			logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()),
-		)
 	}
 
 	strategy, err := strategy.NewControllerStrategy(
