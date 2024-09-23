@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sambly/exchangeService/pkg/model"
 	exModel "github.com/sambly/exchangeService/pkg/model"
 
 	_ "github.com/go-sql-driver/mysql" // init MySQL
@@ -510,7 +509,7 @@ func SelectDeltaPeriod(db *sql.DB, pair string, period string) ([]exModel.Change
 	defer rows.Close()
 
 	for rows.Next() {
-		var changeDelta model.ChangeDeltaForCandle
+		var changeDelta exModel.ChangeDeltaForCandle
 		if err := rows.Scan(
 			&changeDelta.Time,
 			&changeDelta.Volume,
