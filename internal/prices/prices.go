@@ -1,14 +1,15 @@
 package prices
 
 import (
-	"database/sql"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/sambly/exchangebot/internal/database"
 	"github.com/sambly/exchangebot/internal/logger"
+	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/notification"
+	"gorm.io/gorm"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
 )
@@ -27,7 +28,6 @@ type DatasetChangePrices struct {
 	Price float64
 	Time  time.Time
 }
-
 type ChangeDelta struct {
 	Time      time.Time
 	Volume    float64
@@ -44,7 +44,7 @@ type ChangeDeltaDataset struct {
 }
 
 type AsetsPrices struct {
-	database     *sql.DB
+	database     *gorm.DB
 	Notification *notification.Notification
 
 	Pairs          []string
@@ -69,7 +69,7 @@ type AsetsPrices struct {
 
 var pricesLogger = logger.AddFieldsEmpty()
 
-func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time.Duration, weightProcents map[string]float64, db *sql.DB, notification *notification.Notification) *AsetsPrices {
+func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time.Duration, weightProcents map[string]float64, db *gorm.DB, notification *notification.Notification) *AsetsPrices {
 	asetsPrices := &AsetsPrices{
 		Pairs:          pairs,
 		Periods:        periodsChange,
@@ -438,7 +438,7 @@ func (ap *AsetsPrices) GetMarketsStatForPair(pair string) *exModel.MarketsStat {
 	return ap.MarketsStat[pair]
 }
 
-func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]exModel.ChangeDeltaForCandle, error) {
+func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDeltaForCandle, error) {
 
 	timeStart := time.Now()
 
@@ -447,7 +447,7 @@ func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]exModel.ChangeDelt
 		return nil, err
 	}
 
-	clearChangeDelta := []exModel.ChangeDeltaForCandle{}
+	clearChangeDelta := []model.ChangeDeltaForCandle{}
 
 	if len(changeDelta) > 0 {
 		clearChangeDelta = append(clearChangeDelta, changeDelta[0])

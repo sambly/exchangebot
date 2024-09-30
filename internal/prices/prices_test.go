@@ -29,11 +29,10 @@ func TestUpdateDeltaFullData(t *testing.T) {
 		t.Error(err)
 	}
 
-	db, err := database.DbConnection(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
+	db, err := database.DbInit("mysql", config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
 	if err != nil {
 		t.Error(err)
 	}
-	defer db.Close()
 
 	periods := map[string]time.Duration{
 		"ch1m":  time.Second * 60,

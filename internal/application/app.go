@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/sambly/exchangeService/pkg/exchange"
@@ -14,13 +13,14 @@ import (
 	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy"
+	"gorm.io/gorm"
 
 	"golang.org/x/sync/errgroup"
 )
 
 type Application struct {
 	Settings model.Settings
-	database *sql.DB
+	database *gorm.DB
 
 	exchange exchange.Exchange
 	dataFeed exchange.RouterDataFeed
@@ -36,7 +36,7 @@ type Application struct {
 
 var appLogger = logger.AddFieldsEmpty()
 
-func NewApp(ctx context.Context, exch exchange.Exchange, dataFeed exchange.RouterDataFeed, settings model.Settings, db *sql.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage, strategy *strategy.ControllerStrategy) (*Application, error) {
+func NewApp(ctx context.Context, exch exchange.Exchange, dataFeed exchange.RouterDataFeed, settings model.Settings, db *gorm.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage, strategy *strategy.ControllerStrategy) (*Application, error) {
 
 	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, settings.WeightProcents, db, notification)
 	account, err := account.NewAccount(exch, assetsPrices, notification)

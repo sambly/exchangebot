@@ -36,16 +36,20 @@ make lint
 docker login
 
 //Эта команда создает Docker-образ на основе Dockerfile, находящегося в текущей директории.
-docker build -t sambly/exchange_app .
-
+docker build -t exchange_app .
 // Запуск с arg 
-docker build --build-arg GITHUB_TOKEN=<your_github_token> --build-arg BUILD_TARGET=<target> -t sambly/exchange_app .
+docker build --build-arg GITHUB_TOKEN=<your_github_token> -t exchange_app .
 
 // Запуск контейнера Docker: Эта команда запускает контейнер из образа в интерактивном режиме (-it). Флаг --rm удаляет контейнер после его остановки.
 docker run --rm -it sambly/exchange_app
 
 // Отправить docker в docker-hub
 docker push sambly/exchange_app:latest
+
+// Просто запустить docker без docker-compose с уже введеными аргументами 
+make build-simple-docker
+make run-simple-docker
+
 
 # docker-compose
 // запуск docker compose c построением. Эта команда запускает службы, определенные в docker-compose.yml, и перед запуском пересобирает образы. -d запуск в фоновом режиме 

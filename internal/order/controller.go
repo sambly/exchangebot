@@ -2,7 +2,6 @@ package order
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"sync"
 
@@ -10,8 +9,10 @@ import (
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/database"
 	"github.com/sambly/exchangebot/internal/logger"
+	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/prices"
+	"gorm.io/gorm"
 )
 
 type Status string
@@ -20,7 +21,7 @@ type Controller struct {
 	mtx      sync.Mutex
 	ctx      context.Context
 	exchange *exchange.PaperWallet
-	database *sql.DB
+	database *gorm.DB
 
 	assetsPrices   *prices.AsetsPrices
 	socketsMessage *notification.SocketsMessage
@@ -28,7 +29,7 @@ type Controller struct {
 
 var ctrLogger = logger.AddFieldsEmpty()
 
-func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, socketsMessage *notification.SocketsMessage, assetsPrices *prices.AsetsPrices) (*Controller, error) {
+func NewController(ctx context.Context, ex *exchange.PaperWallet, db *gorm.DB, socketsMessage *notification.SocketsMessage, assetsPrices *prices.AsetsPrices) (*Controller, error) {
 
 	ctrl := &Controller{
 		ctx:            ctx,
@@ -45,12 +46,12 @@ func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, so
 	countOrdersActive := 0
 	for _, order := range orders {
 		if order.Status == exModel.OrderStatusTypeActive {
-			ex.AddOrderActive(order)
+			ex.AddOrderActive(&order)
 			countOrdersActive++
 		}
 
 		if order.Status == exModel.OrderStatusTypeClose {
-			ex.AddOrderHistory(order)
+			ex.AddOrderHistory(&order)
 		}
 
 	}
@@ -60,7 +61,7 @@ func NewController(ctx context.Context, ex *exchange.PaperWallet, db *sql.DB, so
 
 }
 
-func (c *Controller) CreateOrderMarket(deal exModel.Deal, size float64) (*exModel.Order, error) {
+func (c *Controller) CreateOrderMarket(deal model.Deal, size float64) (*exModel.Order, error) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
@@ -79,11 +80,9 @@ func (c *Controller) CreateOrderMarket(deal exModel.Deal, size float64) (*exMode
 		return nil, err
 	}
 
-	id, err := database.CreateOrder(c.database, order)
-	if err != nil {
+	if err := database.CreateOrder(c.database, order); err != nil {
 		return nil, err
 	}
-	order.ID = id
 
 	mkStat := c.assetsPrices.MarketsStat[pair]
 	chData := c.assetsPrices.ChangePrices[pair]
@@ -102,8 +101,17 @@ func (c *Controller) CreateOrderMarket(deal exModel.Deal, size float64) (*exMode
 		ctrLogger.Errorf("error jsonmarshal dFastJSON : %v", err)
 	}
 
-	err = database.InsertOrdersInfoTable(c.database, id, deal.Frame, deal.Strategy, deal.Comment, mkStatJSON, chDataJSON, dFastJSON)
-	if err != nil {
+	orderInfo := model.OrderInfo{
+		IdOrder:      uint(order.ID),
+		Frame:        deal.Frame,
+		Strategy:     deal.Strategy,
+		Comment:      deal.Comment,
+		MarketsStat:  mkStatJSON,
+		ChangePrices: chDataJSON,
+		DeltaFast:    dFastJSON,
+	}
+
+	if err := database.InsertOrdersInfoTable(c.database, orderInfo); err != nil {
 		ctrLogger.Errorf("error when create order and add insertinfotables : %v", err)
 	}
 

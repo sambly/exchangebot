@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/model"
 	"gopkg.in/yaml.v3"
 )
 
@@ -99,7 +100,7 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 
 	bodyByte, _ := io.ReadAll(r.Body)
 
-	deal := exModel.Deal{}
+	deal := model.Deal{}
 
 	if err := json.Unmarshal(bodyByte, &deal); err != nil {
 		appWebLogger.Errorf("error json unmarshal: %v", err)

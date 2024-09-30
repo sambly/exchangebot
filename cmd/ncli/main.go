@@ -80,11 +80,10 @@ func main() {
 		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
 	}
 
-	db, err := database.DbInit(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
+	db, err := database.DbInit(config.TypeDB, config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
-	defer db.Close()
 
 	notify := &notification.Notification{Message: make(chan string)}
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}

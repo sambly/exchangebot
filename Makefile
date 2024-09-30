@@ -19,7 +19,7 @@ export GIT_TERMINAL_PROMPT := 1
 
 
 # Настройка окружения Go 
-.PHONY: setup-env prepare install-deps
+.PHONY: setup-env prepare install-deps install-deps-develop
 setup-env: prepare install-deps
 
 prepare:
@@ -29,6 +29,11 @@ prepare:
 install-deps:
 	@echo "Fetching dependencies..."
 	@go get $(PRIVATE_REPO)
+	@go mod tidy
+# использовать ветку develop
+install-deps-develop:
+	@echo "Fetching dependencies..."
+	@go get $(PRIVATE_REPO)@develop
 	@go mod tidy
 
 
@@ -90,3 +95,31 @@ compare-all-envs:
 			dotenv-linter compare $$dir/.env $$dir/.env.example || true; \
 		fi \
 	done
+
+
+
+
+# Запуск docker в одиночном режиме без docker-compose с простыми настройками и sqlite memory
+BUILD_ARGS_DOCKER = \
+    --build-arg GITHUB_TOKEN=$(GITHUB_TOKEN) \
+    --build-arg VITE_GRAFANA_URL=$(VITE_GRAFANA_URL)
+
+build-simple-docker:
+	docker build $(BUILD_ARGS_DOCKER) -t exchange_app .
+
+run-simple-docker:
+	docker run -e SERVER_NAME=exchange_only_docker \
+	           -e ENVIRONMENT=docker \
+               -e EXCHANGE_TYPE=exchange \
+               -e CONTENT_EMBED=true \
+               -e API_KEY_BINANCE=$(API_KEY_BINANCE) \
+               -e API_SECRET_BINANCE=$(API_SECRET_BINANCE) \
+               -e TELEGRAM_TOKEN=$(TELEGRAM_TOKEN) \
+               -e TELEGRAM_USER=$(TELEGRAM_USER) \
+               -e DB_TYPE=sqlite \
+               -p 80:80 exchange_app
+
+
+
+
+			

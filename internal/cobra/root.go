@@ -65,6 +65,7 @@ func init() {
 	RootCmd.PersistentFlags().String("telegram-user", "", "telegram-user")
 
 	// DB
+	RootCmd.PersistentFlags().String("db-type", "mysql", "db-type")
 	RootCmd.PersistentFlags().String("db-name", "datafeeder", "db-name")
 	RootCmd.PersistentFlags().String("db-password", "q1w2e3", "db-password")
 	RootCmd.PersistentFlags().String("db-port", "3306", "db-port")
@@ -165,11 +166,10 @@ func run(cmd *cobra.Command, args []string) error {
 		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
 	}
 
-	db, err := database.DbInit(cfg.NameDb, cfg.HostDb, cfg.PortDb, cfg.UserDb, cfg.PasswordDb)
+	db, err := database.DbInit(cfg.TypeDB, cfg.NameDb, cfg.HostDb, cfg.PortDb, cfg.UserDb, cfg.PasswordDb)
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
-	defer db.Close()
 
 	notify := &notification.Notification{Message: make(chan string)}
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}

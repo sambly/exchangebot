@@ -43,6 +43,8 @@ type Config struct {
 	TlgUser  string `yaml:"tlg-user" mapstructure:"tlg-user"`
 
 	// DB
+	// DB_TYPE mysql or sqlite   default mysql  only docker sqlite
+	TypeDB     string `yaml:"type-db" mapstructure:"type-db"`
 	NameDb     string `yaml:"name-db" mapstructure:"name-db"`
 	PasswordDb string `yaml:"password-db" mapstructure:"password-db"`
 	HostDb     string `yaml:"host-db" mapstructure:"host-db"`
@@ -77,6 +79,7 @@ func (c Config) String() string {
 	sb.WriteString(fmt.Sprintf("  SecretKey:     %s\n", c.SecretKey))
 	sb.WriteString(fmt.Sprintf("  TlgToken:      %s\n", c.TlgToken))
 	sb.WriteString(fmt.Sprintf("  TlgUser:       %s\n", c.TlgUser))
+	sb.WriteString(fmt.Sprintf("  TypeDb:        %s\n", c.TypeDB))
 	sb.WriteString(fmt.Sprintf("  NameDb:        %s\n", c.NameDb))
 	sb.WriteString(fmt.Sprintf("  PasswordDb:    %s\n", c.PasswordDb))
 	sb.WriteString(fmt.Sprintf("  HostDb:        %s\n", c.HostDb))
@@ -106,6 +109,8 @@ func NewConfig() (*Config, error) {
 
 	var hostDb string
 	var hostGrpc string
+
+	typeDb := "mysql"
 
 	if os.Getenv("ENVIRONMENT") == "docker" {
 		var exists bool
@@ -216,6 +221,11 @@ func NewConfig() (*Config, error) {
 	}
 
 	// DB
+
+	typeDb, exists = os.LookupEnv("DB_TYPE")
+	if !exists {
+		return nil, fmt.Errorf("no .env str DB_TYPE found")
+	}
 	nameDb, exists := os.LookupEnv("DB_NAME")
 	if !exists {
 		return nil, fmt.Errorf("no .env str DB_NAME found")
@@ -290,6 +300,7 @@ func NewConfig() (*Config, error) {
 		TlgUser:  tlgUser,
 
 		// DB
+		TypeDB:     typeDb,
 		NameDb:     nameDb,
 		PasswordDb: passwordDb,
 		HostDb:     hostDb,
@@ -333,6 +344,7 @@ func NewConfigV3() (*Config, error) {
 		TlgToken: viper.GetString("telegram-token"),
 		TlgUser:  viper.GetString("telegram-user"),
 
+		TypeDB:     viper.GetString("db-type"),
 		NameDb:     viper.GetString("db-name"),
 		PasswordDb: viper.GetString("db-password"),
 		HostDb:     "",
@@ -369,6 +381,7 @@ func NewConfigV3() (*Config, error) {
 	viper.Set("api-secret-binance", cfg.SecretKey)
 	viper.Set("telegram-token", cfg.TlgToken)
 	viper.Set("telegram-user", cfg.TlgUser)
+	viper.Set("db-type", cfg.TypeDB)
 	viper.Set("db-name", cfg.NameDb)
 	viper.Set("db-password", cfg.PasswordDb)
 	viper.Set("db-host-docker", cfg.HostDb)
