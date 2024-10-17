@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'exchange_app'
+    static_configs:
+      - targets: ['exchange_app:80']  # Используем имя сервиса из Docker
