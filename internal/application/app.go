@@ -6,6 +6,7 @@ import (
 
 	"github.com/sambly/exchangeService/pkg/exchange"
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangeService/pkg/telemetry"
 	"github.com/sambly/exchangebot/internal/account"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/model"
@@ -13,9 +14,8 @@ import (
 	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy"
-	"gorm.io/gorm"
-
 	"golang.org/x/sync/errgroup"
+	"gorm.io/gorm"
 )
 
 type Application struct {
@@ -23,7 +23,7 @@ type Application struct {
 	database *gorm.DB
 
 	exchange exchange.Exchange
-	dataFeed exchange.RouterDataFeed
+	dataFeed *exchange.DataFeed
 
 	Account         *account.Account
 	AssetsPrices    *prices.AsetsPrices
@@ -36,7 +36,7 @@ type Application struct {
 
 var appLogger = logger.AddFieldsEmpty()
 
-func NewApp(ctx context.Context, exch exchange.Exchange, dataFeed exchange.RouterDataFeed, settings model.Settings, db *gorm.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage, strategy *strategy.ControllerStrategy) (*Application, error) {
+func NewApp(ctx context.Context, exch exchange.Exchange, dataFeed *exchange.DataFeed, settings model.Settings, db *gorm.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage, strategy *strategy.ControllerStrategy) (*Application, error) {
 
 	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, settings.WeightProcents, db, notification)
 	account, err := account.NewAccount(exch, assetsPrices, notification)
@@ -103,33 +103,33 @@ func (app *Application) Run(ctx context.Context) error {
 	observers := []func(market exModel.MarketsStat){
 		func(market exModel.MarketsStat) {
 			app.AssetsPrices.OnMarket(market)
-		},
-		func(market exModel.MarketsStat) {
 			app.OrderController.OnMarket(market)
-		},
-		func(market exModel.MarketsStat) {
 			app.Strategy.OnMarket(market)
 		},
 	}
 
+	ctx, rootSpan := telemetry.Tracer.Start(ctx, "app")
+	defer rootSpan.End()
+
+	g, gCtx := errgroup.WithContext(ctx)
+
 	for _, pair := range app.Settings.Pairs {
 
-		app.dataFeed.SubscribeMarketsStat(ctx, pair, "exchangebot")
+		app.dataFeed.SubscribeMarketsStat(pair)
 		for _, observer := range observers {
-			app.dataFeed.SubscribeObserverMarkets(ctx, "exchangebot", pair, observer)
+			if err := app.dataFeed.SubscribeObserverMarkets(gCtx, "exchangebot", pair, observer); err != nil {
+				appLogger.Error(err)
+			}
 		}
 	}
 
-	duration := time.Since(timeStart)
+	g.Go(func() error {
+		return app.dataFeed.StartMarketsStatFeeder(gCtx, "exchangebot")
+	})
 
+	duration := time.Since(timeStart)
 	appLogger.Infof("Время выполнения предварительной загрузки данных: %v ", duration)
 	appLogger.Infof("Время старта: %v ", timeStart)
-
-	g, ctx := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
-		return app.dataFeed.StartMarketsStatFeeder(ctx)
-	})
 
 	//Для предварительного заполения цен всех пар, может сделать меньше время, просто добавляет погрешность для 10m
 	tickerIntervalInit := time.Second * 10 // Здесь выставить 40
@@ -149,7 +149,7 @@ func (app *Application) Run(ctx context.Context) error {
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-gCtx.Done():
 			// Останавливаем все тикеры при завершении контекста
 			tickerInit.Stop()
 			ticker3m.Stop()

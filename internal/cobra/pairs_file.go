@@ -14,15 +14,17 @@ var getPairsCmd = &cobra.Command{
 	Short: "pairs-to-file",
 	Run: func(cmd *cobra.Command, args []string) {
 
+		ctx := context.Background()
+
 		fmt.Println("get-pairs called")
 
-		binance, err := exchange.NewBinance(context.Background())
+		binance, err := exchange.NewBinance(ctx)
 		if err != nil {
 			fmt.Printf("error create binance: %v", err)
 			return
 		}
 
-		pairs, err := binance.GetPairsToUSDT()
+		pairs, err := binance.GetPairsToUSDT(ctx)
 		if err != nil {
 			fmt.Printf("error get pairs frome binance: %v", err)
 			return

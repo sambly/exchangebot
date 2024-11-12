@@ -2,17 +2,18 @@ package service
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/sambly/exchangeService/pkg/exchange"
 )
 
-func GetPairs(fromFile bool, exch exchange.Exchange) ([]string, error) {
+func GetPairs(ctx context.Context, fromFile bool, exch exchange.Exchange) ([]string, error) {
 	if fromFile {
 		return GetPairsFile("configs/pairs.txt")
 	}
-	return exch.GetPairsToUSDT()
+	return exch.GetPairsToUSDT(ctx)
 }
 
 func GetPairsFile(fileName string) ([]string, error) {

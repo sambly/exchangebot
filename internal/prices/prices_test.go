@@ -13,13 +13,15 @@ import (
 
 func TestUpdateDeltaFullData(t *testing.T) {
 
+	ctx := context.Background()
+
 	_ = flag.Set("test.timeout", "5m")
 
-	binance, err := exchange.NewBinance(context.Background())
+	binance, err := exchange.NewBinance(ctx)
 	if err != nil {
 		t.Error(err)
 	}
-	pairs, err := binance.GetPairsToUSDT()
+	pairs, err := binance.GetPairsToUSDT(ctx)
 	if err != nil {
 		t.Error(err)
 	}

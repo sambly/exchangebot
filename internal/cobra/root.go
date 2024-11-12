@@ -5,6 +5,7 @@ package cobra
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -15,6 +16,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/sambly/exchangeService/pkg/exchange"
 	"github.com/sambly/exchangeService/pkg/logadapter"
+	"github.com/sambly/exchangeService/pkg/telemetry"
 	"github.com/sambly/exchangebot"
 	"github.com/sambly/exchangebot/internal/application"
 	"github.com/sambly/exchangebot/internal/config"
@@ -29,6 +31,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 )
 
 var cfg *config.Config
@@ -107,19 +110,22 @@ func preRun(cmd *cobra.Command, args []string) {
 
 func run(cmd *cobra.Command, args []string) error {
 
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	var err error
 	cfg, err = config.NewConfigV3()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	mainLogger := logger.AddFields(map[string]interface{}{
-		"package": "main",
-	})
-
 	if err := logger.InitLogger(cfg.DebugLog, cfg.ProductionLog); err != nil {
 		log.Fatalf("failed to InitLogger: %v", err)
 	}
+
+	mainLogger := logger.AddFields(map[string]interface{}{
+		"package": "main",
+	})
 
 	if err := reloadConfig(); err != nil {
 		mainLogger.Fatal(err)
@@ -127,15 +133,21 @@ func run(cmd *cobra.Command, args []string) error {
 
 	mainLogger.Info("запуск приложения exchangebot-app")
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	err = telemetry.SetupOpenTelemetry(ctx, cfg.OtelExporterEndpoint, cfg.OtelServiceName)
+	if err != nil {
+		mainLogger.Fatalf("failed to initialize OpenTelemetry: %v", err)
+	}
 
-	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(cfg.APIKey, cfg.SecretKey))
+	binance, err := exchange.NewBinance(ctx,
+		exchange.WithBinanceCredentials(cfg.APIKey, cfg.SecretKey),
+		exchange.WithBinanceLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
+		exchange.WithBinanceTracer(telemetry.Tracer),
+	)
 	if err != nil {
 		mainLogger.Fatalf("failed to create exchange instance: %v", err)
 	}
 
-	pairs, err := service.GetPairs(cfg.PairsFromFile, binance)
+	pairs, err := service.GetPairs(ctx, cfg.PairsFromFile, binance)
 	if err != nil {
 		mainLogger.Fatalf("failed get pairs: %v", err)
 	}
@@ -174,23 +186,36 @@ func run(cmd *cobra.Command, args []string) error {
 	notify := &notification.Notification{Message: make(chan string)}
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
-	dataFeed, conn, err := exchange.InitDataFeed(ctx,
-		cfg.ExchangeType,
-		cfg.GrpcHost,
-		cfg.GrpcPort,
-		binance,
-		logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()))
+	var exflow exchange.Exflow
+	var conn *grpc.ClientConn
+	switch cfg.ExchangeType {
+	case "exchange":
+		exflow = binance
+	case "grpc":
+		exflow, conn, err = exchange.NewClientGrpc(
+			fmt.Sprintf("%s:%s", cfg.GrpcHost, cfg.GrpcPort),
+			exchange.WithClientLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
+			exchange.WithClientTracer(telemetry.Tracer),
+		)
+		if err != nil {
+			mainLogger.Fatalf("did not connect to grpc: %v", err)
+		}
+		defer conn.Close()
+	}
+
+	dataFeed := exchange.NewDataFeed(
+		exflow,
+		exchange.WithDataFeedLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
+		exchange.WithDataFeedTracer(telemetry.Tracer),
+	)
+
 	if err != nil {
 		mainLogger.Fatalf("failed to initialize data feed: %v", err)
-	}
-	if conn != nil {
-		defer conn.Close()
 	}
 
 	strategy, err := strategy.NewControllerStrategy(
 		strategy.WithLocalExtremes(strategy.NewLocalExtremes(pairs, periodsStrategy)),
 	)
-
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
@@ -228,10 +253,15 @@ func run(cmd *cobra.Command, args []string) error {
 	g.Go(func() error {
 		return app.Run(gCtx)
 	})
+
 	if err := g.Wait(); err != nil && gCtx.Err() != context.Canceled {
-		mainLogger.Fatalf("приложение exchangebot-app завершено с ошибкой: %v", err)
-	} else {
-		mainLogger.Info("приложение exchangebot-app завершено")
+		mainLogger.Fatalf("ошибка при завершении приложения exchangebot-app: %v", err)
 	}
+
+	if err := telemetry.OpenTelemetryWaitShutdown(); err != nil {
+		mainLogger.Fatalf("ошибка при завершении open-telemetry: %v", err)
+	}
+
+	mainLogger.Info("приложение exchangebot-app завершено")
 	return nil
 }

@@ -58,6 +58,13 @@ type Config struct {
 	// GRPC
 	GrpcHost string `yaml:"grpc-host" mapstructure:"grpc-host"`
 	GrpcPort string `yaml:"grpc-port" mapstructure:"grpc-port"`
+
+	Tracer
+}
+
+type Tracer struct {
+	OtelExporterEndpoint string
+	OtelServiceName      string
 }
 
 func (c Config) String() string {
@@ -89,6 +96,8 @@ func (c Config) String() string {
 	sb.WriteString(fmt.Sprintf("  ProductionLog: %v\n", c.ProductionLog))
 	sb.WriteString(fmt.Sprintf("  GrpcHost:      %s\n", c.GrpcHost))
 	sb.WriteString(fmt.Sprintf("  GrpcPort:      %s\n", c.GrpcPort))
+	sb.WriteString(fmt.Sprintf("  OtelExporterEndpoint:      %s\n", c.OtelExporterEndpoint))
+	sb.WriteString(fmt.Sprintf("  OtelServiceName:      %s\n", c.OtelServiceName))
 	sb.WriteString("  ---------------------------------------------------")
 
 	return sb.String()
@@ -271,6 +280,16 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("no .env str EXCHANGE_TYPE  found")
 	}
 
+	otelExporterOtlpEndpoint, exists := os.LookupEnv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if !exists {
+		return nil, fmt.Errorf("no .env str OTEL_EXPORTER_OTLP_ENDPOINT found")
+	}
+
+	otelServiceName, exists := os.LookupEnv("OTEL_SERVICE_NAME")
+	if !exists {
+		return nil, fmt.Errorf("no .env str OTEL_SERVICE_NAME found")
+	}
+
 	c := &Config{
 
 		// config app
@@ -314,6 +333,8 @@ func NewConfig() (*Config, error) {
 		// GRPC
 		GrpcHost: hostGrpc,
 		GrpcPort: grpcPort,
+
+		Tracer: Tracer{OtelExporterEndpoint: otelExporterOtlpEndpoint, OtelServiceName: otelServiceName},
 	}
 	return c, nil
 }
@@ -356,6 +377,8 @@ func NewConfigV3() (*Config, error) {
 
 		GrpcHost: "",
 		GrpcPort: viper.GetString("grpc-port"),
+
+		Tracer: Tracer{OtelExporterEndpoint: viper.GetString("otel-exporter-otlp-endpoint"), OtelServiceName: viper.GetString("otel-service-name")},
 	}
 
 	if os.Getenv("ENVIRONMENT") == "docker" {
@@ -393,6 +416,8 @@ func NewConfigV3() (*Config, error) {
 	viper.Set("grpc-port", cfg.GrpcPort)
 	viper.Set("grpc-host-docker", cfg.GrpcHost)
 	viper.Set("grpc-host-local", cfg.GrpcHost)
+	viper.Set("otel-exporter-otlp-endpoint", cfg.OtelExporterEndpoint)
+	viper.Set("otel-service-name", cfg.OtelServiceName)
 
 	// Проверка обязательных параметров
 	if cfg.Production && cfg.HostWeb == "" {

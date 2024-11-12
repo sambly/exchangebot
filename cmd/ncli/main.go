@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/sambly/exchangeService/pkg/exchange"
 	"github.com/sambly/exchangeService/pkg/logadapter"
+	"github.com/sambly/exchangeService/pkg/telemetry"
 	"github.com/sambly/exchangebot"
 	"github.com/sambly/exchangebot/internal/application"
 	"github.com/sambly/exchangebot/internal/config"
@@ -22,16 +24,20 @@ import (
 	"github.com/sambly/exchangebot/internal/telegram"
 	"github.com/sambly/exchangebot/internal/web"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 )
 
 func main() {
 
-	config, err := config.NewConfig()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	cfg, err := config.NewConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := logger.InitLogger(config.DebugLog, config.ProductionLog); err != nil {
+	if err := logger.InitLogger(cfg.DebugLog, cfg.ProductionLog); err != nil {
 		log.Fatalf("failed to InitLogger: %v", err)
 	}
 
@@ -41,15 +47,21 @@ func main() {
 
 	mainLogger.Info("запуск приложения exchangebot-app")
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	err = telemetry.SetupOpenTelemetry(ctx, cfg.OtelExporterEndpoint, cfg.OtelServiceName)
+	if err != nil {
+		mainLogger.Fatalf("failed to initialize OpenTelemetry: %v", err)
+	}
 
-	binance, err := exchange.NewBinance(ctx, exchange.WithBinanceCredentials(config.APIKey, config.SecretKey))
+	binance, err := exchange.NewBinance(ctx,
+		exchange.WithBinanceCredentials(cfg.APIKey, cfg.SecretKey),
+		exchange.WithBinanceLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
+		exchange.WithBinanceTracer(telemetry.Tracer),
+	)
 	if err != nil {
 		mainLogger.Fatalf("failed to create exchange instance: %v", err)
 	}
 
-	pairs, err := service.GetPairs(config.PairsFromFile, binance)
+	pairs, err := service.GetPairs(ctx, cfg.PairsFromFile, binance)
 	if err != nil {
 		mainLogger.Fatalf("failed get pairs: %v", err)
 	}
@@ -72,7 +84,7 @@ func main() {
 	}
 
 	settings := model.Settings{
-		ServerName:     config.ServerName,
+		ServerName:     cfg.ServerName,
 		Pairs:          pairs,
 		Timeframe:      "1m",
 		ChangePeriods:  periods,
@@ -80,7 +92,7 @@ func main() {
 		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
 	}
 
-	db, err := database.DbInit(config.TypeDB, config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
+	db, err := database.DbInit(cfg.TypeDB, cfg.NameDb, cfg.HostDb, cfg.PortDb, cfg.UserDb, cfg.PasswordDb)
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
@@ -88,17 +100,30 @@ func main() {
 	notify := &notification.Notification{Message: make(chan string)}
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
-	dataFeed, conn, err := exchange.InitDataFeed(ctx,
-		config.ExchangeType,
-		config.GrpcHost,
-		config.GrpcPort,
-		binance,
-		logadapter.NewLogrusAdapter(logger.AddFieldsEmpty()))
+	var exflow exchange.Exflow
+	var conn *grpc.ClientConn
+	switch cfg.ExchangeType {
+	case "exchange":
+		exflow = binance
+	case "grpc":
+		exflow, conn, err = exchange.NewClientGrpc(
+			fmt.Sprintf("%s:%s", cfg.GrpcHost, cfg.GrpcPort),
+			exchange.WithClientLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
+			exchange.WithClientTracer(telemetry.Tracer),
+		)
+		if err != nil {
+			mainLogger.Fatalf("did not connect to grpc: %v", err)
+		}
+		defer conn.Close()
+	}
+
+	dataFeed := exchange.NewDataFeed(
+		exflow,
+		exchange.WithDataFeedLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
+		exchange.WithDataFeedTracer(telemetry.Tracer),
+	)
 	if err != nil {
 		mainLogger.Fatalf("failed to initialize data feed: %v", err)
-	}
-	if conn != nil {
-		defer conn.Close()
 	}
 
 	strategy, err := strategy.NewControllerStrategy(
@@ -123,11 +148,11 @@ func main() {
 		mainLogger.Fatal(err)
 	}
 
-	appTelegram, err := telegram.NewTelegram(app, config.TlgToken, config.TlgUser, notify)
+	appTelegram, err := telegram.NewTelegram(app, cfg.TlgToken, cfg.TlgUser, notify)
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
-	web := web.NewWeb(app, socketsMessage, config, exchangebot.Content)
+	web := web.NewWeb(app, socketsMessage, cfg, exchangebot.Content)
 
 	g, gCtx := errgroup.WithContext(ctx)
 

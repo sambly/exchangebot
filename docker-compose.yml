@@ -15,12 +15,14 @@ services:
     environment:
       ENVIRONMENT: docker
       CONTENT_EMBED: true
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_SERVICE_NAME: exchange-app      
     env_file:
       - .env
     depends_on:
       - mysql
     networks:
-    - exchange
+      - exchange
     
   mysql:
     image: mysql:8.0
