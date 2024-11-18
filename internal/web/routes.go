@@ -76,7 +76,9 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/trade/updateTop", app.basicAuth(instrumentedHandler("/trade/updateTop", app.updateTop)))
 	mux.HandleFunc("/trade/openDeal", app.basicAuth(instrumentedHandler("/trade/openDeal", app.openDeal)))
 	mux.HandleFunc("/trade/closeDeal", app.basicAuth(instrumentedHandler("/trade/closeDeal", app.closeDeal)))
-	mux.HandleFunc("/trade/ws", app.basicAuth(instrumentedHandler("/trade/ws", app.echo)))
+	// TODO пока закоментил, выдывало ошибку
+	// mux.HandleFunc("/trade/ws", app.basicAuth(instrumentedHandler("/trade/ws", app.echo)))
+	mux.HandleFunc("/trade/ws", app.basicAuth(app.echo))
 
 	mux.HandleFunc("/trade/getChPrice", app.basicAuth(instrumentedHandler("/trade/getChPrice", app.getChPrice)))
 	mux.HandleFunc("/trade/getChDelta", app.basicAuth(instrumentedHandler("/trade/getChDelta", app.getChDelta)))
