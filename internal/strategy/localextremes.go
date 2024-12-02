@@ -10,7 +10,7 @@ import (
 
 type LocalExtremes struct {
 	Pairs    []string
-	Extremes map[string]map[string]*Data
+	Extremes map[PeriodPairKey]*Data
 }
 
 type Data struct {
@@ -18,18 +18,22 @@ type Data struct {
 	Min float64
 }
 
-func NewLocalExtremes(pairs []string, periodsChange map[string]time.Duration) *LocalExtremes {
+type PeriodPairKey struct {
+	Pair   string
+	Period string
+}
+
+func NewLocalExtremes(pairs []string, periods map[string]time.Duration) *LocalExtremes {
 
 	localExtremes := &LocalExtremes{
 		Pairs:    pairs,
-		Extremes: make(map[string]map[string]*Data),
+		Extremes: make(map[PeriodPairKey]*Data),
 	}
 
 	for _, pair := range pairs {
-		localExtremes.Extremes[pair] = map[string]*Data{}
-
-		for period := range periodsChange {
-			localExtremes.Extremes[pair][period] = &Data{}
+		for period := range periods {
+			key := PeriodPairKey{Pair: pair, Period: period}
+			localExtremes.Extremes[key] = &Data{}
 		}
 	}
 
