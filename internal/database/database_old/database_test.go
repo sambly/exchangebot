@@ -9,14 +9,18 @@ import (
 	exModel "github.com/sambly/exchangeService/pkg/model"
 )
 
+var cfg = config.Database{
+	Type:     "mysql",
+	Name:     "datafeeder",
+	Host:     "127.0.0.1",
+	Port:     "3306",
+	User:     "root",
+	Password: "q1w2e3",
+}
+
 func TestSelectCandlesTable(t *testing.T) {
 
-	config, err := config.NewConfig()
-	if err != nil {
-		t.Error(err)
-	}
-
-	db, err := DbConnection(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
+	db, err := DbConnection(cfg.Name, cfg.Host, cfg.Port, cfg.User, cfg.Password)
 	if err != nil {
 		t.Error(err)
 	}
@@ -29,12 +33,8 @@ func TestSelectCandlesTable(t *testing.T) {
 }
 
 func TestCreateOrder(t *testing.T) {
-	config, err := config.NewConfig()
-	if err != nil {
-		t.Error(err)
-	}
 
-	db, err := DbConnection(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
+	db, err := DbConnection(cfg.Name, cfg.Host, cfg.Port, cfg.User, cfg.Password)
 	if err != nil {
 		t.Error(err)
 	}
@@ -64,12 +64,8 @@ func TestCreateOrder(t *testing.T) {
 }
 
 func TestSelectDeltaPeriod(t *testing.T) {
-	config, err := config.NewConfig()
-	if err != nil {
-		t.Error(err)
-	}
 
-	db, err := DbConnection(config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
+	db, err := DbConnection(cfg.Name, cfg.Host, cfg.Port, cfg.User, cfg.Password)
 	if err != nil {
 		t.Error(err)
 	}

@@ -36,7 +36,15 @@ type Application struct {
 
 var appLogger = logger.AddFieldsEmpty()
 
-func NewApp(ctx context.Context, exch exchange.Exchange, dataFeed *exchange.DataFeed, settings model.Settings, db *gorm.DB, notification *notification.Notification, socketsMessage *notification.SocketsMessage, strategy *strategy.ControllerStrategy) (*Application, error) {
+func NewApp(
+	ctx context.Context,
+	exch exchange.Exchange,
+	dataFeed *exchange.DataFeed,
+	settings model.Settings,
+	db *gorm.DB,
+	notification *notification.Notification,
+	socketsMessage *notification.SocketsMessage,
+	strategy *strategy.ControllerStrategy) (*Application, error) {
 
 	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, settings.WeightProcents, db, notification)
 	account, err := account.NewAccount(exch, assetsPrices, notification)

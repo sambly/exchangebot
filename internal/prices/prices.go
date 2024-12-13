@@ -16,7 +16,7 @@ import (
 
 type ChangePrices struct {
 	LastPrice     float64
-	СhangePercent float64
+	ChangePercent float64
 }
 
 type ChangePricesDataset struct {
@@ -301,11 +301,11 @@ func (ap *AsetsPrices) UpdateChangePrices() {
 				}
 			} else {
 
-				ap.ChangePrices[pair][period].СhangePercent = checkValuesDividing(ap.MarketsStat[pair].Price, ap.ChangePrices[pair][period].LastPrice)
+				ap.ChangePrices[pair][period].ChangePercent = checkValuesDividing(ap.MarketsStat[pair].Price, ap.ChangePrices[pair][period].LastPrice)
 
 				// Отправка сообщения об изменении цены
-				if ap.ChangePrices[pair][period].СhangePercent >= ap.WeightProcents[period] {
-					ap.Notification.NotificationWeightPercent(pair, period, ap.ChangePrices[pair][period].СhangePercent)
+				if ap.ChangePrices[pair][period].ChangePercent >= ap.WeightProcents[period] {
+					ap.Notification.NotificationWeightPercent(pair, period, ap.ChangePrices[pair][period].ChangePercent)
 				}
 
 				// Помещаем dataset в самое начало

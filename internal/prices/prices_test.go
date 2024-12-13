@@ -11,6 +11,15 @@ import (
 	"github.com/sambly/exchangebot/internal/database"
 )
 
+var cfg = config.Database{
+	Type:     "mysql",
+	Name:     "datafeeder",
+	Host:     "127.0.0.1",
+	Port:     "3306",
+	User:     "root",
+	Password: "q1w2e3",
+}
+
 func TestUpdateDeltaFullData(t *testing.T) {
 
 	ctx := context.Background()
@@ -26,12 +35,7 @@ func TestUpdateDeltaFullData(t *testing.T) {
 		t.Error(err)
 	}
 
-	config, err := config.NewConfig()
-	if err != nil {
-		t.Error(err)
-	}
-
-	db, err := database.DbInit("mysql", config.NameDb, config.HostDb, config.PortDb, config.UserDb, config.PasswordDb)
+	db, err := database.DbInit(cfg)
 	if err != nil {
 		t.Error(err)
 	}

@@ -65,22 +65,22 @@ func (c *Sockets) SendDataRun(ctx context.Context) {
 	}(c.socketsMessage.Message)
 }
 
-func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, config *config.Config, content embed.FS) *Web {
+func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, cfg config.Web, content embed.FS) *Web {
 	web := &Web{
 		App:          app,
-		production:   config.Production,
-		proxy:        config.ProxyServer,
-		proxyPort:    config.ProxyPort,
-		contentEmbed: config.ContentEmbed,
+		production:   cfg.Production,
+		proxy:        cfg.ProxyServer,
+		proxyPort:    cfg.ProxyPort,
+		contentEmbed: cfg.ContentEmbed,
 		content:      content,
-		hostWeb:      config.HostWeb,
+		hostWeb:      cfg.Host,
 	}
 	web.Sockets = Sockets{
 		clients:        make(map[*websocket.Conn]bool),
 		socketsMessage: socketsMessage,
 	}
 
-	auth := auth{username: config.UsernameAuth, password: config.PasswordAuth}
+	auth := auth{username: cfg.UsernameAuth, password: cfg.PasswordAuth}
 	web.auth = auth
 
 	return web
