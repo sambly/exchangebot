@@ -112,12 +112,11 @@ func PrintConfig(v interface{}, indent string) {
 	}
 }
 
-func NewConfigV3() (*Config, error) {
+func NewConfig() (*Config, error) {
 
 	cfg := &Config{}
 	if err := viper.Unmarshal(&cfg); err != nil {
-		// TODO
-		return nil, fmt.Errorf("%v", "hui")
+		return nil, fmt.Errorf("error unmarshal viper config file: %v", err)
 	}
 
 	if os.Getenv("ENVIRONMENT") == "docker" {
@@ -128,43 +127,5 @@ func NewConfigV3() (*Config, error) {
 		cfg.GRPC.Host = cfg.GRPC.HostLocal
 	}
 
-	// // Проверка обязательных параметров
-	// if cfg.Production && cfg.HostWeb == "" {
-	// 	return nil, fmt.Errorf("HostWeb are required ")
-	// }
-	// if cfg.ProxyServer && cfg.ProxyPort == "" {
-	// 	return nil, fmt.Errorf("ProxyPort are required ")
-	// }
-	// if cfg.APIKey == "" || cfg.SecretKey == "" {
-	// 	return nil, fmt.Errorf("APIKey and SecretKey are required")
-	// }
-	// if cfg.TlgToken == "" || cfg.TlgUser == "" {
-	// 	return nil, fmt.Errorf("TlgToken and TlgUser are required")
-	// }
-
-	// fmt.Println("↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓")
-	// printSettings(viper.AllSettings(), 0)
-	// fmt.Println("↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑")
-
 	return cfg, nil
-
-}
-
-func printSettings(settings map[string]interface{}, indent int) {
-	for key, value := range settings {
-		// Отступы для форматирования
-		indentation := ""
-		for i := 0; i < indent; i++ {
-			indentation += "  "
-		}
-
-		// Выводим ключ и значение
-		switch v := value.(type) {
-		case map[string]interface{}:
-			fmt.Printf("%s%s:\n", indentation, key)
-			printSettings(v, indent+1)
-		default:
-			fmt.Printf("%s%s: %v\n", indentation, key, v)
-		}
-	}
 }

@@ -2,6 +2,7 @@ package cobra
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -22,13 +23,14 @@ var updateCmd = &cobra.Command{
 		}
 		if cmd.Flags().Changed("log-debug") {
 			debugLog, _ := cmd.Flags().GetBool("log-debug")
-			viper.Set("log.debug", debugLog)
+
+			viper.Set("log.debug", strconv.FormatBool(debugLog))
 			fmt.Printf("Updated log-debug to %v\n", debugLog)
 		}
 
 		if cmd.Flags().Changed("log-production") {
 			productionLog, _ := cmd.Flags().GetBool("log-production")
-			viper.Set("log.production", productionLog)
+			viper.Set("log.production", strconv.FormatBool(productionLog))
 			fmt.Printf("Updated log-production to %v\n", productionLog)
 		}
 

@@ -4,18 +4,35 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cobra
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/sambly/exchangeService/pkg/exchange"
+	"github.com/sambly/exchangeService/pkg/logadapter"
+	"github.com/sambly/exchangeService/pkg/telemetry"
+	"github.com/sambly/exchangebot"
+	"github.com/sambly/exchangebot/internal/application"
 	"github.com/sambly/exchangebot/internal/config"
+	"github.com/sambly/exchangebot/internal/database"
 	"github.com/sambly/exchangebot/internal/logger"
+	"github.com/sambly/exchangebot/internal/model"
+	"github.com/sambly/exchangebot/internal/notification"
+	"github.com/sambly/exchangebot/internal/service"
+	"github.com/sambly/exchangebot/internal/strategy"
+	"github.com/sambly/exchangebot/internal/telegram"
+	"github.com/sambly/exchangebot/internal/web"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 )
 
 var cfg *config.Config
@@ -23,9 +40,10 @@ var filenameConfig = "config.yaml"
 var filenameConfigReload = "configs/config_reload.yaml"
 
 var RootCmd = &cobra.Command{
-	Use:   "exchangebot",
-	Short: "exchangebot",
-	RunE:  run,
+	Use:    "exchangebot",
+	Short:  "exchangebot",
+	PreRun: preRun,
+	RunE:   run,
 }
 
 func init() {
@@ -50,6 +68,16 @@ func init() {
 		viper.BindPFlag(key, flag)
 	})
 
+}
+
+func Execute() {
+	if err := RootCmd.Execute(); err != nil {
+		log.Fatalf("cannot execute command")
+	}
+}
+
+func preRun(cmd *cobra.Command, args []string) {
+
 	// Запись в viper конфигурационных значений из env
 	// TODO здесь надо использовать какой то другой тэг, который бы обозначал что мы удаленно запускаем
 	if os.Getenv("ENVIRONMENT") != "docker" {
@@ -68,24 +96,16 @@ func init() {
 	}
 }
 
-func Execute() {
-	if err := RootCmd.Execute(); err != nil {
-		log.Fatalf("cannot execute command")
-	}
-}
-
 func run(cmd *cobra.Command, args []string) error {
 
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	var err error
-	cfg, err = config.NewConfigV3()
+	cfg, err = config.NewConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// config.PrintConfig(cfg, "")
 
 	if err := logger.InitLogger(cfg.Log); err != nil {
 		log.Fatalf("failed to InitLogger: %v", err)
@@ -95,146 +115,143 @@ func run(cmd *cobra.Command, args []string) error {
 		"package": "main",
 	})
 
-	// TODO
 	if err := reloadConfig(); err != nil {
 		mainLogger.Fatal(err)
 	}
 
-	// mainLogger.Info("запуск приложения exchangebot-app")
+	mainLogger.Info("запуск приложения exchangebot-app")
 
-	// err = telemetry.SetupOpenTelemetry(ctx, cfg.OtelExporterEndpoint, cfg.OtelServiceName)
-	// if err != nil {
-	// 	mainLogger.Fatalf("failed to initialize OpenTelemetry: %v", err)
-	// }
+	err = telemetry.SetupOpenTelemetry(ctx, cfg.OtelExporterEndpoint, cfg.OtelServiceName)
+	if err != nil {
+		mainLogger.Fatalf("failed to initialize OpenTelemetry: %v", err)
+	}
 
-	// binance, err := exchange.NewBinance(ctx,
-	// 	exchange.WithBinanceCredentials(cfg.APIKey, cfg.SecretKey),
-	// 	exchange.WithBinanceLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
-	// 	exchange.WithBinanceTracer(telemetry.Tracer),
-	// )
-	// if err != nil {
-	// 	mainLogger.Fatalf("failed to create exchange instance: %v", err)
-	// }
+	binance, err := exchange.NewBinance(ctx,
+		exchange.WithBinanceCredentials(cfg.APIKey, cfg.SecretKey),
+		exchange.WithBinanceLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
+		exchange.WithBinanceTracer(telemetry.Tracer),
+	)
+	if err != nil {
+		mainLogger.Fatalf("failed to create exchange instance: %v", err)
+	}
 
-	// pairs, err := service.GetPairs(ctx, cfg.PairsFromFile, binance)
-	// if err != nil {
-	// 	mainLogger.Fatalf("failed get pairs: %v", err)
-	// }
+	pairs, err := service.GetPairs(ctx, cfg.PairsFromFile, binance)
+	if err != nil {
+		mainLogger.Fatalf("failed get pairs: %v", err)
+	}
 
-	// mainLogger.Infof("колличество пар: %v", len(pairs))
+	mainLogger.Infof("колличество пар: %v", len(pairs))
 
-	// periods := map[string]time.Duration{
-	// 	"1m":  time.Second * 60,
-	// 	"3m":  time.Minute * 3,
-	// 	"15m": time.Minute * 15,
-	// 	"1h":  time.Hour,
-	// 	"4h":  time.Hour * 4,
-	// 	"1d":  time.Hour * 12,
-	// }
+	periods := map[string]time.Duration{
+		"1m":  time.Second * 60,
+		"3m":  time.Minute * 3,
+		"15m": time.Minute * 15,
+		"1h":  time.Hour,
+		"4h":  time.Hour * 4,
+		"1d":  time.Hour * 12,
+	}
 
-	// periodsStrategy := map[string]time.Duration{
-	// 	"1h": time.Hour,
-	// 	"4h": time.Hour * 4,
-	// 	"1d": time.Hour * 12,
-	// }
+	periodsStrategy := map[string]time.Duration{
+		"1h": time.Hour,
+		"4h": time.Hour * 4,
+		"1d": time.Hour * 12,
+	}
 
-	// settings := model.Settings{
-	// 	ServerName:     cfg.ServerName,
-	// 	Pairs:          pairs,
-	// 	Timeframe:      "1m",
-	// 	ChangePeriods:  periods,
-	// 	DeltaPeriods:   periods,
-	// 	WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
-	// }
+	settings := model.Settings{
+		ServerName:     cfg.ServerName,
+		Pairs:          pairs,
+		Timeframe:      "1m",
+		ChangePeriods:  periods,
+		DeltaPeriods:   periods,
+		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
+	}
 
-	// db, err := database.DbInit(cfg.Database)
-	// if err != nil {
-	// 	mainLogger.Fatal(err)
-	// }
+	db, err := database.DbInit(cfg.Database)
+	if err != nil {
+		mainLogger.Fatal(err)
+	}
 
-	// notify := notification.NewNotificationService(cfg.NotificationEnable)
+	notify := notification.NewNotificationService(cfg.NotificationEnable)
 
-	// socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
+	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
-	// var exflow exchange.Exflow
-	// var conn *grpc.ClientConn
-	// switch cfg.ExchangeType {
-	// case "exchange":
-	// 	exflow = binance
-	// case "grpc":
-	// 	exflow, conn, err = exchange.NewClientGrpc(
-	// 		fmt.Sprintf("%s:%s", cfg.GRPC.Host, cfg.GRPC.Port),
-	// 		exchange.WithClientLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
-	// 		exchange.WithClientTracer(telemetry.Tracer),
-	// 	)
-	// 	if err != nil {
-	// 		mainLogger.Fatalf("did not connect to grpc: %v", err)
-	// 	}
-	// 	defer conn.Close()
-	// }
+	var exflow exchange.Exflow
+	var conn *grpc.ClientConn
+	switch cfg.ExchangeType {
+	case "exchange":
+		exflow = binance
+	case "grpc":
+		exflow, conn, err = exchange.NewClientGrpc(
+			fmt.Sprintf("%s:%s", cfg.GRPC.Host, cfg.GRPC.Port),
+			exchange.WithClientLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
+			exchange.WithClientTracer(telemetry.Tracer),
+		)
+		if err != nil {
+			mainLogger.Fatalf("did not connect to grpc: %v", err)
+		}
+		defer conn.Close()
+	}
 
-	// dataFeed := exchange.NewDataFeed(
-	// 	exflow,
-	// 	exchange.WithDataFeedLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
-	// 	exchange.WithDataFeedTracer(telemetry.Tracer),
-	// )
+	dataFeed := exchange.NewDataFeed(
+		exflow,
+		exchange.WithDataFeedLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
+		exchange.WithDataFeedTracer(telemetry.Tracer),
+	)
 
-	// if err != nil {
-	// 	mainLogger.Fatalf("failed to initialize data feed: %v", err)
-	// }
+	if err != nil {
+		mainLogger.Fatalf("failed to initialize data feed: %v", err)
+	}
 
-	// strategy, err := strategy.NewControllerStrategy(
-	// 	strategy.WithLocalExtremes(strategy.NewLocalExtremes(pairs, periodsStrategy)),
-	// )
-	// if err != nil {
-	// 	mainLogger.Fatal(err)
-	// }
+	strategy, err := strategy.NewControllerStrategy(
+		strategy.WithLocalExtremes(strategy.NewLocalExtremes(pairs, periodsStrategy)),
+	)
+	if err != nil {
+		mainLogger.Fatal(err)
+	}
 
-	// app, err := application.NewApp(
-	// 	ctx,
-	// 	binance,
-	// 	dataFeed,
-	// 	settings,
-	// 	db,
-	// 	&notify,
-	// 	socketsMessage,
-	// 	strategy,
-	// )
-	// if err != nil {
-	// 	mainLogger.Fatal(err)
-	// }
+	app, err := application.NewApp(
+		ctx,
+		binance,
+		dataFeed,
+		settings,
+		db,
+		&notify,
+		socketsMessage,
+		strategy,
+	)
+	if err != nil {
+		mainLogger.Fatal(err)
+	}
 
-	// appTelegram, err := telegram.NewTelegram(app, cfg.Telegram, &notify)
-	// if err != nil {
-	// 	mainLogger.Fatal(err)
-	// }
-	// web := web.NewWeb(app, socketsMessage, cfg.Web, exchangebot.Content)
+	appTelegram, err := telegram.NewTelegram(app, cfg.Telegram, &notify)
+	if err != nil {
+		mainLogger.Fatal(err)
+	}
+	web := web.NewWeb(app, socketsMessage, cfg.Web, exchangebot.Content)
 
-	// g, gCtx := errgroup.WithContext(ctx)
+	g, gCtx := errgroup.WithContext(ctx)
 
-	// g.Go(func() error {
-	// 	return appTelegram.Start(gCtx)
-	// })
+	g.Go(func() error {
+		return appTelegram.Start(gCtx)
+	})
 
-	// g.Go(func() error {
-	// 	return web.Run(gCtx)
-	// })
+	g.Go(func() error {
+		return web.Run(gCtx)
+	})
 
-	// g.Go(func() error {
-	// 	return app.Run(gCtx)
-	// })
+	g.Go(func() error {
+		return app.Run(gCtx)
+	})
 
-	// if err := g.Wait(); err != nil && gCtx.Err() != context.Canceled {
-	// 	mainLogger.Fatalf("ошибка при завершении приложения exchangebot-app: %v", err)
-	// }
+	if err := g.Wait(); err != nil && gCtx.Err() != context.Canceled {
+		mainLogger.Fatalf("ошибка при завершении приложения exchangebot-app: %v", err)
+	}
 
-	// if err := telemetry.OpenTelemetryWaitShutdown(); err != nil {
-	// 	mainLogger.Fatalf("ошибка при завершении open-telemetry: %v", err)
-	// }
+	if err := telemetry.OpenTelemetryWaitShutdown(); err != nil {
+		mainLogger.Fatalf("ошибка при завершении open-telemetry: %v", err)
+	}
 
-	// mainLogger.Info("приложение exchangebot-app завершено")
-
-	<-ctx.Done()
+	mainLogger.Info("приложение exchangebot-app завершено")
 
 	return nil
 }
