@@ -8,6 +8,7 @@ import (
 
 	"github.com/glebarez/sqlite"
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sambly/exchangebot/internal/model"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -27,7 +28,14 @@ func dsn(dbname, hostname, port, username, password string) string {
 	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&%s", username, password, hostname, port, dbname, loc)
 }
 
-func DbInit(dbType, dbname, hostname, port, username, password string) (*gorm.DB, error) {
+func DbInit(cfg config.Database) (*gorm.DB, error) {
+
+	dbType := cfg.Type
+	dbname := cfg.Name
+	hostname := cfg.Host
+	port := cfg.Port
+	username := cfg.User
+	password := cfg.Password
 
 	var db *gorm.DB
 	var err error

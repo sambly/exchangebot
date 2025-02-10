@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sambly/exchangebot/internal/application"
+	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
 
@@ -26,7 +27,12 @@ type Telegram struct {
 
 var tlgLogger = logger.AddFieldsEmpty()
 
-func NewTelegram(app *application.Application, tlgToken, tlgUser string, notification *notification.Notification) (*Telegram, error) {
+func NewTelegram(app *application.Application, cfg config.Telegram, notification *notification.Notification) (*Telegram, error) {
+
+	tlgToken := cfg.Token
+	tlgUser := cfg.User
+	// TODO
+	_ = cfg.NotificationEnable
 
 	poller := &tele.LongPoller{Timeout: 10 * time.Second}
 	user, _ := strconv.ParseInt(tlgUser, 10, 64)
@@ -178,7 +184,7 @@ func (t Telegram) differentMess(c tele.Context) error {
 		}
 		text = text + "----------------\n"
 		for key, value := range change[asset] {
-			text = text + fmt.Sprintf("%s		%.2f\n", key, value.СhangePercent)
+			text = text + fmt.Sprintf("%s		%.2f\n", key, value.ChangePercent)
 		}
 	}
 
@@ -201,7 +207,7 @@ func (t Telegram) getPeriods(period string) []string {
 	for _, asset := range t.app.Account.Assets {
 		if _, ok := change[asset.Name][period]; ok {
 			if asset.CommonData.FullPrice >= t.app.BaseAmountAsset {
-				s := fmt.Sprintf("%s:		%.2f", asset.Name[:len(asset.Name)-len("USDT")], change[asset.Name][period].СhangePercent)
+				s := fmt.Sprintf("%s:		%.2f", asset.Name[:len(asset.Name)-len("USDT")], change[asset.Name][period].ChangePercent)
 				out = append(out, s)
 			}
 		}

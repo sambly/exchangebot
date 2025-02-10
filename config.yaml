@@ -1,0 +1,43 @@
+app:
+    server-name: exchange-bot
+    # cobra or ncli
+    build-target: cobra
+    # exchange or grpc    
+    exchange-type: exchange
+    pairs-from-file: true 
+web:
+    production: false
+    proxy-server: false
+    proxy-port: ""
+    host: ""
+    content-embed: true
+    username-auth: ""
+    password-auth: ""
+exchange:
+    api-key: ""
+    secret-key: ""
+tlg:
+    token: ""
+    user: ""
+    notification-enable: false
+db:
+    type: mysql
+    name: datafeeder
+    password: q1w2e3
+    host: ""
+    host-local: 127.0.0.1
+    host-docker: mysql
+    port: 3306
+    user: root
+grpc:
+    host: 0.0.0.0
+    host-local: 0.0.0.0
+    host-docker: exchange_service
+    port: 50051
+log:
+    debug: true
+    production: false
+notification:
+    enable: false
+
+

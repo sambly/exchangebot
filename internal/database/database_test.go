@@ -6,12 +6,22 @@ import (
 	"time"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sambly/exchangebot/internal/model"
 )
 
+var cfg = config.Database{
+	Type:     "mysql",
+	Name:     "datafeeder",
+	Host:     "127.0.0.1",
+	Port:     "3306",
+	User:     "root",
+	Password: "q1w2e3",
+}
+
 func TestCreateOrder(t *testing.T) {
 
-	db, err := DbInit("mysql", "datafeeder", "127.0.0.1", "3306", "root", "q1w2e3")
+	db, err := DbInit(cfg)
 	if err != nil {
 		t.Error(err)
 	}
@@ -34,7 +44,7 @@ func TestCreateOrder(t *testing.T) {
 
 func TestClosePosition(t *testing.T) {
 
-	db, err := DbInit("mysql", "datafeeder", "127.0.0.1", "3306", "root", "q1w2e3")
+	db, err := DbInit(cfg)
 	if err != nil {
 		t.Error(err)
 	}
@@ -55,7 +65,7 @@ func TestClosePosition(t *testing.T) {
 
 func TestCreateOrderInfo(t *testing.T) {
 
-	db, err := DbInit("mysql", "datafeeder", "127.0.0.1", "3306", "root", "q1w2e3")
+	db, err := DbInit(cfg)
 	if err != nil {
 		t.Error(err)
 	}

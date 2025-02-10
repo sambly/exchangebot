@@ -29,13 +29,15 @@ import (
 	"github.com/sambly/exchangebot/internal/telegram"
 	"github.com/sambly/exchangebot/internal/web"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
 var cfg *config.Config
-var filename = "configs/config_reload.yaml"
+var filenameConfig = "config.yaml"
+var filenameConfigReload = "configs/config_reload.yaml"
 
 var RootCmd = &cobra.Command{
 	Use:    "exchangebot",
@@ -46,47 +48,26 @@ var RootCmd = &cobra.Command{
 
 func init() {
 
-	RootCmd.PersistentFlags().String("exchange-type", "exchange", "select exchange type exchange or grpc")
+	RootCmd.PersistentFlags().String("app-exchange-type", "exchange", "select exchange type exchange or grpc")
+	RootCmd.PersistentFlags().Bool("app-pairs-from-file", false, "брать пары из файла")
 
-	RootCmd.PersistentFlags().Bool("pairs-from-file", false, "брать пары из файла")
+	RootCmd.PersistentFlags().Bool("web-production", true, "запуск сервера в режиме production, запуск возможен напрямую или через proxy")
+	RootCmd.PersistentFlags().Bool("web-proxy-server", false, "запуск через proxy, необходимо также чтобы production = true")
+	RootCmd.PersistentFlags().String("web-proxy-port", "444", "proxy port")
+	RootCmd.PersistentFlags().String("web-host", "", "host-web")
+	RootCmd.PersistentFlags().Bool("web-content-embed", false, "в режиме production=true выставить тоже в true, все web файлы объединяет в один бинарник")
+	RootCmd.PersistentFlags().String("web-username-auth", "", "username-auth")
+	RootCmd.PersistentFlags().String("web-password-auth", "", "password-auth")
 
-	// Web
-	RootCmd.PersistentFlags().Bool("production", false, "запуск сервера в режиме production, запуск возможен напрямую или через proxy")
-	RootCmd.PersistentFlags().Bool("proxy-server", false, "запуск через proxy, необходимо также чтобы production = true")
-	RootCmd.PersistentFlags().String("proxy-port", "444", "proxy port")
-	RootCmd.PersistentFlags().String("host-web", "", "host-web")
-	RootCmd.PersistentFlags().Bool("content-embed", false, "в режиме production=true выставить тоже в true, все web файлы объединяет в один бинарник")
-	RootCmd.PersistentFlags().String("username-auth", "", "username-auth")
-	RootCmd.PersistentFlags().String("password-auth", "", "password-auth")
+	RootCmd.PersistentFlags().Bool("log-debug", false, "debug log mode")
+	RootCmd.PersistentFlags().Bool("log-production", false, "production-log log mode")
 
-	// Exchange
-	RootCmd.PersistentFlags().String("api-key-binance", "", "api-key-binance")
-	RootCmd.PersistentFlags().String("api-secret-binance", "", "api-secret-binance")
+	RootCmd.PersistentFlags().VisitAll(func(flag *pflag.Flag) {
+		parts := strings.SplitN(flag.Name, "-", 2)
+		key := strings.Join(parts, ".")
+		viper.BindPFlag(key, flag)
+	})
 
-	// TLG
-	RootCmd.PersistentFlags().String("telegram-token", "", "telegram-token")
-	RootCmd.PersistentFlags().String("telegram-user", "", "telegram-user")
-
-	// DB
-	RootCmd.PersistentFlags().String("db-type", "mysql", "db-type")
-	RootCmd.PersistentFlags().String("db-name", "datafeeder", "db-name")
-	RootCmd.PersistentFlags().String("db-password", "q1w2e3", "db-password")
-	RootCmd.PersistentFlags().String("db-port", "3306", "db-port")
-	RootCmd.PersistentFlags().String("db-user", "root", "db-user")
-	RootCmd.PersistentFlags().String("db-host-local", "127.0.0.1", "db-host-local")
-
-	// Log
-	RootCmd.PersistentFlags().Bool("debug-log", false, "debug log mode")
-	RootCmd.PersistentFlags().Bool("production-log", false, "production-log log mode")
-
-	// Grpc
-	RootCmd.PersistentFlags().String("grpc-port", "50051", "grpc-port")
-	RootCmd.PersistentFlags().String("grpc-host-local", "0.0.0.0", "grpc-host-local")
-
-	viper.SetConfigFile(filename)
-	if err := viper.BindPFlags(RootCmd.PersistentFlags()); err != nil {
-		log.Fatalf("failed to bind persistent flags. please check the flag settings. %v", err)
-	}
 }
 
 func Execute() {
@@ -97,15 +78,22 @@ func Execute() {
 
 func preRun(cmd *cobra.Command, args []string) {
 
+	// Запись в viper конфигурационных значений из env
+	// TODO здесь надо использовать какой то другой тэг, который бы обозначал что мы удаленно запускаем
 	if os.Getenv("ENVIRONMENT") != "docker" {
+		// Загружаем файл .env, если запуск происходит локально
 		if err := godotenv.Load(".env"); err != nil {
-			log.Printf("Error loading .env file, %s", err)
+			log.Fatalf("Error loading .env file, %s", err)
 		}
 	}
-
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 
+	// Запись в viper конфигурационных значений из файла
+	viper.SetConfigFile(filenameConfig)
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Unable to read config file: %v", err)
+	}
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -114,12 +102,12 @@ func run(cmd *cobra.Command, args []string) error {
 	defer stop()
 
 	var err error
-	cfg, err = config.NewConfigV3()
+	cfg, err = config.NewConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := logger.InitLogger(cfg.DebugLog, cfg.ProductionLog); err != nil {
+	if err := logger.InitLogger(cfg.Log); err != nil {
 		log.Fatalf("failed to InitLogger: %v", err)
 	}
 
@@ -178,12 +166,13 @@ func run(cmd *cobra.Command, args []string) error {
 		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
 	}
 
-	db, err := database.DbInit(cfg.TypeDB, cfg.NameDb, cfg.HostDb, cfg.PortDb, cfg.UserDb, cfg.PasswordDb)
+	db, err := database.DbInit(cfg.Database)
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
 
-	notify := &notification.Notification{Message: make(chan string)}
+	notify := notification.NewNotificationService(cfg.NotificationEnable)
+
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
 	var exflow exchange.Exflow
@@ -193,7 +182,7 @@ func run(cmd *cobra.Command, args []string) error {
 		exflow = binance
 	case "grpc":
 		exflow, conn, err = exchange.NewClientGrpc(
-			fmt.Sprintf("%s:%s", cfg.GrpcHost, cfg.GrpcPort),
+			fmt.Sprintf("%s:%s", cfg.GRPC.Host, cfg.GRPC.Port),
 			exchange.WithClientLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
 			exchange.WithClientTracer(telemetry.Tracer),
 		)
@@ -226,7 +215,7 @@ func run(cmd *cobra.Command, args []string) error {
 		dataFeed,
 		settings,
 		db,
-		notify,
+		&notify,
 		socketsMessage,
 		strategy,
 	)
@@ -234,11 +223,11 @@ func run(cmd *cobra.Command, args []string) error {
 		mainLogger.Fatal(err)
 	}
 
-	appTelegram, err := telegram.NewTelegram(app, cfg.TlgToken, cfg.TlgUser, notify)
+	appTelegram, err := telegram.NewTelegram(app, cfg.Telegram, &notify)
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
-	web := web.NewWeb(app, socketsMessage, cfg, exchangebot.Content)
+	web := web.NewWeb(app, socketsMessage, cfg.Web, exchangebot.Content)
 
 	g, gCtx := errgroup.WithContext(ctx)
 
@@ -263,5 +252,6 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	mainLogger.Info("приложение exchangebot-app завершено")
+
 	return nil
 }

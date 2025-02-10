@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,7 +41,7 @@ var callerPrettyfier = func(f *runtime.Frame) (string, string) {
 	return "", fileName + ":" + strconv.Itoa(f.Line)
 }
 
-func InitLogger(debug, production bool) error {
+func InitLogger(config config.Log) error {
 
 	log.SetOutput(ioutil.Discard) // Send all logs to nowhere by default
 	log.SetReportCaller(true)
@@ -67,8 +68,8 @@ func InitLogger(debug, production bool) error {
 	}
 	log.AddHook(consoleHook)
 
-	LoggerSetLevel(debug)
-	LoggerSetFormatter(production)
+	LoggerSetLevel(config.Debug)
+	LoggerSetFormatter(config.Production)
 
 	return nil
 }
