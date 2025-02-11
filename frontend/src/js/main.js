@@ -900,17 +900,17 @@ function forming_tickers_list() {
             (marketsStat[pair].Volume).toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' }),
             { 'name': 'volume', 'value': marketsStat[pair].Volume }, 'price-col3', null, 'col3');
         // 4 столбец ch1m
-        createCell(changePrices[pair][heads[0]]['СhangePercent'].toFixed(2), { 'name': heads[0] }, 'price-col4', null, 'col4');
+        createCell(changePrices[pair][heads[0]]['ChangePercent'].toFixed(2), { 'name': heads[0] }, 'price-col4', null, 'col4');
         // 5 столбец ch3m
-        createCell(changePrices[pair][heads[1]]['СhangePercent'].toFixed(2), { 'name': heads[1] }, 'price-col5', null, 'col5');
+        createCell(changePrices[pair][heads[1]]['ChangePercent'].toFixed(2), { 'name': heads[1] }, 'price-col5', null, 'col5');
         // 6 столбец ch15m
-        createCell(changePrices[pair][heads[2]]['СhangePercent'].toFixed(2), { 'name': heads[2] }, 'price-col6', null, 'col6');
+        createCell(changePrices[pair][heads[2]]['ChangePercent'].toFixed(2), { 'name': heads[2] }, 'price-col6', null, 'col6');
         // 7 столбец ch1h
-        createCell(changePrices[pair][heads[3]]['СhangePercent'].toFixed(2), { 'name': heads[3] }, 'price-col7', null, 'col7');
+        createCell(changePrices[pair][heads[3]]['ChangePercent'].toFixed(2), { 'name': heads[3] }, 'price-col7', null, 'col7');
         // 8 столбец ch4h
-        createCell(changePrices[pair][heads[4]]['СhangePercent'].toFixed(2), { 'name': heads[4] }, 'price-col8', null, 'col8');
+        createCell(changePrices[pair][heads[4]]['ChangePercent'].toFixed(2), { 'name': heads[4] }, 'price-col8', null, 'col8');
         // 9 столбец ch12h
-        createCell(changePrices[pair][heads[5]]['СhangePercent'].toFixed(2), { 'name': heads[5] }, 'price-col9', null, 'col9');
+        createCell(changePrices[pair][heads[5]]['ChangePercent'].toFixed(2), { 'name': heads[5] }, 'price-col9', null, 'col9');
 
     };
 

@@ -6,6 +6,8 @@
 - Установка зависимостей `yarn install` 
 - Построить проект `yarn build`
 - Запустить сервер vite hot reload `yarn dev`
+- Включить sourcemap `yarn dev --mode=development`
+
   
 При запуске `yarn dev` CONTENT_EMBED=false
 
