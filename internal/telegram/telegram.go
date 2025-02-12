@@ -31,8 +31,6 @@ func NewTelegram(app *application.Application, cfg config.Telegram, notification
 
 	tlgToken := cfg.Token
 	tlgUser := cfg.User
-	// TODO
-	_ = cfg.NotificationEnable
 
 	poller := &tele.LongPoller{Timeout: 10 * time.Second}
 	user, _ := strconv.ParseInt(tlgUser, 10, 64)
@@ -78,11 +76,12 @@ func NewTelegram(app *application.Application, cfg config.Telegram, notification
 	)
 
 	bot := &Telegram{
-		client:      client,
-		defaultMenu: menu,
-		app:         app,
-		tlgUser:     user,
-		Messages:    notification,
+		client:             client,
+		defaultMenu:        menu,
+		app:                app,
+		tlgUser:            user,
+		Messages:           notification,
+		notificationEnable: cfg.NotificationEnable,
 	}
 
 	client.Handle("/start", func(c tele.Context) error {

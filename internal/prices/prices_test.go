@@ -49,7 +49,7 @@ func TestUpdateDeltaFullData(t *testing.T) {
 		"ch12h": time.Hour * 12,
 	}
 
-	asetsPrices := NewAssetsPrices(pairs, periods, periods, nil, db, nil)
+	asetsPrices := NewAssetsPrices(pairs, periods, periods, db)
 
 	_ = asetsPrices.UpdateChangeDelta()
 

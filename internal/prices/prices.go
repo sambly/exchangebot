@@ -8,7 +8,6 @@ import (
 	"github.com/sambly/exchangebot/internal/database"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/model"
-	"github.com/sambly/exchangebot/internal/notification"
 	"gorm.io/gorm"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
@@ -21,7 +20,7 @@ type ChangePrices struct {
 
 type ChangePricesDataset struct {
 	dataset []DatasetChangePrices
-	fill    bool
+	Fill    bool
 }
 
 type DatasetChangePrices struct {
@@ -44,15 +43,14 @@ type ChangeDeltaDataset struct {
 }
 
 type AsetsPrices struct {
-	database     *gorm.DB
-	Notification *notification.Notification
+	database *gorm.DB
 
-	Pairs          []string
-	Periods        map[string]time.Duration
-	PeriodsDelta   map[string]time.Duration
-	WeightProcents map[string]float64
+	Pairs        []string
+	Periods      map[string]time.Duration
+	PeriodsDelta map[string]time.Duration
 
-	UpdateTime time.Time
+	UpdateTime   time.Time
+	UpdateChanel chan struct{}
 
 	// Актуальные данные для каждой пары. Price, 24ch, Volume
 	MarketsStatMu sync.RWMutex
@@ -69,12 +67,13 @@ type AsetsPrices struct {
 
 var pricesLogger = logger.AddFieldsEmpty()
 
-func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time.Duration, weightProcents map[string]float64, db *gorm.DB, notification *notification.Notification) *AsetsPrices {
+func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time.Duration, db *gorm.DB) *AsetsPrices {
 	asetsPrices := &AsetsPrices{
-		Pairs:          pairs,
-		Periods:        periodsChange,
-		PeriodsDelta:   periodsDelta,
-		WeightProcents: weightProcents,
+		Pairs:        pairs,
+		Periods:      periodsChange,
+		PeriodsDelta: periodsDelta,
+
+		UpdateChanel: make(chan struct{}),
 
 		MarketsStat: make(map[string]*exModel.MarketsStat),
 
@@ -84,8 +83,7 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 		ChangeDelta:        make(map[string]map[string]*ChangeDelta),
 		ChangeDeltaDataset: make(map[string]map[string]*ChangeDeltaDataset),
 
-		database:     db,
-		Notification: notification,
+		database: db,
 	}
 
 	for _, pair := range pairs {
@@ -129,10 +127,16 @@ func (ap *AsetsPrices) OnMarket(ms exModel.MarketsStat) {
 			// За это время ждем пока остальные пары обновят цену, не точное решение...
 			time.Sleep(1 * time.Second)
 			ap.UpdateChangePrices()
+			select {
+			case ap.UpdateChanel <- struct{}{}:
+			default:
+			}
+
 		}()
 
 		go func() {
-			// Ожидание пока данные запишутся в базу данных, потом мы считаем новые значения
+			// Ожидание пока данные запишутся в базу данных,данные пишутся в базу данных с feederApp, потом мы считаем новые значения
+			// В принципе есть время на это учитывая что запись производим каждую минуту
 			time.Sleep(10 * time.Second)
 			if err := ap.UpdateChangeDelta(); err != nil {
 				pricesLogger.Errorf("error in updateDelta: %v", err)
@@ -182,7 +186,7 @@ func (ap *AsetsPrices) InitChangePrices() {
 
 			data := ap.ChangePricesDataset[candle.Pair][period]
 
-			if !data.fill {
+			if !data.Fill {
 
 				item := DatasetChangePrices{
 					Price: candle.Close,
@@ -193,7 +197,7 @@ func (ap *AsetsPrices) InitChangePrices() {
 
 					data.dataset = append(data.dataset, item)
 					ap.ChangePrices[candle.Pair][period].LastPrice = data.dataset[len(data.dataset)-1].Price
-					ap.ChangePricesDataset[candle.Pair][period].fill = true
+					ap.ChangePricesDataset[candle.Pair][period].Fill = true
 					ap.ChangePricesDataset[candle.Pair][period].dataset = data.dataset
 
 				} else {
@@ -290,11 +294,11 @@ func (ap *AsetsPrices) UpdateChangePrices() {
 				Time:  ap.MarketsStat[pair].Time,
 			}
 
-			if !data.fill {
+			if !data.Fill {
 				if len(data.dataset) == int(periodValue.Minutes()-1) {
 					data.dataset = append(data.dataset, item)
 					ap.ChangePrices[pair][period].LastPrice = data.dataset[len(data.dataset)-1].Price
-					ap.ChangePricesDataset[pair][period].fill = true
+					ap.ChangePricesDataset[pair][period].Fill = true
 					ap.ChangePricesDataset[pair][period].dataset = data.dataset
 				} else {
 					ap.ChangePricesDataset[pair][period].dataset = append(data.dataset, item)
@@ -302,11 +306,6 @@ func (ap *AsetsPrices) UpdateChangePrices() {
 			} else {
 
 				ap.ChangePrices[pair][period].ChangePercent = checkValuesDividing(ap.MarketsStat[pair].Price, ap.ChangePrices[pair][period].LastPrice)
-
-				// Отправка сообщения об изменении цены
-				if ap.ChangePrices[pair][period].ChangePercent >= ap.WeightProcents[period] {
-					ap.Notification.NotificationWeightPercent(pair, period, ap.ChangePrices[pair][period].ChangePercent)
-				}
 
 				// Помещаем dataset в самое начало
 				data.dataset = append([]DatasetChangePrices{item}, data.dataset...)

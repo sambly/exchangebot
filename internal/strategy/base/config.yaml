@@ -1,0 +1,19 @@
+# Включение уведомлений 
+notificationEnable: true
+# Проверить все пары
+allPairs: true
+
+pairs:
+  - BTCUSDT
+  - XRPUSDT
+  - SOLUSDT
+  - BNBUSDT
+  - GALAUSDT
+
+weightProcents:
+  1m: 1.0
+  3m: 45.0
+  15m: 40.0
+  1h: 38.0
+  4h: 35.0
+  1d: 30.0

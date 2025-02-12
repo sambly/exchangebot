@@ -1,21 +1,24 @@
 package strategy
 
-import exModel "github.com/sambly/exchangeService/pkg/model"
+import (
+	"context"
+	"fmt"
+
+	exModel "github.com/sambly/exchangeService/pkg/model"
+)
 
 type Strategy interface {
 	OnMarket(ms exModel.MarketsStat)
-	Start()
+	Start(ctx context.Context) error
 }
 
 type Option func(*ControllerStrategy)
 
 type ControllerStrategy struct {
-	Strategy      []Strategy
-	LocalExtremes *LocalExtremes
+	Strategies []Strategy
 }
 
 func NewControllerStrategy(options ...Option) (*ControllerStrategy, error) {
-
 	ctrlStr := &ControllerStrategy{}
 
 	for _, option := range options {
@@ -25,13 +28,16 @@ func NewControllerStrategy(options ...Option) (*ControllerStrategy, error) {
 	return ctrlStr, nil
 }
 
-func WithLocalExtremes(strategy *LocalExtremes) Option {
-	return func(ctrlStr *ControllerStrategy) {
-		ctrlStr.LocalExtremes = strategy
-		ctrlStr.Strategy = append(ctrlStr.Strategy, strategy)
-	}
+func (cs *ControllerStrategy) WithStrategy(strategy Strategy) *ControllerStrategy {
+	cs.Strategies = append(cs.Strategies, strategy)
+	return cs
 }
 
-func (ctrStr *ControllerStrategy) OnMarket(ms exModel.MarketsStat) {
-
+func (cs *ControllerStrategy) StartAll(ctx context.Context) error {
+	for _, strategy := range cs.Strategies {
+		if err := strategy.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start strategy: %w", err)
+		}
+	}
+	return nil
 }

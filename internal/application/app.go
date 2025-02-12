@@ -25,11 +25,11 @@ type Application struct {
 	exchange exchange.Exchange
 	dataFeed *exchange.DataFeed
 
-	Account         *account.Account
-	AssetsPrices    *prices.AsetsPrices
-	OrderController *order.Controller
-	PaperWallet     *exchange.PaperWallet
-	Strategy        *strategy.ControllerStrategy
+	Account            *account.Account
+	AssetsPrices       *prices.AsetsPrices
+	OrderController    *order.Controller
+	PaperWallet        *exchange.PaperWallet
+	ControllerStrategy *strategy.ControllerStrategy
 
 	BaseAmountAsset float64
 }
@@ -44,9 +44,10 @@ func NewApp(
 	db *gorm.DB,
 	notification *notification.Notification,
 	socketsMessage *notification.SocketsMessage,
-	strategy *strategy.ControllerStrategy) (*Application, error) {
+	assetsPrices *prices.AsetsPrices,
+	controllerStrategy *strategy.ControllerStrategy) (*Application, error) {
 
-	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, settings.WeightProcents, db, notification)
+	//assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, settings.WeightProcents, db, notification)
 	account, err := account.NewAccount(exch, assetsPrices, notification)
 	if err != nil {
 		return nil, err
@@ -63,12 +64,12 @@ func NewApp(
 		dataFeed: dataFeed,
 		database: db,
 
-		AssetsPrices:    assetsPrices,
-		Account:         account,
-		OrderController: orderController,
-		PaperWallet:     paperWallet,
-		Strategy:        strategy,
-		BaseAmountAsset: 1,
+		AssetsPrices:       assetsPrices,
+		Account:            account,
+		OrderController:    orderController,
+		PaperWallet:        paperWallet,
+		ControllerStrategy: controllerStrategy,
+		BaseAmountAsset:    1,
 	}
 
 	app.PaperWallet.MarketsStat = assetsPrices.MarketsStat
@@ -112,7 +113,7 @@ func (app *Application) Run(ctx context.Context) error {
 		func(market exModel.MarketsStat) {
 			app.AssetsPrices.OnMarket(market)
 			app.OrderController.OnMarket(market)
-			app.Strategy.OnMarket(market)
+			//app.Strategy.OnMarket(market)
 		},
 	}
 
@@ -133,6 +134,10 @@ func (app *Application) Run(ctx context.Context) error {
 
 	g.Go(func() error {
 		return app.dataFeed.StartMarketsStatFeeder(gCtx, "exchangebot")
+	})
+
+	g.Go(func() error {
+		return app.ControllerStrategy.StartAll(gCtx)
 	})
 
 	duration := time.Since(timeStart)

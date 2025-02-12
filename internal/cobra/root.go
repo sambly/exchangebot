@@ -24,8 +24,10 @@ import (
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/notification"
+	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/service"
 	"github.com/sambly/exchangebot/internal/strategy"
+	"github.com/sambly/exchangebot/internal/strategy/base"
 	"github.com/sambly/exchangebot/internal/telegram"
 	"github.com/sambly/exchangebot/internal/web"
 	"github.com/spf13/cobra"
@@ -151,19 +153,12 @@ func run(cmd *cobra.Command, args []string) error {
 		"1d":  time.Hour * 12,
 	}
 
-	periodsStrategy := map[string]time.Duration{
-		"1h": time.Hour,
-		"4h": time.Hour * 4,
-		"1d": time.Hour * 12,
-	}
-
 	settings := model.Settings{
-		ServerName:     cfg.ServerName,
-		Pairs:          pairs,
-		Timeframe:      "1m",
-		ChangePeriods:  periods,
-		DeltaPeriods:   periods,
-		WeightProcents: map[string]float64{"ch3m": 0.7, "ch15m": 1.2, "ch1h": 2, "ch4h": 4},
+		ServerName:    cfg.ServerName,
+		Pairs:         pairs,
+		Timeframe:     "1m",
+		ChangePeriods: periods,
+		DeltaPeriods:  periods,
 	}
 
 	db, err := database.DbInit(cfg.Database)
@@ -197,17 +192,23 @@ func run(cmd *cobra.Command, args []string) error {
 		exchange.WithDataFeedLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
 		exchange.WithDataFeedTracer(telemetry.Tracer),
 	)
-
 	if err != nil {
 		mainLogger.Fatalf("failed to initialize data feed: %v", err)
 	}
 
-	strategy, err := strategy.NewControllerStrategy(
-		strategy.WithLocalExtremes(strategy.NewLocalExtremes(pairs, periodsStrategy)),
-	)
+	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, db)
+
+	controllerStrategy, err := strategy.NewControllerStrategy()
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
+
+	baseStrategy, err := base.NewStrategy(assetsPrices, periods, pairs, &notify)
+	if err != nil {
+		mainLogger.Fatal(err)
+	}
+
+	controllerStrategy.WithStrategy(baseStrategy)
 
 	app, err := application.NewApp(
 		ctx,
@@ -217,7 +218,8 @@ func run(cmd *cobra.Command, args []string) error {
 		db,
 		&notify,
 		socketsMessage,
-		strategy,
+		assetsPrices,
+		controllerStrategy,
 	)
 	if err != nil {
 		mainLogger.Fatal(err)

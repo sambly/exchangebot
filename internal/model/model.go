@@ -7,12 +7,11 @@ import (
 )
 
 type Settings struct {
-	ServerName     string
-	Pairs          []string
-	Timeframe      string
-	ChangePeriods  map[string]time.Duration
-	DeltaPeriods   map[string]time.Duration
-	WeightProcents map[string]float64
+	ServerName    string
+	Pairs         []string
+	Timeframe     string
+	ChangePeriods map[string]time.Duration
+	DeltaPeriods  map[string]time.Duration
 }
 type ChangeDeltaForCandle struct {
 	Time      time.Time
