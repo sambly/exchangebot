@@ -4,21 +4,21 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/sambly/exchangebot/internal/application"
 	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
+	"github.com/sambly/exchangebot/internal/telegram/menu/manager"
 
-	"golang.org/x/exp/slices"
 	tele "gopkg.in/telebot.v3"
 )
 
 type Telegram struct {
-	defaultMenu        *tele.ReplyMarkup
-	client             *tele.Bot
+	client *tele.Bot
+	menu   *manager.MenuManager
+
 	app                *application.Application
 	tlgUser            int64
 	Messages           *notification.Notification
@@ -27,111 +27,71 @@ type Telegram struct {
 
 var tlgLogger = logger.AddFieldsEmpty()
 
+// UserState хранит состояние каждого пользователя (в каком меню он находится)
+var UserState = make(map[int64]string)
+
 func NewTelegram(app *application.Application, cfg config.Telegram, notification *notification.Notification) (*Telegram, error) {
+	user, _ := strconv.ParseInt(cfg.User, 10, 64)
 
-	tlgToken := cfg.Token
-	tlgUser := cfg.User
-
-	poller := &tele.LongPoller{Timeout: 10 * time.Second}
-	user, _ := strconv.ParseInt(tlgUser, 10, 64)
-
-	userMiddleware := tele.NewMiddlewarePoller(poller, func(u *tele.Update) bool {
-		if u.Message == nil || u.Message.Sender == nil {
-			tlgLogger.Debug("No message")
-			return false
-		}
-		if u.Message.Sender.ID == user {
-			return true
-		}
-		tlgLogger.Debug("Invalid user")
-		return false
-	})
-
-	client, err := tele.NewBot(tele.Settings{
-		ParseMode: tele.ModeMarkdown,
-		Token:     tlgToken,
-		Poller:    userMiddleware,
-	})
-	if err != nil {
-		return nil, err
+	pref := tele.Settings{
+		Token:  cfg.Token,
+		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
 	}
-	var (
-		menu       = &tele.ReplyMarkup{ResizeKeyboard: true}
-		btnBalance = menu.Text("Balance")
-	)
 
-	commandPeriods := []tele.Command{
-		{Text: "/ch3m", Description: "Изменение за 3м"},
-		{Text: "/ch15m", Description: "Изменение за 15м"},
-		{Text: "/ch1h", Description: "Изменение за 1ч"},
-		{Text: "/ch4h", Description: "Изменение за 4ч"},
-	}
-	err = client.SetCommands(commandPeriods)
+	bot, err := tele.NewBot(pref)
 	if err != nil {
 		return nil, err
 	}
 
-	menu.Reply(
-		menu.Row(btnBalance),
-	)
-
-	bot := &Telegram{
-		client:             client,
-		defaultMenu:        menu,
+	tlg := &Telegram{
+		client:             bot,
+		menu:               manager.NewMenuManager(),
 		app:                app,
 		tlgUser:            user,
 		Messages:           notification,
 		notificationEnable: cfg.NotificationEnable,
 	}
 
-	client.Handle("/start", func(c tele.Context) error {
-		return c.Send("Hello!", menu)
-	})
-
-	client.Handle(&btnBalance, func(c tele.Context) error {
-		bufer := ""
-		for _, item := range bot.getAssets() {
-			bufer = bufer + item + "\n"
-		}
-		return c.Send(bufer)
-	})
-
-	client.Handle("/ch3m", bot.hanlePeriods)
-	client.Handle("/ch15m", bot.hanlePeriods)
-	client.Handle("/ch1h", bot.hanlePeriods)
-	client.Handle("/ch4h", bot.hanlePeriods)
-	client.Handle(tele.OnText, bot.differentMess)
-
-	return bot, nil
+	return tlg, nil
 }
 
 func (t Telegram) Start(ctx context.Context) error {
+	menu := t.menu
+	// Запускаем обработчики всех кнопок
+	menu.InitHandlers(t.client)
+
 	go t.client.Start()
-	_, err := t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Bot initialized. Server name - %s", t.app.Settings.ServerName), t.defaultMenu)
+	_, err := t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Bot initialized. Server name - %s", t.app.Settings.ServerName), menu.Main.Markup)
 	if err != nil {
 		return err
 	}
 	tlgLogger.Infof("Telegram started. Server name - %s", t.app.Settings.ServerName)
 
-	go func(message chan string) {
+	// Горутина для обработки входящих сообщений
+	go func() {
 		for {
 			select {
-			case mes := <-message:
-				// Проверяем бит разрешения отправки уведомлений
+			case mes, ok := <-t.Messages.Message:
+				if !ok {
+					// Канал закрыт, выходим из горутины
+					return
+				}
+
 				if t.notificationEnable {
-					_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, t.defaultMenu)
+					_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, menu.Main.Markup)
 					if err != nil {
 						tlgLogger.Errorf("error send message tlg: %v", err)
 					}
 				}
+
 			case <-ctx.Done():
 				return
 			}
 		}
-	}(t.Messages.Message)
+	}()
 
 	<-ctx.Done()
-	_, err = t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName), t.defaultMenu)
+	_, err = t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName), menu.Main.Markup)
 	if err != nil {
 		return err
 	}
@@ -139,93 +99,4 @@ func (t Telegram) Start(ctx context.Context) error {
 
 	tlgLogger.Infof("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName)
 	return nil
-}
-
-func (t Telegram) differentMess(c tele.Context) error {
-
-	text := ""
-
-	// Выбор определенной пары
-	asset := strings.ToUpper(c.Text()) + "USDT"
-	assets := t.app.Account.Assets
-	assetsKey := t.app.Account.AssetsKey
-	marketStat := t.app.AssetsPrices.MarketsStat
-	change := t.app.AssetsPrices.ChangePrices
-	if idx := slices.Index(assetsKey, asset); idx >= 0 {
-		fullPrice := assets[asset].CommonData.FullPrice
-		ch24 := marketStat[asset].Ch24
-
-		text = fmt.Sprintf("----%s----\nСтоимость	%.1f\nch24	%.1f\n", asset, fullPrice, ch24)
-
-		var fullPriceSpot, fullPriceFlexible, AssetStaking float64
-
-		if assets[asset].SpotData != nil {
-			fullPriceSpot = assets[asset].SpotData.FullPrice
-		}
-		if assets[asset].FlexibleData != nil {
-			fullPriceFlexible = assets[asset].FlexibleData.FullPrice
-		}
-		if assets[asset].StakingData != nil {
-			AssetStaking = assets[asset].StakingData.FullPrice
-		}
-
-		if fullPriceFlexible != 0 || AssetStaking != 0 {
-			if fullPriceSpot > 0 {
-				text = text + fmt.Sprintf("spot:	%.1f\n", fullPriceSpot)
-			}
-			if fullPriceFlexible > 0 {
-				text = text + fmt.Sprintf("earn:	%.1f\n", fullPriceFlexible)
-			}
-			if AssetStaking > 0 {
-				text = text + fmt.Sprintf("staking:	%.1f\n", AssetStaking)
-			}
-
-		}
-		text = text + "----------------\n"
-		for key, value := range change[asset] {
-			text = text + fmt.Sprintf("%s		%.2f\n", key, value.ChangePercent)
-		}
-	}
-
-	return c.Send(text)
-}
-
-func (t Telegram) hanlePeriods(c tele.Context) error {
-	text := ""
-	period := c.Text()[1:]
-	assets := t.getPeriods(period)
-	for _, item := range assets {
-		text = text + fmt.Sprintf("%s\n", item)
-	}
-	return c.Send(text)
-}
-
-func (t Telegram) getPeriods(period string) []string {
-	change := t.app.AssetsPrices.ChangePrices
-	var out []string
-	for _, asset := range t.app.Account.Assets {
-		if _, ok := change[asset.Name][period]; ok {
-			if asset.CommonData.FullPrice >= t.app.BaseAmountAsset {
-				s := fmt.Sprintf("%s:		%.2f", asset.Name[:len(asset.Name)-len("USDT")], change[asset.Name][period].ChangePercent)
-				out = append(out, s)
-			}
-		}
-	}
-	return out
-}
-
-func (t Telegram) getAssets() []string {
-	err := t.app.Account.UpdateAssets()
-	if err != nil {
-		tlgLogger.Errorf("error tlg getAssets: %v", err)
-	}
-	marketStat := t.app.AssetsPrices.MarketsStat
-	var out []string
-	for _, asset := range t.app.Account.Assets {
-		if asset.CommonData.FullPrice >= t.app.BaseAmountAsset {
-			s := fmt.Sprintf("%s: %.1f💲  24ch: %-5.1f", asset.Name[:len(asset.Name)-len("USDT")], asset.CommonData.FullPrice, marketStat[asset.Name].Ch24)
-			out = append(out, s)
-		}
-	}
-	return out
 }
