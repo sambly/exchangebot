@@ -1,71 +1,86 @@
 package account
 
 import (
-	"github.com/sambly/exchangebot/internal/telegram/menu/manager"
+	"github.com/sambly/exchangebot/internal/telegram/menu/base"
+	"github.com/sambly/exchangebot/internal/telegram/menu/global"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 
 	tele "gopkg.in/telebot.v3"
 )
 
-const (
-	menuName = "Аккаунт:"
-	menuID   = "account"
+var (
+	btnLabelAccount = "📌 Аккаунт"
 
-	buttonName = "📌 Аккаунт"
-	buttonID   = "btnAccount"
+	// Кнопка точка входа
+	entryButton = global.Markup.Text(btnLabelAccount)
+
+	// Базовые кнопки в меню
+	defaultButtons = []tele.Btn{
+		global.BtnBack,
+	}
 )
-
-type Buttons struct {
-	Markup *tele.ReplyMarkup
-	Back   tele.Btn
-}
 
 // Структура меню аккаунта
 type AccountMenu struct {
-	Name        string
-	ID          string
-	EntryButton *model.EntryButton // Кнопка для входа в меню
-
-	Buttons Buttons
+	*base.BaseMenu
 }
 
-func NewAccountMenu() *AccountMenu {
-
-	m := &AccountMenu{
-		Name:        menuName,
-		ID:          menuID,
-		EntryButton: model.NewEntryButton(buttonName, buttonID),
+func NewAccountMenu(name, id string) *AccountMenu {
+	menu := &AccountMenu{
+		BaseMenu: base.NewBaseMenu(name, id),
 	}
 
-	m.initButtons()
-	m.setupMarkup()
-	return m
+	menu.BaseMenu.WithEntryButton(entryButton)
+	menu.BaseMenu.AddButtons(defaultButtons...)
+
+	return menu
 }
 
-func (m *AccountMenu) initButtons() {
-	markup := &tele.ReplyMarkup{}
-	m.Buttons.Markup = markup
+// Handle обрабатывает кнопки меню аккаунта
+func (m *AccountMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
+	// Обработчик кнопки входа (Account)
+	b.Handle(&m.ButtonsHandler.EntryButton, func(c tele.Context) error {
+		userID := c.Sender().ID
 
-	m.Buttons.Back = markup.Text("🔙 Назад")
-}
+		// Сохраняем текущее меню и клавиатуру перед переходом
+		handler.SetUserMenu(userID, m.ID, m.Markup)
 
-func (m *AccountMenu) setupMarkup() {
-	markup := m.Buttons.Markup
+		// Устанавливаем состояние пользователя
+		handler.SetUserState(userID, m.ID)
 
-	markup.Reply(
-		markup.Row(m.Buttons.Back),
-	)
-}
-
-// Handle обрабатывает кнопки меню аккаунта.
-func (m *AccountMenu) Handle(b *tele.Bot, manager *manager.MenuManager) {
-	b.Handle(&m.Buttons.Back, func(c tele.Context) error {
-		manager.UserState[c.Sender().ID] = "main"
-
+		// Удаляем сообщение пользователя, если оно есть
 		if c.Message() != nil {
 			_ = c.Delete()
 		}
 
-		return c.Send("Главное меню:", manager.Main.Markup)
+		// Отправляем сообщение с меню аккаунта
+		return c.Send("Меню аккаунта:", m.Markup)
 	})
+
+	// // Обработчик кнопки "Назад"
+	// for _, btn := range m.ButtonsHandler.Buttons {
+	// 	btn := btn /
+	// 	// fmt.Printf("ID: %s, Text: %s\n", btn.ID, btn.TgBtn.Text)
+	// 	if btn.ID == "" {
+	// 		b.Handle(&btn.TgBtn, func(c tele.Context) error {
+	// 			userID := c.Sender().ID
+
+	// 			fmt.Println("Кнопка назад нажата")
+	// 			// Получаем предыдущее меню и клавиатуру
+	// 			previousMenu := handler.GetPreviousMenu(userID)
+	// 			previousMarkup := handler.GetPreviousMarkup(userID)
+
+	// 			// Устанавливаем состояние пользователя на предыдущее
+	// 			handler.SetUserState(userID, previousMenu)
+
+	// 			// Удаляем сообщение пользователя, если оно есть
+	// 			if c.Message() != nil {
+	// 				_ = c.Delete()
+	// 			}
+
+	// 			// Отправляем предыдущее меню с соответствующей клавиатурой
+	// 			return c.Send("Возврат в предыдущее меню:", previousMarkup)
+	// 		})
+	// 	}
+	// }
 }

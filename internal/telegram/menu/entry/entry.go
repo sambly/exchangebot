@@ -1,47 +1,59 @@
 package entry
 
 import (
-	"github.com/sambly/exchangebot/internal/telegram/menu/manager"
+	"github.com/sambly/exchangebot/internal/telegram/menu/base"
+	"github.com/sambly/exchangebot/internal/telegram/menu/global"
+	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 	tele "gopkg.in/telebot.v3"
 )
 
 // Cтруктура главного меню
 type MainMenu struct {
-	Name   string
-	ID     string
-	Markup *tele.ReplyMarkup
-	Buttons
+	*base.BaseMenu
 }
 
 // NewMainMenu создаёт главное меню.
-func NewMainMenu() *MainMenu {
-	m := &MainMenu{
-		Name:   "Главное меню",
-		ID:     "main",
-		Markup: &tele.ReplyMarkup{},
+func NewMainMenu(name, id string) *MainMenu {
+	menu := &MainMenu{
+		BaseMenu: base.NewBaseMenu(name, id),
 	}
-	return m
+	return menu
 }
 
-// Handle обрабатывает кнопки главного меню.
-func (m *MainMenu) Handle(b *tele.Bot, manager *manager.MenuManager) {
-	b.Handle(&m.Account, func(c tele.Context) error {
-		manager.UserState[c.Sender().ID] = "account"
+func (m *MainMenu) ShowMainMenu(c tele.Context, handler model.MenuHandler) error {
+	userID := c.Sender().ID
 
+	// Сохраняем текущее меню и состояние пользователя
+	handler.SetUserState(userID, m.ID)
+	handler.SetUserMenu(userID, m.ID, m.Markup)
+
+	// Отправляем главное меню
+	return c.Send("Главное меню:", m.Markup)
+}
+
+func (m *MainMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
+	// Обрабатываем команду /start, чтобы показать главное меню
+	b.Handle("/start", func(c tele.Context) error {
+		return m.ShowMainMenu(c, handler)
+	})
+
+	b.Handle(&global.BtnBack, func(c tele.Context) error {
+		userID := c.Sender().ID
+
+		// Получаем предыдущее меню и клавиатуру
+		previousMenu := handler.GetPreviousMenu(userID)
+		previousMarkup := handler.GetPreviousMarkup(userID)
+
+		// Устанавливаем состояние пользователя на предыдущее
+		handler.SetUserState(userID, previousMenu)
+
+		// Удаляем сообщение пользователя, если оно есть
 		if c.Message() != nil {
 			_ = c.Delete()
 		}
 
-		return c.Send("Меню аккаунта:", manager.Account.Markup)
+		// Отправляем предыдущее меню с соответствующей клавиатурой
+		return c.Send("Возврат в предыдущее меню:", previousMarkup)
 	})
 
-	b.Handle(&m.Strategy, func(c tele.Context) error {
-		manager.UserState[c.Sender().ID] = "strategy"
-
-		if c.Message() != nil {
-			_ = c.Delete()
-		}
-
-		return c.Send("Меню стратегий:", manager.Strategy.Markup)
-	})
 }

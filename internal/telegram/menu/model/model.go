@@ -2,21 +2,29 @@ package model
 
 import tele "gopkg.in/telebot.v3"
 
-// EntryButton структура кнопки Меню
-type EntryButton struct {
-	Name   string   // Отображаемое имя кнопки
-	ID     string   // Уникальный идентификатор кнопки
-	Button tele.Btn // Кнопка telebot
+type MenuHandler interface {
+	InitHandlers(b *tele.Bot)
+	GetUserState(userID int64) string
+	GetPreviousState(userID int64) string
+	SetUserState(userID int64, state string)
+	GetCurrentMenu(userID int64) string
+	GetPreviousMenu(userID int64) string
+	SetUserMenu(userID int64, menu string, markup *tele.ReplyMarkup)
+	GetPreviousMarkup(userID int64) *tele.ReplyMarkup
 }
 
-func NewEntryButton(name, id string) *EntryButton {
-	markup := &tele.ReplyMarkup{}
+// // универсальная структура для кнопок
+// type Button struct {
+// 	Name  string
+// 	ID    string
+// 	TgBtn tele.Btn // Кнопка telebot
+// }
 
-	btn := &EntryButton{
-		Name:   name,
-		ID:     id,
-		Button: markup.Text(name),
-	}
-
-	return btn
-}
+// // TODO, здесь нет смыссла в id ,обычные кнопки хранят только текст
+// func NewButton(name, id string) Button {
+// 	return Button{
+// 		Name:  name,
+// 		ID:    id,
+// 		TgBtn: tele.Btn{Text: name},
+// 	}
+// }

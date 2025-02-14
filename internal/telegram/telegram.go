@@ -60,8 +60,11 @@ func (t Telegram) Start(ctx context.Context) error {
 	// Запускаем обработчики всех кнопок
 	menu.InitHandlers(t.client)
 
+	menu.SetUserState(t.tlgUser, menu.Main.ID)
+	menu.SetUserMenu(t.tlgUser, menu.Main.ID, menu.Main.BaseMenu.Markup)
+
 	go t.client.Start()
-	_, err := t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Bot initialized. Server name - %s", t.app.Settings.ServerName), menu.Main.Markup)
+	_, err := t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Bot initialized. Server name - %s", t.app.Settings.ServerName), menu.Main.BaseMenu.Markup)
 	if err != nil {
 		return err
 	}
@@ -78,7 +81,7 @@ func (t Telegram) Start(ctx context.Context) error {
 				}
 
 				if t.notificationEnable {
-					_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, menu.Main.Markup)
+					_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, menu.Main.BaseMenu.Markup)
 					if err != nil {
 						tlgLogger.Errorf("error send message tlg: %v", err)
 					}
@@ -91,10 +94,11 @@ func (t Telegram) Start(ctx context.Context) error {
 	}()
 
 	<-ctx.Done()
-	_, err = t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName), menu.Main.Markup)
+	_, err = t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName), menu.Main.BaseMenu.Markup)
 	if err != nil {
 		return err
 	}
+
 	t.client.Stop()
 
 	tlgLogger.Infof("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName)
