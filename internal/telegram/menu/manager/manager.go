@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"github.com/sambly/exchangebot/internal/application"
 	"github.com/sambly/exchangebot/internal/telegram/menu/account"
 	"github.com/sambly/exchangebot/internal/telegram/menu/entry"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
@@ -19,13 +20,14 @@ type MenuManager struct {
 	Account   *account.AccountMenu
 	Strategy  *strategies.StrategyMenu
 	UserState map[int64]*UserSession // Хранит состояния пользователей
+
 }
 
 // NewMenuManager создаёт все меню.
-func NewMenuManager() *MenuManager {
+func NewMenuManager(app *application.Application) *MenuManager {
 	mainMenu := entry.NewMainMenu("Главное меню:", "main")
 	accountMenu := account.NewAccountMenu("Аккаунт:", "account")
-	strategiesMenu := strategies.NewStrategyMenu("Стратегии:", "strategies")
+	strategiesMenu := strategies.NewStrategyMenu("Стратегии:", "strategies", app.ControllerStrategy)
 
 	mainMenu.AddButtons(accountMenu.ButtonsHandler.EntryButton)
 	mainMenu.AddButtons(strategiesMenu.ButtonsHandler.EntryButton)

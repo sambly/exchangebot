@@ -1,6 +1,7 @@
 package strategies
 
 import (
+	"github.com/sambly/exchangebot/internal/strategy"
 	"github.com/sambly/exchangebot/internal/telegram/menu/base"
 	"github.com/sambly/exchangebot/internal/telegram/menu/global"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
@@ -22,11 +23,13 @@ var (
 
 type StrategyMenu struct {
 	*base.BaseMenu
+	StrategyController *strategy.ControllerStrategy
 }
 
-func NewStrategyMenu(name, id string) *StrategyMenu {
+func NewStrategyMenu(name, id string, strategyCtrl *strategy.ControllerStrategy) *StrategyMenu {
 	menu := &StrategyMenu{
-		BaseMenu: base.NewBaseMenu(name, id),
+		BaseMenu:           base.NewBaseMenu(name, id),
+		StrategyController: strategyCtrl,
 	}
 
 	menu.BaseMenu.WithEntryButton(entryButton)

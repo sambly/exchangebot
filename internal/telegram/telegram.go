@@ -27,9 +27,6 @@ type Telegram struct {
 
 var tlgLogger = logger.AddFieldsEmpty()
 
-// UserState хранит состояние каждого пользователя (в каком меню он находится)
-var UserState = make(map[int64]string)
-
 func NewTelegram(app *application.Application, cfg config.Telegram, notification *notification.Notification) (*Telegram, error) {
 	user, _ := strconv.ParseInt(cfg.User, 10, 64)
 
@@ -45,7 +42,7 @@ func NewTelegram(app *application.Application, cfg config.Telegram, notification
 
 	tlg := &Telegram{
 		client:             bot,
-		menu:               manager.NewMenuManager(),
+		menu:               manager.NewMenuManager(app),
 		app:                app,
 		tlgUser:            user,
 		Messages:           notification,
