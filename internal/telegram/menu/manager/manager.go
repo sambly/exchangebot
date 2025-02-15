@@ -3,17 +3,13 @@ package manager
 import (
 	"github.com/sambly/exchangebot/internal/telegram/menu/account"
 	"github.com/sambly/exchangebot/internal/telegram/menu/entry"
+	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 	"github.com/sambly/exchangebot/internal/telegram/menu/strategies"
 	tele "gopkg.in/telebot.v3"
 )
 
-// UserSession хранит текущее и предыдущее состояние пользователя.
 type UserSession struct {
-	CurrentState   string
-	PreviousState  string
-	CurrentMenu    string
-	PreviousMenu   string
-	PreviousMarkup *tele.ReplyMarkup // Предыдущая клавиатура
+	PreviousMenuFunc func(c tele.Context, handler model.MenuHandler) error
 }
 
 // MenuManager управляет всеми меню бота.
@@ -48,68 +44,21 @@ func (m *MenuManager) InitHandlers(b *tele.Bot) {
 	m.Strategy.Handle(b, m)
 }
 
-// GetUserState возвращает текущее состояние пользователя.
-func (m *MenuManager) GetUserState(userID int64) string {
+// SetPreviousMenu устанавливает функцию для возврата в предыдущее меню.
+func (m *MenuManager) SetPreviousMenu(userID int64, prevFunc func(c tele.Context, handler model.MenuHandler) error) {
 	if session, exists := m.UserState[userID]; exists {
-		return session.CurrentState
-	}
-	return ""
-}
-
-// GetPreviousState возвращает предыдущее состояние пользователя.
-func (m *MenuManager) GetPreviousState(userID int64) string {
-	if session, exists := m.UserState[userID]; exists {
-		return session.PreviousState
-	}
-	return ""
-}
-
-// SetUserState устанавливает новое состояние пользователя и сохраняет предыдущее.
-func (m *MenuManager) SetUserState(userID int64, state string) {
-	if session, exists := m.UserState[userID]; exists {
-		session.PreviousState = session.CurrentState
-		session.CurrentState = state
+		session.PreviousMenuFunc = prevFunc
 	} else {
 		m.UserState[userID] = &UserSession{
-			CurrentState: state,
+			PreviousMenuFunc: prevFunc,
 		}
 	}
 }
 
-// SetUserMenu устанавливает текущее и предыдущее меню пользователя, сохраняя предыдущее состояние клавиатуры.
-func (m *MenuManager) SetUserMenu(userID int64, menu string, markup *tele.ReplyMarkup) {
+// GetPreviousMenu вызывает сохраненную функцию возврата.
+func (m *MenuManager) GetPreviousMenu(userID int64) func(c tele.Context, handler model.MenuHandler) error {
 	if session, exists := m.UserState[userID]; exists {
-		session.PreviousMenu = session.CurrentMenu
-		session.CurrentMenu = menu
-		session.PreviousMarkup = markup
-	} else {
-		m.UserState[userID] = &UserSession{
-			CurrentMenu:    menu,
-			PreviousMarkup: markup,
-		}
-	}
-}
-
-// GetCurrentMenu возвращает текущее меню пользователя.
-func (m *MenuManager) GetCurrentMenu(userID int64) string {
-	if session, exists := m.UserState[userID]; exists {
-		return session.CurrentMenu
-	}
-	return ""
-}
-
-// GetPreviousMenu возвращает предыдущее меню пользователя.
-func (m *MenuManager) GetPreviousMenu(userID int64) string {
-	if session, exists := m.UserState[userID]; exists {
-		return session.PreviousMenu
-	}
-	return ""
-}
-
-// GetPreviousMarkup возвращает предыдущую клавиатуру пользователя.
-func (m *MenuManager) GetPreviousMarkup(userID int64) *tele.ReplyMarkup {
-	if session, exists := m.UserState[userID]; exists {
-		return session.PreviousMarkup
+		return session.PreviousMenuFunc
 	}
 	return nil
 }

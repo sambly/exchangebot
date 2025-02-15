@@ -60,9 +60,6 @@ func (t Telegram) Start(ctx context.Context) error {
 	// Запускаем обработчики всех кнопок
 	menu.InitHandlers(t.client)
 
-	menu.SetUserState(t.tlgUser, menu.Main.ID)
-	menu.SetUserMenu(t.tlgUser, menu.Main.ID, menu.Main.BaseMenu.Markup)
-
 	go t.client.Start()
 	_, err := t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Bot initialized. Server name - %s", t.app.Settings.ServerName), menu.Main.BaseMenu.Markup)
 	if err != nil {

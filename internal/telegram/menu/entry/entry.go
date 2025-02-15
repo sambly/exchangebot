@@ -20,40 +20,29 @@ func NewMainMenu(name, id string) *MainMenu {
 	return menu
 }
 
-func (m *MainMenu) ShowMainMenu(c tele.Context, handler model.MenuHandler) error {
-	userID := c.Sender().ID
-
-	// Сохраняем текущее меню и состояние пользователя
-	handler.SetUserState(userID, m.ID)
-	handler.SetUserMenu(userID, m.ID, m.Markup)
-
+func (m *MainMenu) Show(c tele.Context, handler model.MenuHandler) error {
 	// Отправляем главное меню
 	return c.Send("Главное меню:", m.Markup)
 }
 
+// Handle регистрирует обработчики главного меню.
 func (m *MainMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 	// Обрабатываем команду /start, чтобы показать главное меню
 	b.Handle("/start", func(c tele.Context) error {
-		return m.ShowMainMenu(c, handler)
+		return m.Show(c, handler)
 	})
 
+	// Обрабатываем кнопку "Назад" для всех меню
 	b.Handle(&global.BtnBack, func(c tele.Context) error {
 		userID := c.Sender().ID
 
-		// Получаем предыдущее меню и клавиатуру
-		previousMenu := handler.GetPreviousMenu(userID)
-		previousMarkup := handler.GetPreviousMarkup(userID)
-
-		// Устанавливаем состояние пользователя на предыдущее
-		handler.SetUserState(userID, previousMenu)
-
-		// Удаляем сообщение пользователя, если оно есть
-		if c.Message() != nil {
-			_ = c.Delete()
+		// Получаем функцию возврата в предыдущее меню
+		prevMenu := handler.GetPreviousMenu(userID)
+		if prevMenu != nil {
+			return prevMenu(c, handler) // Переключаем пользователя обратно
 		}
 
-		// Отправляем предыдущее меню с соответствующей клавиатурой
-		return c.Send("Возврат в предыдущее меню:", previousMarkup)
+		// Если предыдущее меню отсутствует — значит, мы уже в главном
+		return c.Send("Вы уже в главном меню.")
 	})
-
 }

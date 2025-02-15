@@ -1,5 +1,5 @@
 # Включение уведомлений 
-notificationEnable: true
+notificationEnable: false
 # Проверить все пары
 allPairs: true
 
