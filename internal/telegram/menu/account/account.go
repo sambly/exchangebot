@@ -17,6 +17,7 @@ var (
 	// Базовые кнопки в меню
 	defaultButtons = []tele.Btn{
 		global.BtnBack,
+		global.BtnMainMenu,
 	}
 )
 
@@ -38,7 +39,7 @@ func NewAccountMenu(name, id string) *AccountMenu {
 
 func (m *AccountMenu) Show(c tele.Context, handler model.MenuHandler) error {
 	userID := c.Sender().ID
-	handler.SetPreviousMenu(userID, m.Show)
+	handler.SetCurrentMenu(userID, m.Show)
 	return c.Send("Меню аккаунта:", m.Markup)
 }
 

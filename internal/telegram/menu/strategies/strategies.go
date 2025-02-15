@@ -16,6 +16,7 @@ var (
 	// Базовые кнопки в меню
 	defaultButtons = []tele.Btn{
 		global.BtnBack,
+		global.BtnMainMenu,
 	}
 )
 
@@ -36,7 +37,7 @@ func NewStrategyMenu(name, id string) *StrategyMenu {
 
 func (m *StrategyMenu) Show(c tele.Context, handler model.MenuHandler) error {
 	userID := c.Sender().ID
-	handler.SetPreviousMenu(userID, m.Show) // Запоминаем предыдущее меню
+	handler.SetCurrentMenu(userID, m.Show)
 	return c.Send("Меню стратегий:", m.Markup)
 }
 

@@ -9,6 +9,7 @@ import (
 )
 
 type UserSession struct {
+	CurrentMenuFunc  func(c tele.Context, handler model.MenuHandler) error
 	PreviousMenuFunc func(c tele.Context, handler model.MenuHandler) error
 }
 
@@ -44,18 +45,24 @@ func (m *MenuManager) InitHandlers(b *tele.Bot) {
 	m.Strategy.Handle(b, m)
 }
 
-// SetPreviousMenu устанавливает функцию для возврата в предыдущее меню.
-func (m *MenuManager) SetPreviousMenu(userID int64, prevFunc func(c tele.Context, handler model.MenuHandler) error) {
-	if session, exists := m.UserState[userID]; exists {
-		session.PreviousMenuFunc = prevFunc
-	} else {
-		m.UserState[userID] = &UserSession{
-			PreviousMenuFunc: prevFunc,
-		}
-	}
+func (m *MenuManager) GetMainMenu() func(c tele.Context, handler model.MenuHandler) error {
+	return m.Main.Show
 }
 
-// GetPreviousMenu вызывает сохраненную функцию возврата.
+// SetCurrentMenu устанавливает текущее и предыдущее меню.
+func (m *MenuManager) SetCurrentMenu(userID int64, newMenuFunc func(c tele.Context, handler model.MenuHandler) error) {
+	session, exists := m.UserState[userID]
+	if !exists {
+		session = &UserSession{}
+		m.UserState[userID] = session
+	}
+
+	// Сохраняем текущее меню как предыдущее перед обновлением
+	session.PreviousMenuFunc = session.CurrentMenuFunc
+	session.CurrentMenuFunc = newMenuFunc
+}
+
+// GetPreviousMenu вызывает сохраненное предыдущее меню.
 func (m *MenuManager) GetPreviousMenu(userID int64) func(c tele.Context, handler model.MenuHandler) error {
 	if session, exists := m.UserState[userID]; exists {
 		return session.PreviousMenuFunc

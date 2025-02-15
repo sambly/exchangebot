@@ -21,7 +21,10 @@ func NewMainMenu(name, id string) *MainMenu {
 }
 
 func (m *MainMenu) Show(c tele.Context, handler model.MenuHandler) error {
-	// Отправляем главное меню
+
+	userID := c.Sender().ID
+	handler.SetCurrentMenu(userID, m.Show)
+
 	return c.Send("Главное меню:", m.Markup)
 }
 
@@ -32,7 +35,7 @@ func (m *MainMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		return m.Show(c, handler)
 	})
 
-	// Обрабатываем кнопку "Назад" для всех меню
+	// Обрабатываем кнопку "Назад"
 	b.Handle(&global.BtnBack, func(c tele.Context) error {
 		userID := c.Sender().ID
 
@@ -43,6 +46,12 @@ func (m *MainMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		}
 
 		// Если предыдущее меню отсутствует — значит, мы уже в главном
-		return c.Send("Вы уже в главном меню.")
+		return handler.GetMainMenu()(c, handler)
 	})
+
+	// Обрабатываем кнопку "Главное меню"
+	b.Handle(&global.BtnMainMenu, func(c tele.Context) error {
+		return handler.GetMainMenu()(c, handler)
+	})
+
 }
