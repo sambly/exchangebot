@@ -7,17 +7,19 @@ import (
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/prices"
+	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
 
-type Strategy struct {
+type StrategyBase struct {
 	Config       *Config
 	Notification *notification.Notification
+	TelegramMenu *StrategyBaseMenu
 
 	Periods      map[string]time.Duration
 	AssetsPrices *prices.AsetsPrices
 }
 
-func NewStrategy(assetsPrices *prices.AsetsPrices, periods map[string]time.Duration, pairs []string, notify *notification.Notification) (*Strategy, error) {
+func NewStrategy(assetsPrices *prices.AsetsPrices, periods map[string]time.Duration, pairs []string, notify *notification.Notification) (*StrategyBase, error) {
 	cfg, err := NewConfig()
 	if err != nil {
 		return nil, err
@@ -26,7 +28,7 @@ func NewStrategy(assetsPrices *prices.AsetsPrices, periods map[string]time.Durat
 		cfg.Pairs = pairs
 	}
 
-	str := &Strategy{
+	str := &StrategyBase{
 		AssetsPrices: assetsPrices,
 		Periods:      periods,
 		Config:       cfg,
@@ -35,7 +37,13 @@ func NewStrategy(assetsPrices *prices.AsetsPrices, periods map[string]time.Durat
 	return str, nil
 }
 
-func (str *Strategy) Start(ctx context.Context) error {
+func (s *StrategyBase) WithTelegramMenu() *StrategyBase {
+	tlgMenu := NewStrategyMenu("Base стратегия", "strategiesBase")
+	s.TelegramMenu = tlgMenu
+	return s
+}
+
+func (str *StrategyBase) Start(ctx context.Context) error {
 
 	for {
 		select {
@@ -47,7 +55,7 @@ func (str *Strategy) Start(ctx context.Context) error {
 	}
 }
 
-func (str *Strategy) changePrices() {
+func (str *StrategyBase) changePrices() {
 
 	if !str.Config.NotificationEnable {
 		return
@@ -69,7 +77,10 @@ func (str *Strategy) changePrices() {
 			}
 		}
 	}
-
 }
 
-func (str *Strategy) OnMarket(ms exModel.MarketsStat) {}
+func (str *StrategyBase) OnMarket(ms exModel.MarketsStat) {}
+
+func (str *StrategyBase) GetTelegramMenu() model.WindowHandler {
+	return str.TelegramMenu
+}

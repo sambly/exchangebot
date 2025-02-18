@@ -28,14 +28,36 @@ type Telegram struct {
 var tlgLogger = logger.AddFieldsEmpty()
 
 func NewTelegram(app *application.Application, cfg config.Telegram, notification *notification.Notification) (*Telegram, error) {
+
 	user, _ := strconv.ParseInt(cfg.User, 10, 64)
+	poller := &tele.LongPoller{Timeout: 10 * time.Second}
+
+	userMiddleware := tele.NewMiddlewarePoller(poller, func(u *tele.Update) bool {
+		if u.Message == nil || u.Message.Sender == nil {
+			tlgLogger.Debug("No message")
+			return false
+		}
+		if u.Message.Sender.ID == user {
+			return true
+		}
+		tlgLogger.Debug("Invalid user")
+		return false
+	})
 
 	pref := tele.Settings{
 		Token:  cfg.Token,
-		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
+		Poller: userMiddleware,
 	}
 
 	bot, err := tele.NewBot(pref)
+	if err != nil {
+		return nil, err
+	}
+
+	command := []tele.Command{
+		{Text: "/start", Description: "Стартовая страница"},
+	}
+	err = bot.SetCommands(command)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +80,12 @@ func (t Telegram) Start(ctx context.Context) error {
 	menu.InitHandlers(t.client)
 
 	go t.client.Start()
-	_, err := t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Bot initialized. Server name - %s", t.app.Settings.ServerName), menu.Main.BaseMenu.Markup)
+	_, err := t.client.Send(
+		&tele.User{ID: t.tlgUser},
+		fmt.Sprintf("🚀 *Бот успешно запущен!*\n🔹*Сервер:* %s\n", t.app.Settings.ServerName),
+		menu.Main.BaseMenu.Markup,
+	)
+
 	if err != nil {
 		return err
 	}
@@ -88,7 +115,14 @@ func (t Telegram) Start(ctx context.Context) error {
 	}()
 
 	<-ctx.Done()
-	_, err = t.client.Send(&tele.User{ID: t.tlgUser}, fmt.Sprintf("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName), menu.Main.BaseMenu.Markup)
+
+	t.menu.DeleteAllUserMessages(t.client)
+	_, err = t.client.Send(
+		&tele.User{ID: t.tlgUser},
+		fmt.Sprintf("⚠️ *Бот остановлен.*\n🔹 *Сервер:* %s\n", t.app.Settings.ServerName),
+		menu.Main.BaseMenu.Markup,
+	)
+
 	if err != nil {
 		return err
 	}

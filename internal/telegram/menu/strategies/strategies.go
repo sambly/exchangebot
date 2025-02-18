@@ -35,17 +35,37 @@ func NewStrategyMenu(name, id string, strategyCtrl *strategy.ControllerStrategy)
 	menu.BaseMenu.WithEntryButton(entryButton)
 	menu.BaseMenu.AddButtons(defaultButtons...)
 
+	// Добавление точек входа в подменю стратегий
+	for _, strategy := range strategyCtrl.Strategies {
+		if strMenu := strategy.GetTelegramMenu(); strMenu != nil {
+			menu.AddButtons(strMenu.GetEntryButton())
+		}
+	}
+
 	return menu
 }
 
+// Показать главное меню
 func (m *StrategyMenu) Show(c tele.Context, handler model.MenuHandler) error {
 	userID := c.Sender().ID
 	handler.SetCurrentMenu(userID, m.Show)
-	return c.Send("Меню стратегий:", m.Markup)
+	handler.DeleteUserMessages(c, userID)
+
+	msg, err := c.Bot().Send(c.Chat(), "Меню стратегий:", m.Markup)
+	if err == nil {
+		handler.SaveMessage(userID, msg)
+	}
+	return err
 }
 
 // Handle обрабатывает кнопки меню стратегий
 func (m *StrategyMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
+
+	// обработка меню подстратегий
+	for _, strategy := range m.StrategyController.Strategies {
+		strategy.GetTelegramMenu().Handle(b, handler)
+	}
+
 	// Обработчик кнопки входа в меню стратегий
 	b.Handle(&m.ButtonsHandler.EntryButton, func(c tele.Context) error {
 		return m.Show(c, handler)

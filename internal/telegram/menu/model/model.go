@@ -8,4 +8,16 @@ type MenuHandler interface {
 	GetMainMenu() func(c tele.Context, handler MenuHandler) error
 	SetCurrentMenu(userID int64, newFunc func(c tele.Context, handler MenuHandler) error)
 	GetPreviousMenu(userID int64) func(c tele.Context, handler MenuHandler) error
+	ResetPreviousMenu(userID int64)
+	SaveMessage(userID int64, msg *tele.Message)
+	DeleteUserMessages(c tele.Context, userID int64)
+	ActivateBntBack(userID int64) MenuHandler
+}
+
+type WindowHandler interface {
+	AddButtons(buttons ...tele.Btn)
+	WithEntryButton(button tele.Btn)
+	GetEntryButton() tele.Btn
+	Show(c tele.Context, handler MenuHandler) error
+	Handle(b *tele.Bot, handler MenuHandler)
 }

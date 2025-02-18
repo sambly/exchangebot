@@ -207,6 +207,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
+	baseStrategy.WithTelegramMenu()
 
 	controllerStrategy.WithStrategy(baseStrategy)
 

@@ -24,8 +24,14 @@ func (m *MainMenu) Show(c tele.Context, handler model.MenuHandler) error {
 
 	userID := c.Sender().ID
 	handler.SetCurrentMenu(userID, m.Show)
+	handler.ResetPreviousMenu(userID)
+	handler.DeleteUserMessages(c, userID)
 
-	return c.Send("Главное меню:", m.Markup)
+	msg, err := c.Bot().Send(c.Chat(), "Главное меню:", m.Markup)
+	if err == nil {
+		handler.SaveMessage(userID, msg)
+	}
+	return err
 }
 
 // Handle регистрирует обработчики главного меню.
@@ -38,11 +44,10 @@ func (m *MainMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 	// Обрабатываем кнопку "Назад"
 	b.Handle(&global.BtnBack, func(c tele.Context) error {
 		userID := c.Sender().ID
-
 		// Получаем функцию возврата в предыдущее меню
 		prevMenu := handler.GetPreviousMenu(userID)
 		if prevMenu != nil {
-			return prevMenu(c, handler) // Переключаем пользователя обратно
+			return prevMenu(c, handler.ActivateBntBack(userID)) // Переключаем пользователя обратно
 		}
 
 		// Если предыдущее меню отсутствует — значит, мы уже в главном
