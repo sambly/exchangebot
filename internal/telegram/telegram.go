@@ -54,6 +54,18 @@ func NewTelegram(app *application.Application, cfg config.Telegram, notification
 		return nil, err
 	}
 
+	// Middleware для обработки ошибок
+	bot.Use(func(next tele.HandlerFunc) tele.HandlerFunc {
+		return func(c tele.Context) error {
+			err := next(c)
+			if err != nil {
+				// tlgLogger.Errorf("Ошибка в обработчике: %v", err)
+				return c.Send("❌ Произошла ошибка, попробуйте позже.")
+			}
+			return nil
+		}
+	})
+
 	command := []tele.Command{
 		{Text: "/start", Description: "Стартовая страница"},
 	}
