@@ -31,6 +31,7 @@ func NewTelegram(app *application.Application, cfg config.Telegram, notification
 
 	user, _ := strconv.ParseInt(cfg.User, 10, 64)
 	poller := &tele.LongPoller{Timeout: 10 * time.Second}
+	menu := manager.NewMenuManager(app)
 
 	userMiddleware := tele.NewMiddlewarePoller(poller, func(u *tele.Update) bool {
 		if u.Message == nil || u.Message.Sender == nil {
@@ -59,8 +60,14 @@ func NewTelegram(app *application.Application, cfg config.Telegram, notification
 		return func(c tele.Context) error {
 			err := next(c)
 			if err != nil {
-				// tlgLogger.Errorf("Ошибка в обработчике: %v", err)
-				return c.Send("❌ Произошла ошибка, попробуйте позже.")
+				tlgLogger.Errorf("Ошибка в обработчике: %v", err)
+
+				msg, err := c.Bot().Send(c.Chat(), "❌ Произошла ошибка, попробуйте позже.", menu.Main.Markup)
+				if err == nil {
+					menu.SaveMessage(c.Sender().ID, msg)
+				}
+
+				return err
 			}
 			return nil
 		}
@@ -76,7 +83,7 @@ func NewTelegram(app *application.Application, cfg config.Telegram, notification
 
 	tlg := &Telegram{
 		client:             bot,
-		menu:               manager.NewMenuManager(app),
+		menu:               menu,
 		app:                app,
 		tlgUser:            user,
 		Messages:           notification,

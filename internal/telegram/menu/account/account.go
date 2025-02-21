@@ -70,6 +70,9 @@ func (m *AccountMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 
 	b.Handle(&balance, func(c tele.Context) error {
 
+		userID := c.Sender().ID
+		handler.DeleteUserMessages(c, userID)
+
 		if err := m.Account.UpdateAssets(); err != nil {
 			return err
 		}
