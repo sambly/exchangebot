@@ -50,7 +50,7 @@ func (acc *Account) UpdateAssets() (err error) {
 	}
 	acc.feederAssets(assetsSpotRaw, "AssetSpot")
 
-	assetsFlexible, err := acc.exchange.GetAssetsFlexible(context.Background())
+	assetsFlexible, err := acc.exchange.GetAssetsFlexibleV2(context.Background())
 	if err != nil {
 		return err
 	}
