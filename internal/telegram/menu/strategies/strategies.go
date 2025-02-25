@@ -9,10 +9,9 @@ import (
 )
 
 var (
-	btnLabelStrategies = "📊 Стратегии"
 
 	// Кнопка точка входа
-	entryButton = global.Markup.Text(btnLabelStrategies)
+	entryButton = tele.Btn{Text: "📊 Стратегии"}
 
 	// Базовые кнопки в меню
 	defaultButtons = [][]tele.Btn{
@@ -31,8 +30,8 @@ func NewStrategyMenu(name, id string, strategyCtrl *strategy.ControllerStrategy)
 		StrategyController: strategyCtrl,
 	}
 
-	menu.BaseMenu.WithEntryButton(entryButton)
-	menu.BaseMenu.AddButtons(defaultButtons...)
+	menu.WithEntryButton(entryButton)
+	menu.AddButtons(defaultButtons...)
 
 	// Добавление точек входа в подменю стратегий
 	for _, strategy := range strategyCtrl.Strategies {

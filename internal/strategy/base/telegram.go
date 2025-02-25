@@ -9,16 +9,15 @@ import (
 
 var (
 	// Кнопка точка входа
-	entryButton = global.Markup.Text("BASE")
-
+	entryButton = tele.Btn{Text: "BASE"}
 	// Базовые кнопки в меню
 	defaultButtons = [][]tele.Btn{
 		{global.BtnBack, global.BtnMainMenu},
 	}
 
 	// Inline кнопки
-	btnEnableNotifications  = global.Markup.Data("🔔 Включить уведомления", "enable_notif")
-	btnDisableNotifications = global.Markup.Data("🔕 Отключить уведомления", "disable_notif")
+	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif"}
+	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif"}
 
 	inlineButtons = [][]tele.Btn{
 		{btnEnableNotifications, btnDisableNotifications},
@@ -34,9 +33,9 @@ func NewStrategyMenu(name, id string) *StrategyBaseMenu {
 		BaseMenu: base.NewBaseMenu(name, id),
 	}
 
-	menu.BaseMenu.AddButtons(defaultButtons...)
-	menu.BaseMenu.WithEntryButton(entryButton)
-	menu.BaseMenu.AddButtonsInline(inlineButtons...)
+	menu.AddButtons(defaultButtons...)
+	menu.WithEntryButton(entryButton)
+	menu.AddButtonsInline(inlineButtons...)
 
 	return menu
 }

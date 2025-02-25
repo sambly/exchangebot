@@ -14,12 +14,12 @@ import (
 
 var (
 	// Кнопка точка входа
-	entryButton = global.Markup.Text("📌 Аккаунт")
+	entryButton = tele.Btn{Text: "📌 Аккаунт"}
 
-	updateData  = global.Markup.Text("Обновить данные")
-	balance     = global.Markup.Text("BALANCE")
-	changePrice = global.Markup.Text("Периоды")
-	selectAsset = global.Markup.Text("Выбрать пару")
+	updateData  = tele.Btn{Text: "Обновить данные"}
+	balance     = tele.Btn{Text: "BALANCE"}
+	changePrice = tele.Btn{Text: "Периоды"}
+	selectAsset = tele.Btn{Text: "Выбрать пару"}
 
 	defaultButtons = [][]tele.Btn{
 		{updateData},
@@ -46,8 +46,8 @@ func NewAccountMenu(name, id string, account *account.Account, asetsPrices *pric
 		BaseAmountAsset: baseAmountAsset,
 	}
 
-	menu.BaseMenu.WithEntryButton(entryButton)
-	menu.BaseMenu.AddButtons(defaultButtons...)
+	menu.WithEntryButton(entryButton)
+	menu.AddButtons(defaultButtons...)
 
 	return menu
 }

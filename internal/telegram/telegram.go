@@ -102,7 +102,7 @@ func (t Telegram) Start(ctx context.Context) error {
 	_, err := t.client.Send(
 		&tele.User{ID: t.tlgUser},
 		fmt.Sprintf("🚀 *Бот успешно запущен!*\n🔹*Сервер:* %s\n", t.app.Settings.ServerName),
-		menu.Main.BaseMenu.Markup,
+		menu.Main.Markup,
 	)
 
 	if err != nil {
@@ -121,7 +121,7 @@ func (t Telegram) Start(ctx context.Context) error {
 				}
 
 				if t.notificationEnable {
-					_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, menu.Main.BaseMenu.Markup)
+					_, err := t.client.Send(&tele.User{ID: t.tlgUser}, mes, menu.Main.Markup)
 					if err != nil {
 						tlgLogger.Errorf("error send message tlg: %v", err)
 					}
@@ -139,7 +139,7 @@ func (t Telegram) Start(ctx context.Context) error {
 	_, err = t.client.Send(
 		&tele.User{ID: t.tlgUser},
 		fmt.Sprintf("⚠️ *Бот остановлен.*\n🔹 *Сервер:* %s\n", t.app.Settings.ServerName),
-		menu.Main.BaseMenu.Markup,
+		menu.Main.Markup,
 	)
 
 	if err != nil {
