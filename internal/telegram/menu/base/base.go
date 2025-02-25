@@ -9,7 +9,7 @@ type BaseMenu struct {
 	Name           string
 	ID             string
 	Markup         *tele.ReplyMarkup
-	ButtonsMarkup  []tele.Btn     // Отображаемые кнопки в меню
+	ButtonsMarkup  [][]tele.Btn   // Отображаемые кнопки в меню
 	ButtonsHandler ButtonsHandler // Обработчики кнопок
 
 	InlineMarkup  *tele.ReplyMarkup
@@ -19,7 +19,7 @@ type BaseMenu struct {
 // Структура для хранения кнопок обработки событий
 type ButtonsHandler struct {
 	EntryButton tele.Btn
-	Buttons     []tele.Btn
+	Buttons     [][]tele.Btn
 }
 
 // Создает новое базовое меню
@@ -29,19 +29,34 @@ func NewBaseMenu(name, id string) *BaseMenu {
 		ID:            id,
 		Markup:        &tele.ReplyMarkup{ResizeKeyboard: true},
 		InlineMarkup:  &tele.ReplyMarkup{},
-		ButtonsMarkup: []tele.Btn{},
+		ButtonsMarkup: [][]tele.Btn{},
 		InlineButtons: []tele.Btn{},
 		ButtonsHandler: ButtonsHandler{
-			Buttons: []tele.Btn{},
+			Buttons: [][]tele.Btn{},
 		},
 	}
 	menu.updateMarkup()
 	return menu
 }
 
+// Добавляет кнопку в меню
+func (m *BaseMenu) AddButton(button tele.Btn, prepend bool) {
+	newRow := []tele.Btn{button}
+
+	if prepend {
+		// Вставляем кнопку в начало списка
+		m.ButtonsHandler.Buttons = append([][]tele.Btn{newRow}, m.ButtonsHandler.Buttons...)
+	} else {
+		// Добавляем кнопку в конец списка
+		m.ButtonsHandler.Buttons = append(m.ButtonsHandler.Buttons, newRow)
+	}
+
+	m.updateMarkup()
+}
+
 // Добавляет кнопки в меню
-func (m *BaseMenu) AddButtons(buttons ...tele.Btn) {
-	m.ButtonsHandler.Buttons = append(buttons, m.ButtonsHandler.Buttons...)
+func (m *BaseMenu) AddButtons(buttons ...[]tele.Btn) {
+	m.ButtonsHandler.Buttons = append(m.ButtonsHandler.Buttons, buttons...)
 	m.updateMarkup()
 }
 
@@ -61,10 +76,16 @@ func (m *BaseMenu) GetEntryButton() tele.Btn {
 
 // Обновляет отображение кнопок в меню
 func (m *BaseMenu) updateMarkup() {
-	m.ButtonsMarkup = append([]tele.Btn{}, m.ButtonsHandler.Buttons...)
-	m.Markup.Reply(m.ButtonsMarkup)
-}
 
+	m.ButtonsMarkup = append([][]tele.Btn{}, m.ButtonsHandler.Buttons...)
+
+	var rows []tele.Row
+	for _, btnRow := range m.ButtonsMarkup {
+		rows = append(rows, tele.Row(btnRow))
+	}
+
+	m.Markup.Reply(rows...)
+}
 func (m *BaseMenu) updateInlineMarkup() {
 	m.InlineButtons = append([]tele.Btn{}, m.InlineButtons...)
 	m.InlineMarkup.Inline(m.InlineButtons)

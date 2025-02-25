@@ -15,7 +15,8 @@ type MenuHandler interface {
 }
 
 type WindowHandler interface {
-	AddButtons(buttons ...tele.Btn)
+	AddButton(button tele.Btn, prepend bool)
+	AddButtons(buttons ...[]tele.Btn)
 	WithEntryButton(button tele.Btn)
 	GetEntryButton() tele.Btn
 	Show(c tele.Context, handler MenuHandler) error

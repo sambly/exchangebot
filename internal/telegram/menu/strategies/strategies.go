@@ -15,9 +15,8 @@ var (
 	entryButton = global.Markup.Text(btnLabelStrategies)
 
 	// Базовые кнопки в меню
-	defaultButtons = []tele.Btn{
-		global.BtnBack,
-		global.BtnMainMenu,
+	defaultButtons = [][]tele.Btn{
+		{global.BtnBack, global.BtnMainMenu},
 	}
 )
 
@@ -38,7 +37,7 @@ func NewStrategyMenu(name, id string, strategyCtrl *strategy.ControllerStrategy)
 	// Добавление точек входа в подменю стратегий
 	for _, strategy := range strategyCtrl.Strategies {
 		if strMenu := strategy.GetTelegramMenu(); strMenu != nil {
-			menu.AddButtons(strMenu.GetEntryButton())
+			menu.AddButton(strMenu.GetEntryButton(), true)
 		}
 	}
 

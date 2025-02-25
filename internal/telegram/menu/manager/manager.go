@@ -34,8 +34,8 @@ func NewMenuManager(app *application.Application) *MenuManager {
 	accountMenu := account.NewAccountMenu("Аккаунт:", "account", app.Account, app.AssetsPrices, app.BaseAmountAsset)
 	strategiesMenu := strategies.NewStrategyMenu("Стратегии:", "strategies", app.ControllerStrategy)
 
-	mainMenu.AddButtons(accountMenu.ButtonsHandler.EntryButton)
-	mainMenu.AddButtons(strategiesMenu.ButtonsHandler.EntryButton)
+	mainMenu.AddButton(accountMenu.ButtonsHandler.EntryButton, false)
+	mainMenu.AddButton(strategiesMenu.ButtonsHandler.EntryButton, false)
 
 	return &MenuManager{
 		Main:      mainMenu,

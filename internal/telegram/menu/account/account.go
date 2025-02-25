@@ -16,13 +16,17 @@ var (
 	// Кнопка точка входа
 	entryButton = global.Markup.Text("📌 Аккаунт")
 
-	balance = global.Markup.Text("BALANCE")
+	updateData  = global.Markup.Text("Обновить данные")
+	balance     = global.Markup.Text("BALANCE")
+	changePrice = global.Markup.Text("Периоды")
+	selectAsset = global.Markup.Text("Выбрать пару")
 
-	// Базовые кнопки в меню
-	defaultButtons = []tele.Btn{
-		balance,
-		global.BtnBack,
-		global.BtnMainMenu,
+	defaultButtons = [][]tele.Btn{
+		{updateData},
+		{balance},
+		{changePrice},
+		{selectAsset},
+		{global.BtnBack, global.BtnMainMenu},
 	}
 )
 
@@ -68,14 +72,24 @@ func (m *AccountMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		return m.Show(c, handler)
 	})
 
+	b.Handle(&updateData, func(c tele.Context) error {
+
+		userID := c.Sender().ID
+		handler.DeleteUserMessages(c, userID)
+
+		msg, err := c.Bot().Send(c.Chat(), "Данные обновлены", m.Markup)
+		if err == nil {
+			handler.SaveMessage(c.Sender().ID, msg)
+		}
+
+		return nil
+	})
+
 	b.Handle(&balance, func(c tele.Context) error {
 
 		userID := c.Sender().ID
 		handler.DeleteUserMessages(c, userID)
 
-		if err := m.Account.UpdateAssets(); err != nil {
-			return err
-		}
 		marketStat := m.AssetsPrices.MarketsStat
 
 		var out []string
@@ -86,12 +100,19 @@ func (m *AccountMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 			}
 		}
 
-		bufer := ""
+		var bufer string
+		var message string
 		for _, item := range out {
 			bufer = bufer + item + "\n"
 		}
 
-		msg, err := c.Bot().Send(c.Chat(), bufer, m.Markup)
+		if bufer == "" {
+			message = "Данные отсутствуют"
+		} else {
+			message = bufer
+		}
+
+		msg, err := c.Bot().Send(c.Chat(), message, m.Markup)
 		if err == nil {
 			handler.SaveMessage(c.Sender().ID, msg)
 		}
