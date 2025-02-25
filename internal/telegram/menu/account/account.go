@@ -120,4 +120,30 @@ func (m *AccountMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		return nil
 	})
 
+	b.Handle(&changePrice, func(c tele.Context) error {
+
+		userID := c.Sender().ID
+		handler.DeleteUserMessages(c, userID)
+
+		msg, err := c.Bot().Send(c.Chat(), "Изменение цены!!!!", m.Markup)
+		if err == nil {
+			handler.SaveMessage(c.Sender().ID, msg)
+		}
+
+		return nil
+	})
+
+	b.Handle(&selectAsset, func(c tele.Context) error {
+
+		userID := c.Sender().ID
+		handler.DeleteUserMessages(c, userID)
+
+		msg, err := c.Bot().Send(c.Chat(), "Выбрать пару!!!!", m.Markup)
+		if err == nil {
+			handler.SaveMessage(c.Sender().ID, msg)
+		}
+
+		return nil
+	})
+
 }

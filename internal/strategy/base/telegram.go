@@ -15,9 +15,14 @@ var (
 	defaultButtons = [][]tele.Btn{
 		{global.BtnBack, global.BtnMainMenu},
 	}
+
 	// Inline кнопки
 	btnEnableNotifications  = global.Markup.Data("🔔 Включить уведомления", "enable_notif")
 	btnDisableNotifications = global.Markup.Data("🔕 Отключить уведомления", "disable_notif")
+
+	inlineButtons = [][]tele.Btn{
+		{btnEnableNotifications, btnDisableNotifications},
+	}
 )
 
 type StrategyBaseMenu struct {
@@ -31,9 +36,7 @@ func NewStrategyMenu(name, id string) *StrategyBaseMenu {
 
 	menu.BaseMenu.AddButtons(defaultButtons...)
 	menu.BaseMenu.WithEntryButton(entryButton)
-
-	menu.BaseMenu.AddButtonsInline(btnEnableNotifications)
-	menu.BaseMenu.AddButtonsInline(btnDisableNotifications)
+	menu.BaseMenu.AddButtonsInline(inlineButtons...)
 
 	return menu
 }
