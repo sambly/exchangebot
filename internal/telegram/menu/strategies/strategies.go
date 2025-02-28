@@ -37,6 +37,7 @@ func NewStrategyMenu(name, id string, strategyCtrl *strategy.ControllerStrategy)
 	for _, strategy := range strategyCtrl.Strategies {
 		if strMenu := strategy.GetTelegramMenu(); strMenu != nil {
 			menu.AddButton(strMenu.GetEntryButton(), true)
+			menu.AddSubMenu(strMenu)
 		}
 	}
 
@@ -59,9 +60,9 @@ func (m *StrategyMenu) Show(c tele.Context, handler model.MenuHandler) error {
 // Handle обрабатывает кнопки меню стратегий
 func (m *StrategyMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 
-	// обработка меню подстратегий
-	for _, strategy := range m.StrategyController.Strategies {
-		strategy.GetTelegramMenu().Handle(b, handler)
+	// Подключаем обработчики подменю
+	for _, subMenu := range m.SubMenus {
+		subMenu.Handle(b, handler)
 	}
 
 	// Обработчик кнопки входа в меню стратегий

@@ -1,6 +1,7 @@
 package base
 
 import (
+	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 	tele "gopkg.in/telebot.v3"
 )
 
@@ -14,6 +15,8 @@ type BaseMenu struct {
 
 	InlineMarkup  *tele.ReplyMarkup
 	InlineButtons [][]tele.Btn
+
+	SubMenus []model.WindowHandler
 }
 
 // Структура для хранения кнопок обработки событий
@@ -104,4 +107,8 @@ func (m *BaseMenu) updateInlineMarkup() {
 	}
 
 	m.InlineMarkup.Inline(rows...)
+}
+
+func (m *BaseMenu) AddSubMenu(subMenu model.WindowHandler) {
+	m.SubMenus = append(m.SubMenus, subMenu)
 }

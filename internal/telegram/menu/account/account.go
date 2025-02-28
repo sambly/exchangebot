@@ -18,13 +18,12 @@ var (
 
 	updateData  = tele.Btn{Text: "Обновить данные"}
 	balance     = tele.Btn{Text: "BALANCE"}
-	changePrice = tele.Btn{Text: "Периоды"}
 	selectAsset = tele.Btn{Text: "Выбрать пару"}
 
 	defaultButtons = [][]tele.Btn{
 		{updateData},
 		{balance},
-		{changePrice},
+		{entryButtonChangePeriods},
 		{selectAsset},
 		{global.BtnBack, global.BtnMainMenu},
 	}
@@ -48,6 +47,7 @@ func NewAccountMenu(name, id string, account *account.Account, asetsPrices *pric
 
 	menu.WithEntryButton(entryButton)
 	menu.AddButtons(defaultButtons...)
+	menu.AddSubMenu(NewChangePeriodsMenu(menu))
 
 	return menu
 }
@@ -67,6 +67,12 @@ func (m *AccountMenu) Show(c tele.Context, handler model.MenuHandler) error {
 
 // Handle обрабатывает кнопки меню аккаунта
 func (m *AccountMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
+
+	// Подключаем обработчики подменю
+	for _, subMenu := range m.SubMenus {
+		subMenu.Handle(b, handler)
+	}
+
 	// Обработчик кнопки входа в аккаунт
 	b.Handle(&m.ButtonsHandler.EntryButton, func(c tele.Context) error {
 		return m.Show(c, handler)
@@ -113,19 +119,6 @@ func (m *AccountMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		}
 
 		msg, err := c.Bot().Send(c.Chat(), message, m.Markup)
-		if err == nil {
-			handler.SaveMessage(c.Sender().ID, msg)
-		}
-
-		return nil
-	})
-
-	b.Handle(&changePrice, func(c tele.Context) error {
-
-		userID := c.Sender().ID
-		handler.DeleteUserMessages(c, userID)
-
-		msg, err := c.Bot().Send(c.Chat(), "Изменение цены!!!!", m.Markup)
 		if err == nil {
 			handler.SaveMessage(c.Sender().ID, msg)
 		}
