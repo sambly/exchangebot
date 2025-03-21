@@ -43,7 +43,7 @@ func NewChangePeriodsMenu(account *AccountMenu) *ChangePeriodsMenu {
 	}
 
 	menu.WithEntryButton(entryButtonChangePeriods)
-	menu.AddButtons(defaultButtonsChangePeriods...)
+	menu.AddButtonRows(defaultButtonsChangePeriods...)
 
 	return menu
 }
@@ -51,14 +51,9 @@ func NewChangePeriodsMenu(account *AccountMenu) *ChangePeriodsMenu {
 func (m *ChangePeriodsMenu) Show(c tele.Context, handler model.MenuHandler) error {
 
 	userID := c.Sender().ID
-	handler.SetCurrentMenu(userID, m.Show)
+	handler.SetCurrentMenu(userID, m.Show, nil)
 	handler.DeleteUserMessages(c, userID)
-
-	msg, err := c.Bot().Send(c.Chat(), "Выбери период:", m.Markup)
-	if err == nil {
-		handler.SaveMessage(userID, msg)
-	}
-	return err
+	return c.Send("Выбери период:", m.Markup)
 }
 
 func (m *ChangePeriodsMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
@@ -79,6 +74,10 @@ func (m *ChangePeriodsMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		return m.handlePeriod(c, handler)
 	})
 
+	b.Handle(&period_1h, func(c tele.Context) error {
+		return m.handlePeriod(c, handler)
+	})
+
 	b.Handle(&period_4h, func(c tele.Context) error {
 		return m.handlePeriod(c, handler)
 	})
@@ -94,7 +93,7 @@ func (m *ChangePeriodsMenu) handlePeriod(c tele.Context, handler model.MenuHandl
 
 	var bufer string
 	var message string
-	period := c.Text()[1:]
+	period := c.Text()
 	assets := m.getPeriods(period)
 	for _, item := range assets {
 		bufer = bufer + fmt.Sprintf("%s\n", item)
@@ -104,13 +103,7 @@ func (m *ChangePeriodsMenu) handlePeriod(c tele.Context, handler model.MenuHandl
 	} else {
 		message = bufer
 	}
-
-	msg, err := c.Bot().Send(c.Chat(), message, m.Markup)
-	if err == nil {
-		handler.SaveMessage(c.Sender().ID, msg)
-	}
-
-	return nil
+	return c.Send(message, m.Markup)
 }
 
 func (m *ChangePeriodsMenu) getPeriods(period string) []string {

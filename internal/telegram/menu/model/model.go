@@ -6,7 +6,7 @@ import tele "gopkg.in/telebot.v3"
 type MenuHandler interface {
 	InitHandlers(b *tele.Bot)
 	GetMainMenu() func(c tele.Context, handler MenuHandler) error
-	SetCurrentMenu(userID int64, newFunc func(c tele.Context, handler MenuHandler) error)
+	SetCurrentMenu(userID int64, newFunc func(c tele.Context, handler MenuHandler) error, handleTextFunc func(c tele.Context) error)
 	GetPreviousMenu(userID int64) func(c tele.Context, handler MenuHandler) error
 	ResetPreviousMenu(userID int64)
 	SaveMessage(userID int64, msg *tele.Message)
@@ -15,10 +15,10 @@ type MenuHandler interface {
 }
 
 type WindowHandler interface {
-	AddButton(button tele.Btn, prepend bool)
-	AddButtons(buttons ...[]tele.Btn)
-	AddButtonInline(button tele.Btn, prepend bool)
-	AddButtonsInline(buttons ...[]tele.Btn)
+	AddButtons(prepend bool, buttons ...tele.Btn)
+	AddButtonRows(buttonRows ...[]tele.Btn)
+	AddButtonsInline(prepend bool, buttons ...tele.Btn)
+	AddButtonRowsInline(buttonRows ...[]tele.Btn)
 	WithEntryButton(button tele.Btn)
 	GetEntryButton() tele.Btn
 	Show(c tele.Context, handler MenuHandler) error

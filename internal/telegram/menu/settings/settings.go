@@ -1,6 +1,7 @@
-package base
+package settings
 
 import (
+	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sambly/exchangebot/internal/telegram/menu/base"
 	"github.com/sambly/exchangebot/internal/telegram/menu/global"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
@@ -9,30 +10,30 @@ import (
 
 var (
 	// Кнопка точка входа
-	entryButton = tele.Btn{Text: "BASE"}
+	entryButton = tele.Btn{Text: "⚙️ Настройки"}
 	// Базовые кнопки в меню
 	replyButtons = [][]tele.Btn{
 		{global.BtnBack, global.BtnMainMenu},
 	}
 
 	// Inline кнопки
-	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif"}
-	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif"}
+	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif_tlg"}
+	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif_tlg"}
 
 	inlineButtons = [][]tele.Btn{
 		{btnEnableNotifications, btnDisableNotifications},
 	}
 )
 
-type StrategyBaseMenu struct {
+type SettingsMenu struct {
 	*base.BaseMenu
-	Strategy *StrategyBase
+	settings *config.Telegram
 }
 
-func NewStrategyMenu(name, id string, str *StrategyBase) *StrategyBaseMenu {
-	menu := &StrategyBaseMenu{
+func NewSettingsMenu(name, id string, cfg *config.Telegram) *SettingsMenu {
+	menu := &SettingsMenu{
 		BaseMenu: base.NewBaseMenu(name, id),
-		Strategy: str,
+		settings: cfg,
 	}
 
 	menu.AddButtonRows(replyButtons...)
@@ -42,14 +43,14 @@ func NewStrategyMenu(name, id string, str *StrategyBase) *StrategyBaseMenu {
 	return menu
 }
 
-func (m *StrategyBaseMenu) Show(c tele.Context, handler model.MenuHandler) error {
+func (m *SettingsMenu) Show(c tele.Context, handler model.MenuHandler) error {
 
 	userID := c.Sender().ID
 	handler.SetCurrentMenu(userID, m.Show, nil)
 	handler.DeleteUserMessages(c, userID)
 
-	text := "Настройки Base стратегии:\n"
-	if m.Strategy.Config.NotificationEnable {
+	text := "Настройки бота:\n"
+	if m.settings.NotificationEnable {
 		text += "Уведомления: включены"
 	} else {
 		text += "Уведомления: отключены"
@@ -61,7 +62,7 @@ func (m *StrategyBaseMenu) Show(c tele.Context, handler model.MenuHandler) error
 
 	// Кнопки inline отправляем отдельно
 	if len(m.InlineButtons) > 0 {
-		if err := c.Send("Выберите действие:", m.InlineMarkup); err != nil {
+		if err := c.Send("Уведомления:", m.InlineMarkup); err != nil {
 			return err
 		}
 	}
@@ -69,19 +70,19 @@ func (m *StrategyBaseMenu) Show(c tele.Context, handler model.MenuHandler) error
 }
 
 // Handle обрабатывает кнопки меню стратегий
-func (m *StrategyBaseMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
+func (m *SettingsMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 	// Обработчик кнопки входа в меню стратегий
 	b.Handle(&m.ButtonsHandler.EntryButton, func(c tele.Context) error {
 		return m.Show(c, handler)
 	})
 
 	b.Handle(&btnEnableNotifications, func(c tele.Context) error {
-		m.Strategy.Config.NotificationEnable = true
+		m.settings.NotificationEnable = true
 		return c.Respond(&tele.CallbackResponse{Text: "Уведомления включены ✅", ShowAlert: true})
 	})
 
 	b.Handle(&btnDisableNotifications, func(c tele.Context) error {
-		m.Strategy.Config.NotificationEnable = true
+		m.settings.NotificationEnable = false
 		return c.Respond(&tele.CallbackResponse{Text: "Уведомления отключены ❌", ShowAlert: true})
 	})
 

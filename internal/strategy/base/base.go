@@ -38,7 +38,7 @@ func NewStrategy(assetsPrices *prices.AsetsPrices, periods map[string]time.Durat
 }
 
 func (s *StrategyBase) WithTelegramMenu() *StrategyBase {
-	tlgMenu := NewStrategyMenu("Base стратегия", "strategiesBase")
+	tlgMenu := NewStrategyMenu("Base стратегия", "strategiesBase", s)
 	s.TelegramMenu = tlgMenu
 	return s
 }

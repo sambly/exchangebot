@@ -8,6 +8,7 @@ import (
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangeService/pkg/telemetry"
 	"github.com/sambly/exchangebot/internal/account"
+	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/notification"
@@ -20,6 +21,7 @@ import (
 
 type Application struct {
 	Settings model.Settings
+	Config   *config.Config
 	database *gorm.DB
 
 	exchange exchange.Exchange
@@ -45,9 +47,9 @@ func NewApp(
 	notification *notification.Notification,
 	socketsMessage *notification.SocketsMessage,
 	assetsPrices *prices.AsetsPrices,
-	controllerStrategy *strategy.ControllerStrategy) (*Application, error) {
+	controllerStrategy *strategy.ControllerStrategy,
+	cfg *config.Config) (*Application, error) {
 
-	//assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, settings.WeightProcents, db, notification)
 	account, err := account.NewAccount(exch, assetsPrices, notification)
 	if err != nil {
 		return nil, err
@@ -60,6 +62,7 @@ func NewApp(
 
 	app := &Application{
 		Settings: settings,
+		Config:   cfg,
 		exchange: exch,
 		dataFeed: dataFeed,
 		database: db,

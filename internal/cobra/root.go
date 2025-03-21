@@ -221,6 +221,7 @@ func run(cmd *cobra.Command, args []string) error {
 		socketsMessage,
 		assetsPrices,
 		controllerStrategy,
+		cfg,
 	)
 	if err != nil {
 		mainLogger.Fatal(err)

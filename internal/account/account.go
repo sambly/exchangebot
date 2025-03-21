@@ -18,6 +18,8 @@ type Account struct {
 	AssetPrices  *prices.AsetsPrices
 	AssetsKey    []string                  // пары к USDT которые есть на на Spot, Flexible, Staking
 	Assets       map[string]*exModel.Asset // Сруктура пары к USDT
+
+	BaseLimitAsset float64 // TODO   BaseLimitAsset эту хрень здесь как то реализовать надо , а потом еще уведомление починить везде и запуск без телеграма
 }
 
 func NewAccount(exchange exchange.Exchange, assetPrices *prices.AsetsPrices, notification *notification.Notification) (*Account, error) {

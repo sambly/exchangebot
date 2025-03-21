@@ -23,15 +23,10 @@ func NewMainMenu(name, id string) *MainMenu {
 func (m *MainMenu) Show(c tele.Context, handler model.MenuHandler) error {
 
 	userID := c.Sender().ID
-	handler.SetCurrentMenu(userID, m.Show)
+	handler.SetCurrentMenu(userID, m.Show, nil)
 	handler.ResetPreviousMenu(userID)
 	handler.DeleteUserMessages(c, userID)
-
-	msg, err := c.Bot().Send(c.Chat(), "Главное меню:", m.Markup)
-	if err == nil {
-		handler.SaveMessage(userID, msg)
-	}
-	return err
+	return c.Send("Главное меню:", m.Markup)
 }
 
 // Handle регистрирует обработчики главного меню.

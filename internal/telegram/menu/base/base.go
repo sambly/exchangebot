@@ -10,13 +10,10 @@ type BaseMenu struct {
 	Name           string
 	ID             string
 	Markup         *tele.ReplyMarkup
-	ButtonsMarkup  [][]tele.Btn   // Все кнопки отоборажаемые в меню, вместе с EntryButton другого меню
+	InlineMarkup   *tele.ReplyMarkup
 	ButtonsHandler ButtonsHandler // Обработчики кнопок
-
-	InlineMarkup  *tele.ReplyMarkup
-	InlineButtons [][]tele.Btn
-
-	SubMenus []model.WindowHandler
+	InlineButtons  [][]tele.Btn
+	SubMenus       []model.WindowHandler
 }
 
 // Структура для хранения кнопок обработки событий
@@ -28,52 +25,56 @@ type ButtonsHandler struct {
 // Создает новое базовое меню
 func NewBaseMenu(name, id string) *BaseMenu {
 	menu := &BaseMenu{
-		Name:          name,
-		ID:            id,
-		Markup:        &tele.ReplyMarkup{ResizeKeyboard: true},
-		InlineMarkup:  &tele.ReplyMarkup{},
-		ButtonsMarkup: [][]tele.Btn{},
-		InlineButtons: [][]tele.Btn{},
+		Name:         name,
+		ID:           id,
+		Markup:       &tele.ReplyMarkup{ResizeKeyboard: true},
+		InlineMarkup: &tele.ReplyMarkup{ResizeKeyboard: true},
 		ButtonsHandler: ButtonsHandler{
-			Buttons: [][]tele.Btn{},
+			Buttons: make([][]tele.Btn, 0),
 		},
+		InlineButtons: make([][]tele.Btn, 0),
 	}
 	menu.updateMarkup()
 	return menu
 }
 
-// Добавляет кнопку в меню
-func (m *BaseMenu) AddButton(button tele.Btn, prepend bool) {
-	newRow := []tele.Btn{button}
+// Добавляет кнопку или группу кнопок в меню
+func (m *BaseMenu) AddButtons(prepend bool, buttons ...tele.Btn) {
+	if len(buttons) == 0 {
+		return
+	}
+	newRow := buttons
 	if prepend {
-		// Вставляем кнопку в начало списка
 		m.ButtonsHandler.Buttons = append([][]tele.Btn{newRow}, m.ButtonsHandler.Buttons...)
 	} else {
-		// Добавляем кнопку в конец списка
 		m.ButtonsHandler.Buttons = append(m.ButtonsHandler.Buttons, newRow)
 	}
 	m.updateMarkup()
 }
 
-// Добавляет кнопки в меню
-func (m *BaseMenu) AddButtons(buttons ...[]tele.Btn) {
-	m.ButtonsHandler.Buttons = append(m.ButtonsHandler.Buttons, buttons...)
+// Добавляет несколько строк кнопок
+func (m *BaseMenu) AddButtonRows(buttonRows ...[]tele.Btn) {
+	m.ButtonsHandler.Buttons = append(m.ButtonsHandler.Buttons, buttonRows...)
 	m.updateMarkup()
 }
-func (m *BaseMenu) AddButtonInline(button tele.Btn, prepend bool) {
-	newRow := []tele.Btn{button}
+
+// Добавляет кнопку или группу кнопок в inline-меню
+func (m *BaseMenu) AddButtonsInline(prepend bool, buttons ...tele.Btn) {
+	if len(buttons) == 0 {
+		return
+	}
+	newRow := buttons
 	if prepend {
-		// Вставляем кнопку в начало списка
 		m.InlineButtons = append([][]tele.Btn{newRow}, m.InlineButtons...)
 	} else {
-		// Добавляем кнопку в конец списка
 		m.InlineButtons = append(m.InlineButtons, newRow)
 	}
 	m.updateInlineMarkup()
 }
 
-func (m *BaseMenu) AddButtonsInline(buttons ...[]tele.Btn) {
-	m.InlineButtons = append(m.InlineButtons, buttons...)
+// Добавляет несколько строк inline-кнопок
+func (m *BaseMenu) AddButtonRowsInline(buttonRows ...[]tele.Btn) {
+	m.InlineButtons = append(m.InlineButtons, buttonRows...)
 	m.updateInlineMarkup()
 }
 
@@ -88,27 +89,23 @@ func (m *BaseMenu) GetEntryButton() tele.Btn {
 
 // Обновляет отображение кнопок в меню
 func (m *BaseMenu) updateMarkup() {
-
-	m.ButtonsMarkup = append([][]tele.Btn{}, m.ButtonsHandler.Buttons...)
-
 	var rows []tele.Row
-	for _, btnRow := range m.ButtonsMarkup {
-		rows = append(rows, tele.Row(btnRow))
+	for _, btnRow := range m.ButtonsHandler.Buttons {
+		rows = append(rows, m.Markup.Row(btnRow...)) // Используем встроенную Row
 	}
 	m.Markup.Reply(rows...)
 }
+
+// Обновляет отображение inline-кнопок
 func (m *BaseMenu) updateInlineMarkup() {
-
-	m.InlineButtons = append([][]tele.Btn{}, m.InlineButtons...)
-
 	var rows []tele.Row
 	for _, btnRow := range m.InlineButtons {
-		rows = append(rows, tele.Row(btnRow))
+		rows = append(rows, m.InlineMarkup.Row(btnRow...)) // Аналогично для инлайн-кнопок
 	}
-
 	m.InlineMarkup.Inline(rows...)
 }
 
+// Добавляет подменю
 func (m *BaseMenu) AddSubMenu(subMenu model.WindowHandler) {
 	m.SubMenus = append(m.SubMenus, subMenu)
 }
