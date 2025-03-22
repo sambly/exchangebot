@@ -33,13 +33,13 @@ var (
 
 type ChangePeriodsMenu struct {
 	*base.BaseMenu
-	Account *AccountMenu
+	*AccountMenu
 }
 
 func NewChangePeriodsMenu(account *AccountMenu) *ChangePeriodsMenu {
 	menu := &ChangePeriodsMenu{
-		BaseMenu: base.NewBaseMenu("Периоды", "periods"),
-		Account:  account,
+		BaseMenu:    base.NewBaseMenu("Периоды", "periods"),
+		AccountMenu: account,
 	}
 
 	menu.WithEntryButton(entryButtonChangePeriods)
@@ -107,14 +107,12 @@ func (m *ChangePeriodsMenu) handlePeriod(c tele.Context, handler model.MenuHandl
 }
 
 func (m *ChangePeriodsMenu) getPeriods(period string) []string {
-	change := m.Account.AssetsPrices.ChangePrices
+	change := m.AssetsPrices.ChangePrices
 	var out []string
-	for _, asset := range m.Account.Account.Assets {
+	for _, asset := range m.Account.Assets {
 		if _, ok := change[asset.Name][period]; ok {
-			if asset.CommonData.FullPrice >= m.Account.BaseAmountAsset {
-				s := fmt.Sprintf("%s:		%.2f", asset.Name[:len(asset.Name)-len("USDT")], change[asset.Name][period].ChangePercent)
-				out = append(out, s)
-			}
+			s := fmt.Sprintf("%s:		%.2f", asset.Name[:len(asset.Name)-len("USDT")], change[asset.Name][period].ChangePercent)
+			out = append(out, s)
 		}
 	}
 	return out

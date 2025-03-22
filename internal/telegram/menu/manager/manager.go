@@ -34,7 +34,7 @@ type MenuManager struct {
 // NewMenuManager создаёт все меню.
 func NewMenuManager(app *application.Application) *MenuManager {
 	mainMenu := entry.NewMainMenu("Главное меню:", "main")
-	accountMenu := account.NewAccountMenu("Аккаунт:", "account", app.Account, app.AssetsPrices, app.BaseAmountAsset)
+	accountMenu := account.NewAccountMenu("Аккаунт:", "account", app.Account, app.AssetsPrices)
 	strategiesMenu := strategies.NewStrategyMenu("Стратегии:", "strategies", app.ControllerStrategy)
 	settingsMenu := settings.NewSettingsMenu("Настройки:", "settings", &app.Config.Telegram)
 

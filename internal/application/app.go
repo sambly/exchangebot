@@ -32,8 +32,6 @@ type Application struct {
 	OrderController    *order.Controller
 	PaperWallet        *exchange.PaperWallet
 	ControllerStrategy *strategy.ControllerStrategy
-
-	BaseAmountAsset float64
 }
 
 var appLogger = logger.AddFieldsEmpty()
@@ -44,13 +42,14 @@ func NewApp(
 	dataFeed *exchange.DataFeed,
 	settings model.Settings,
 	db *gorm.DB,
-	notification *notification.Notification,
 	socketsMessage *notification.SocketsMessage,
 	assetsPrices *prices.AsetsPrices,
 	controllerStrategy *strategy.ControllerStrategy,
 	cfg *config.Config) (*Application, error) {
 
-	account, err := account.NewAccount(exch, assetsPrices, notification)
+	baseLimitAsset := 1.0
+
+	account, err := account.NewAccount(exch, assetsPrices, baseLimitAsset)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +71,6 @@ func NewApp(
 		OrderController:    orderController,
 		PaperWallet:        paperWallet,
 		ControllerStrategy: controllerStrategy,
-		BaseAmountAsset:    1,
 	}
 
 	app.PaperWallet.MarketsStat = assetsPrices.MarketsStat

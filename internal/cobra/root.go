@@ -166,8 +166,7 @@ func run(cmd *cobra.Command, args []string) error {
 		mainLogger.Fatal(err)
 	}
 
-	notify := notification.NewNotificationService(cfg.NotificationEnable)
-
+	notificationService := notification.NewNotificationService(cfg.NotificationEnable)
 	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
 
 	var exflow exchange.Exflow
@@ -203,7 +202,7 @@ func run(cmd *cobra.Command, args []string) error {
 		mainLogger.Fatal(err)
 	}
 
-	baseStrategy, err := base.NewStrategy(assetsPrices, periods, pairs, &notify)
+	baseStrategy, err := base.NewStrategy(assetsPrices, periods, pairs, notificationService)
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
@@ -217,7 +216,6 @@ func run(cmd *cobra.Command, args []string) error {
 		dataFeed,
 		settings,
 		db,
-		&notify,
 		socketsMessage,
 		assetsPrices,
 		controllerStrategy,
@@ -227,16 +225,22 @@ func run(cmd *cobra.Command, args []string) error {
 		mainLogger.Fatal(err)
 	}
 
-	appTelegram, err := telegram.NewTelegram(app, cfg.Telegram, &notify)
+	telegram, err := telegram.NewTelegram(app, cfg.Telegram)
 	if err != nil {
 		mainLogger.Fatal(err)
 	}
+	notificationService.AddService(telegram)
+
 	web := web.NewWeb(app, socketsMessage, cfg.Web, exchangebot.Content)
 
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return appTelegram.Start(gCtx)
+		return telegram.Start(gCtx)
+	})
+
+	g.Go(func() error {
+		return notificationService.Start(gCtx)
 	})
 
 	g.Go(func() error {

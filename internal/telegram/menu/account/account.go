@@ -34,17 +34,15 @@ var (
 // Структура меню аккаунта
 type AccountMenu struct {
 	*base.BaseMenu
-	Account         *account.Account
-	AssetsPrices    *prices.AsetsPrices
-	BaseAmountAsset float64
+	Account      *account.Account
+	AssetsPrices *prices.AsetsPrices
 }
 
-func NewAccountMenu(name, id string, account *account.Account, asetsPrices *prices.AsetsPrices, baseAmountAsset float64) *AccountMenu {
+func NewAccountMenu(name, id string, account *account.Account, asetsPrices *prices.AsetsPrices) *AccountMenu {
 	menu := &AccountMenu{
-		BaseMenu:        base.NewBaseMenu(name, id),
-		Account:         account,
-		AssetsPrices:    asetsPrices,
-		BaseAmountAsset: baseAmountAsset,
+		BaseMenu:     base.NewBaseMenu(name, id),
+		Account:      account,
+		AssetsPrices: asetsPrices,
 	}
 
 	menu.WithEntryButton(entryButton)
@@ -96,10 +94,8 @@ func (m *AccountMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 
 		var out []string
 		for _, asset := range m.Account.Assets {
-			if asset.CommonData.FullPrice >= m.BaseAmountAsset {
-				s := fmt.Sprintf("%s: %.1f💲  24ch: %-5.1f", asset.Name[:len(asset.Name)-len("USDT")], asset.CommonData.FullPrice, marketStat[asset.Name].Ch24)
-				out = append(out, s)
-			}
+			s := fmt.Sprintf("%s: %.1f💲  24ch: %-5.1f", asset.Name[:len(asset.Name)-len("USDT")], asset.CommonData.FullPrice, marketStat[asset.Name].Ch24)
+			out = append(out, s)
 		}
 
 		var bufer string

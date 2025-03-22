@@ -9,16 +9,11 @@ import (
 	"github.com/sambly/exchangebot/internal/application"
 	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sambly/exchangebot/internal/logger"
-	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/telegram/menu/manager"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 
 	tele "gopkg.in/telebot.v3"
 )
-
-type Settings struct {
-	NotificationEnable bool
-}
 
 type Telegram struct {
 	bot  *tele.Bot
@@ -26,13 +21,12 @@ type Telegram struct {
 	*config.Telegram
 	user int64
 
-	app      *application.Application
-	messages *notification.Notification
+	app *application.Application
 }
 
 var tlgLogger = logger.AddFieldsEmpty()
 
-func NewTelegram(app *application.Application, cfg config.Telegram, notification *notification.Notification) (*Telegram, error) {
+func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, error) {
 
 	user, _ := strconv.ParseInt(cfg.User, 10, 64)
 	poller := &tele.LongPoller{Timeout: 10 * time.Second}
@@ -64,7 +58,6 @@ func NewTelegram(app *application.Application, cfg config.Telegram, notification
 		bot:      bot,
 		menu:     menu,
 		app:      app,
-		messages: notification,
 		Telegram: &cfg,
 		user:     user,
 	}
@@ -88,29 +81,6 @@ func (t Telegram) Start(ctx context.Context) error {
 	}
 	tlgLogger.Infof("Telegram started. Server name - %s", t.app.Settings.ServerName)
 
-	// Горутина для обработки входящих сообщений
-	go func() {
-		for {
-			select {
-			case mes, ok := <-t.messages.Message:
-				if !ok {
-					// Канал закрыт, выходим из горутины
-					return
-				}
-
-				if t.NotificationEnable {
-					_, err := t.bot.Send(&tele.User{ID: t.user}, mes, menu.Main.Markup)
-					if err != nil {
-						tlgLogger.Errorf("error send message tlg: %v", err)
-					}
-				}
-
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
 	<-ctx.Done()
 
 	t.menu.DeleteAllUserMessages(t.bot)
@@ -128,6 +98,15 @@ func (t Telegram) Start(ctx context.Context) error {
 
 	tlgLogger.Infof("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName)
 	return nil
+}
+
+func (t *Telegram) Send(message string) {
+	if t.NotificationEnable {
+		_, err := t.bot.Send(&tele.User{ID: t.user}, message, t.menu.Main.Markup)
+		if err != nil {
+			tlgLogger.Errorf("error sending message via Telegram: %v", err)
+		}
+	}
 }
 
 // Middleware проверки пользователя

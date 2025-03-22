@@ -8,7 +8,6 @@ import (
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/prices"
-	"golang.org/x/exp/slices"
 )
 
 type Account struct {
@@ -22,13 +21,13 @@ type Account struct {
 	BaseLimitAsset float64 // TODO   BaseLimitAsset эту хрень здесь как то реализовать надо , а потом еще уведомление починить везде и запуск без телеграма
 }
 
-func NewAccount(exchange exchange.Exchange, assetPrices *prices.AsetsPrices, notification *notification.Notification) (*Account, error) {
+func NewAccount(exchange exchange.Exchange, assetPrices *prices.AsetsPrices, baseLimitAsset float64) (*Account, error) {
 	acc := Account{
-		exchange:     exchange,
-		AssetsKey:    make([]string, 0),
-		Assets:       make(map[string]*exModel.Asset),
-		AssetPrices:  assetPrices,
-		Notification: notification,
+		exchange:       exchange,
+		AssetsKey:      make([]string, 0),
+		Assets:         make(map[string]*exModel.Asset),
+		AssetPrices:    assetPrices,
+		BaseLimitAsset: baseLimitAsset,
 	}
 	return &acc, nil
 }
@@ -64,10 +63,13 @@ func (acc *Account) UpdateAssets() (err error) {
 	}
 	acc.feederAssets(assetsStaking, "AssetStaking")
 
-	// Если позиция удаленна , удаляем ее из App
+	acc.AssetsKey = nil
+	// Если позиция удаленна , удаляем ее из App или меньше лимитной уставки
 	for key := range acc.Assets {
-		if !acc.Assets[key].On {
+		if !acc.Assets[key].On || acc.Assets[key].CommonData.FullPrice < acc.BaseLimitAsset {
 			delete(acc.Assets, key)
+		} else {
+			acc.AssetsKey = append(acc.AssetsKey, key)
 		}
 	}
 
@@ -79,9 +81,6 @@ func (acc *Account) feederAssets(data []exModel.AssetData, typeData string) {
 	for _, value := range data {
 
 		valueAsset := value.AssetBase + "USDT"
-		if idx := slices.Index(acc.AssetsKey, valueAsset); idx == -1 {
-			acc.AssetsKey = append(acc.AssetsKey, valueAsset)
-		}
 		if _, ok := acc.Assets[valueAsset]; !ok {
 			acc.Assets[valueAsset] = &exModel.Asset{Name: valueAsset}
 		}
