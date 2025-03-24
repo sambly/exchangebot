@@ -5,11 +5,13 @@ import (
 	"fmt"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
 
 type Strategy interface {
 	OnMarket(ms exModel.MarketsStat)
 	Start(ctx context.Context) error
+	GetTelegramMenu() model.WindowHandler
 }
 
 type Option func(*ControllerStrategy)
