@@ -24,10 +24,7 @@ import (
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/notification"
-	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/service"
-	"github.com/sambly/exchangebot/internal/strategy"
-	"github.com/sambly/exchangebot/internal/strategy/base"
 	"github.com/sambly/exchangebot/internal/telegram"
 	"github.com/sambly/exchangebot/internal/web"
 	"github.com/spf13/cobra"
@@ -195,21 +192,6 @@ func run(cmd *cobra.Command, args []string) error {
 		mainLogger.Fatalf("failed to initialize data feed: %v", err)
 	}
 
-	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, db)
-
-	controllerStrategy, err := strategy.NewControllerStrategy()
-	if err != nil {
-		mainLogger.Fatal(err)
-	}
-
-	baseStrategy, err := base.NewStrategy(assetsPrices, periods, pairs, notificationService)
-	if err != nil {
-		mainLogger.Fatal(err)
-	}
-	baseStrategy.WithTelegramMenu()
-
-	controllerStrategy.WithStrategy(baseStrategy)
-
 	app, err := application.NewApp(
 		ctx,
 		binance,
@@ -217,9 +199,8 @@ func run(cmd *cobra.Command, args []string) error {
 		settings,
 		db,
 		socketsMessage,
-		assetsPrices,
-		controllerStrategy,
 		cfg,
+		notificationService,
 	)
 	if err != nil {
 		mainLogger.Fatal(err)

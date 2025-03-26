@@ -24,6 +24,8 @@ type Application struct {
 	Config   *config.Config
 	database *gorm.DB
 
+	Notification *notification.Notification
+
 	exchange exchange.Exchange
 	dataFeed *exchange.DataFeed
 
@@ -43,9 +45,10 @@ func NewApp(
 	settings model.Settings,
 	db *gorm.DB,
 	socketsMessage *notification.SocketsMessage,
-	assetsPrices *prices.AsetsPrices,
-	controllerStrategy *strategy.ControllerStrategy,
-	cfg *config.Config) (*Application, error) {
+	cfg *config.Config,
+	notification *notification.Notification) (*Application, error) {
+
+	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, db)
 
 	baseLimitAsset := 1.0
 
@@ -55,6 +58,11 @@ func NewApp(
 	}
 	paperWallet := exchange.NewPaperWallet(ctx)
 	orderController, err := order.NewController(ctx, paperWallet, db, socketsMessage, assetsPrices)
+	if err != nil {
+		return nil, err
+	}
+
+	controllerStrategy, err := strategy.NewControllerStrategy(assetsPrices, settings.ChangePeriods, settings.Pairs, notification, orderController, paperWallet)
 	if err != nil {
 		return nil, err
 	}
