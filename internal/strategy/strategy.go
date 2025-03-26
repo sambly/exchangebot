@@ -61,11 +61,11 @@ func (cs *ControllerStrategy) build() error {
 		return err
 	}
 	baseStrategy.WithTelegramMenu()
-	cs.WithStrategy(baseStrategy)
+	cs.AddStrategy(baseStrategy)
 	return nil
 }
 
-func (cs *ControllerStrategy) WithStrategy(strategy Strategy) *ControllerStrategy {
+func (cs *ControllerStrategy) AddStrategy(strategy Strategy) *ControllerStrategy {
 	cs.Strategies = append(cs.Strategies, strategy)
 	return cs
 }
