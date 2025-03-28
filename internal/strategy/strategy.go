@@ -3,19 +3,19 @@ package strategy
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/sambly/exchangeService/pkg/exchange"
-	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy/base"
+	simplebuy "github.com/sambly/exchangebot/internal/strategy/simpleBuy"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
 
 type Strategy interface {
-	OnMarket(ms exModel.MarketsStat)
 	Start(ctx context.Context) error
 	GetTelegramMenu() model.WindowHandler
 }
@@ -42,14 +42,20 @@ func NewControllerStrategy(
 	options ...Option) (*ControllerStrategy, error) {
 
 	ctrlStr := &ControllerStrategy{
-		AssetsPrices: assetsPrices,
-		Periods:      periods,
-		Pairs:        pairs,
-		Notification: notify,
+		AssetsPrices:    assetsPrices,
+		Periods:         periods,
+		Pairs:           pairs,
+		Notification:    notify,
+		OrderController: orderController,
+		PaperWallet:     paperWallet,
 	}
 
 	for _, option := range options {
 		option(ctrlStr)
+	}
+
+	if err := ctrlStr.build(); err != nil {
+		return nil, err
 	}
 
 	return ctrlStr, nil
@@ -62,6 +68,15 @@ func (cs *ControllerStrategy) build() error {
 	}
 	baseStrategy.WithTelegramMenu()
 	cs.AddStrategy(baseStrategy)
+
+	simpleBuyStrategy, err := simplebuy.NewStrategy(cs.Notification, cs.AssetsPrices, cs.OrderController, cs.PaperWallet)
+	if err != nil {
+		return err
+	}
+	simpleBuyStrategy.WithTelegramMenu()
+	baseStrategy.Subscribe(simpleBuyStrategy.StrategyBaseResult)
+	cs.AddStrategy(simpleBuyStrategy)
+
 	return nil
 }
 
@@ -71,14 +86,19 @@ func (cs *ControllerStrategy) AddStrategy(strategy Strategy) *ControllerStrategy
 }
 
 func (cs *ControllerStrategy) StartAll(ctx context.Context) error {
-
-	if err := cs.build(); err != nil {
-		return err
-	}
+	var wg sync.WaitGroup
 	for _, strategy := range cs.Strategies {
-		if err := strategy.Start(ctx); err != nil {
-			return fmt.Errorf("failed to start strategy: %w", err)
-		}
+		strategy := strategy
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+			if err := strategy.Start(ctx); err != nil {
+				fmt.Printf("Failed to start strategy: %v\n", err)
+			}
+		}()
 	}
+
+	wg.Wait()
 	return nil
 }

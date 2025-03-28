@@ -16,8 +16,8 @@ var (
 	}
 
 	// Inline кнопки
-	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif"}
-	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif"}
+	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif_base"}
+	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif_base"}
 
 	inlineButtons = [][]tele.Btn{
 		{btnEnableNotifications, btnDisableNotifications},

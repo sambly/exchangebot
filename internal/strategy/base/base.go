@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
@@ -87,18 +86,18 @@ func (str *StrategyBase) changePrices() {
 				// Отправка сообщения об изменении цены
 				if assets.ChangePrices[pair][period].ChangePercent >= str.Config.WeightProcents[period] {
 					str.NotificationWeightPercent(pair, period, assets.ChangePrices[pair][period].ChangePercent)
+					result := StrategyBaseResult{
+						Executed: true,
+						Data: BaseResult{
+							Pair:          pair,
+							Period:        period,
+							ChangePercent: assets.ChangePrices[pair][period].ChangePercent,
+						},
+					}
+					// Уведомляем подписчиков
+					str.notifySubscribers(result)
 				}
 			}
-			result := StrategyBaseResult{
-				Executed: true,
-				Data: BaseResult{
-					Pair:          pair,
-					Period:        period,
-					ChangePercent: assets.ChangePrices[pair][period].ChangePercent,
-				},
-			}
-			// Уведомляем подписчиков
-			str.notifySubscribers(result)
 		}
 	}
 }
@@ -109,6 +108,7 @@ func (str *StrategyBase) Subscribe(ch chan StrategyBaseResult) {
 
 func (str *StrategyBase) notifySubscribers(result StrategyBaseResult) {
 	for _, sub := range str.subscribers {
+		sub := sub
 		go func(sub chan StrategyBaseResult) {
 			select {
 			case sub <- result:
@@ -119,8 +119,6 @@ func (str *StrategyBase) notifySubscribers(result StrategyBaseResult) {
 		}(sub)
 	}
 }
-
-func (str *StrategyBase) OnMarket(ms exModel.MarketsStat) {}
 
 func (str *StrategyBase) GetTelegramMenu() model.WindowHandler {
 	return str.TelegramMenu
