@@ -22,6 +22,7 @@ type UserSession struct {
 
 // MenuManager управляет всеми меню бота.
 type MenuManager struct {
+	User     int64
 	Main     *entry.MainMenu
 	Account  *account.AccountMenu
 	Strategy *strategies.StrategyMenu
@@ -32,7 +33,7 @@ type MenuManager struct {
 }
 
 // NewMenuManager создаёт все меню.
-func NewMenuManager(app *application.Application) *MenuManager {
+func NewMenuManager(app *application.Application, user int64) *MenuManager {
 	mainMenu := entry.NewMainMenu("Главное меню:", "main")
 	accountMenu := account.NewAccountMenu("Аккаунт:", "account", app.Account, app.AssetsPrices)
 	strategiesMenu := strategies.NewStrategyMenu("Стратегии:", "strategies", app.ControllerStrategy)
@@ -43,6 +44,7 @@ func NewMenuManager(app *application.Application) *MenuManager {
 	mainMenu.AddButtons(false, settingsMenu.ButtonsHandler.EntryButton)
 
 	return &MenuManager{
+		User:      user,
 		Main:      mainMenu,
 		Account:   accountMenu,
 		Strategy:  strategiesMenu,
@@ -81,6 +83,10 @@ func (m *MenuManager) HandleText(c tele.Context) error {
 
 func (m *MenuManager) GetMainMenu() func(c tele.Context, handler model.MenuHandler) error {
 	return m.Main.Show
+}
+
+func (m *MenuManager) GetUser() int64 {
+	return m.User
 }
 
 // SetCurrentMenu устанавливает текущее и предыдущее меню.

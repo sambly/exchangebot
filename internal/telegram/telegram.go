@@ -30,7 +30,7 @@ func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, 
 
 	user, _ := strconv.ParseInt(cfg.User, 10, 64)
 	poller := &tele.LongPoller{Timeout: 10 * time.Second}
-	menu := manager.NewMenuManager(app)
+	menu := manager.NewMenuManager(app, user)
 
 	pref := tele.Settings{
 		Token:  cfg.Token,
@@ -102,7 +102,7 @@ func (t Telegram) Start(ctx context.Context) error {
 
 func (t *Telegram) Send(message string) {
 	if t.NotificationEnable {
-		_, err := t.bot.Send(&tele.User{ID: t.user}, message, t.menu.Main.Markup)
+		_, err := t.bot.Send(&tele.User{ID: t.user}, message)
 		if err != nil {
 			tlgLogger.Errorf("error sending message via Telegram: %v", err)
 		}
