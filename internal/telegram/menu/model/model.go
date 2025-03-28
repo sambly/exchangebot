@@ -6,6 +6,7 @@ import tele "gopkg.in/telebot.v3"
 type MenuHandler interface {
 	InitHandlers(b *tele.Bot)
 	GetMainMenu() func(c tele.Context, handler MenuHandler) error
+	GetUser() int64
 	SetCurrentMenu(userID int64, newFunc func(c tele.Context, handler MenuHandler) error, handleTextFunc func(c tele.Context) error)
 	GetPreviousMenu(userID int64) func(c tele.Context, handler MenuHandler) error
 	ResetPreviousMenu(userID int64)
