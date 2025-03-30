@@ -2,6 +2,7 @@ package simplebuy
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/sambly/exchangeService/pkg/exchange"
 	"github.com/sambly/exchangebot/internal/notification"
@@ -18,7 +19,6 @@ type StrategySimpleBuy struct {
 
 	AssetsPrices    *prices.AsetsPrices
 	OrderController *order.Controller
-	PaperWallet     *exchange.PaperWallet
 
 	StrategyBaseResult chan base.StrategyBaseResult
 }
@@ -39,7 +39,6 @@ func NewStrategy(
 		Notification:       notify,
 		AssetsPrices:       assetsPrices,
 		OrderController:    orderController,
-		PaperWallet:        paperWallet,
 		StrategyBaseResult: make(chan base.StrategyBaseResult),
 	}
 	return str, nil
@@ -67,12 +66,23 @@ func (str *StrategySimpleBuy) Start(ctx context.Context) error {
 		}
 	}
 }
+
 func (str *StrategySimpleBuy) execute(baseResult base.StrategyBaseResult) error {
 	if str.TelegramMenu == nil {
 		return nil
 	}
 
-	str.TelegramMenu.SendMessageBuy(baseResult)
+	order, err := str.TelegramMenu.SendMessageBuy(baseResult)
+	if err != nil {
+		fmt.Println("ОШИБКА ЖЕ ЕСТЬ")
+		return err
+	}
+
+	if order == nil {
+		fmt.Println("Таймаут - ордер не создан")
+	} else {
+		fmt.Println("Ордер создан:", order)
+	}
 
 	return nil
 }
