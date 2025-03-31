@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	dealModel "github.com/sambly/exchangebot/internal/model"
 	strbase "github.com/sambly/exchangebot/internal/strategy/base"
@@ -25,10 +26,7 @@ var (
 	// Inline кнопки
 	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif_simple_buy"}
 	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif_simple_buy"}
-
-	btnSimpleBuy = tele.Btn{Text: "Купить", Unique: "buy_ack"}
-
-	btnsNotify = []tele.Btn{btnEnableNotifications, btnDisableNotifications}
+	btnsNotify              = []tele.Btn{btnEnableNotifications, btnDisableNotifications}
 )
 
 type StrategySimpleBuyMenu struct {
@@ -80,14 +78,19 @@ func (m *StrategySimpleBuyMenu) Show(c tele.Context, handler model.MenuHandler) 
 }
 
 func (m *StrategySimpleBuyMenu) SendMessageBuy(baseResult strbase.StrategyBaseResult) (*exModel.Order, error) {
-	uniqueID := fmt.Sprintf("%d", time.Now().UnixNano())
-	btnSimpleBuy.Data = fmt.Sprintf("%s|%s|%.2f|%s",
-		baseResult.Data.Pair,
-		baseResult.Data.Period,
-		baseResult.Data.ChangePercent,
-		uniqueID)
+	uniqueID := uuid.New().String()[:8]
+	fmt.Println("Unic - ", uniqueID)
+	btn := tele.Btn{
+		Unique: "buy_btn_" + uniqueID, // Уникальное название
+		Text:   "Купить",
+		Data: fmt.Sprintf("%s|%s|%.2f|%s",
+			baseResult.Data.Pair,
+			baseResult.Data.Period,
+			baseResult.Data.ChangePercent,
+			uniqueID),
+	}
 
-	m.InlineMarkup.Inline(m.InlineMarkup.Row([]tele.Btn{btnSimpleBuy}...))
+	m.InlineMarkup.Inline(m.InlineMarkup.Row([]tele.Btn{btn}...))
 
 	text := fmt.Sprintf("Будете совершать покупку?\nПара: %s\nПериод: %s\nИзменение: %.2f%%",
 		baseResult.Data.Pair, baseResult.Data.Period, baseResult.Data.ChangePercent)
@@ -140,7 +143,7 @@ func (m *StrategySimpleBuyMenu) SendMessageBuy(baseResult strbase.StrategyBaseRe
 		}
 	}
 
-	m.b.Handle(&btnSimpleBuy, handler)
+	m.b.Handle(&btn, handler)
 
 	// Горутина для таймаута
 	go func() {
@@ -179,34 +182,4 @@ func (m *StrategySimpleBuyMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		m.Strategy.Config.NotificationEnable = true
 		return c.Respond(&tele.CallbackResponse{Text: "Уведомления отключены ❌", ShowAlert: true})
 	})
-
-	// b.Handle(&btnSimpleBuy, func(c tele.Context) error {
-	// 	data := c.Callback().Data
-	// 	parts := strings.Split(data, "|")
-	// 	if len(parts) != 3 {
-	// 		return c.Respond(&tele.CallbackResponse{Text: "Ошибка данных", ShowAlert: true})
-	// 	}
-
-	// 	pair := parts[0]
-	// 	period := parts[1]
-	// 	changePercent := parts[2]
-
-	// 	deal := dealModel.Deal{
-	// 		Pair:     pair,
-	// 		SideType: "buy",
-	// 		Frame:    period,
-	// 		Strategy: "simplebuy",
-	// 		Comment:  changePercent,
-	// 	}
-
-	// 	_, err := m.Strategy.OrderController.CreateOrderMarket(deal, 1.0)
-	// 	if err != nil {
-	// 		return c.Respond(&tele.CallbackResponse{Text: "Ошибка создания ордера", ShowAlert: true})
-	// 	}
-	// 	// // Использование параметров в логике обработки
-	// 	// fmt.Printf("Покупка пары %s, период %s, изменение: %.2f%%\n", pair, period, changePercent)
-
-	// 	return c.Respond(&tele.CallbackResponse{Text: "Покупка обработана ✅", ShowAlert: true})
-	// })
-
 }

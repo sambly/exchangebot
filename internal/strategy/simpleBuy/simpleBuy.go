@@ -71,18 +71,19 @@ func (str *StrategySimpleBuy) execute(baseResult base.StrategyBaseResult) error 
 	if str.TelegramMenu == nil {
 		return nil
 	}
+	go func() {
+		order, err := str.TelegramMenu.SendMessageBuy(baseResult)
+		if err != nil {
+			fmt.Printf("Ошибка SendMessageBuy %v\n", err)
+			return
+		}
 
-	order, err := str.TelegramMenu.SendMessageBuy(baseResult)
-	if err != nil {
-		fmt.Println("ОШИБКА ЖЕ ЕСТЬ")
-		return err
-	}
-
-	if order == nil {
-		fmt.Println("Таймаут - ордер не создан")
-	} else {
-		fmt.Println("Ордер создан:", order)
-	}
+		if order == nil {
+			fmt.Println("Таймаут - ордер не создан")
+		} else {
+			fmt.Println("Ордер создан:", order)
+		}
+	}()
 
 	return nil
 }
