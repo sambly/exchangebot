@@ -1,9 +1,7 @@
 app:
     server-name: exchange-bot
-    # cobra or ncli
-    build-target: cobra
     # exchange or grpc    
-    exchange-type: exchange
+    exchange-flow-type: exchange
     pairs-from-file: true 
 web:
     production: false

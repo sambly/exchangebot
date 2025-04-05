@@ -10,12 +10,10 @@ import (
 
 type App struct {
 	// Config app
-	ServerName    string `mapstructure:"server-name" yaml:"server-name"`
-	BuildTarget   string `mapstructure:"build-target" yaml:"build-target"`
-	ExchangeType  string `mapstructure:"exchange-type" yaml:"exchange-type"`
-	PairsFromFile bool   `mapstructure:"pairs-from-file" yaml:"pairs-from-file"`
+	ServerName       string `mapstructure:"server-name" yaml:"server-name"`
+	ExchangeFlowType string `mapstructure:"exchange-flow-type" yaml:"exchange-flow-type"`
+	PairsFromFile    bool   `mapstructure:"pairs-from-file" yaml:"pairs-from-file"`
 }
-
 type Web struct {
 	Production   bool   `mapstructure:"production" yaml:"production"`
 	ProxyServer  bool   `mapstructure:"proxy-server" yaml:"proxy-server"`
@@ -28,6 +26,19 @@ type Web struct {
 type Exchange struct {
 	APIKey    string `mapstructure:"api-key" yaml:"api-key"`
 	SecretKey string `mapstructure:"secret-key" yaml:"secret-key"`
+}
+
+type GRPC struct {
+	Host       string `mapstructure:"host" yaml:"host"`
+	HostDocker string `mapstructure:"host-docker" yaml:"host-docker"`
+	HostLocal  string `mapstructure:"host-local" yaml:"host-local"`
+	Port       string `mapstructure:"port" yaml:"port"`
+}
+
+type ExchangeFlow struct {
+	ExchangeFlowType string
+	Exchange
+	GRPC
 }
 type Telegram struct {
 	Token              string `mapstructure:"token" yaml:"token"`
@@ -47,12 +58,6 @@ type Database struct {
 type Log struct {
 	Debug      bool `mapstructure:"debug" yaml:"debug"`
 	Production bool `mapstructure:"production" yaml:"production"`
-}
-type GRPC struct {
-	Host       string `mapstructure:"host" yaml:"host"`
-	HostDocker string `mapstructure:"host-docker" yaml:"host-docker"`
-	HostLocal  string `mapstructure:"host-local" yaml:"host-local"`
-	Port       string `mapstructure:"port" yaml:"port"`
 }
 
 // TODO
@@ -75,6 +80,7 @@ type Config struct {
 	GRPC         `mapstructure:"grpc" yaml:"grpc"`
 	Tracer       `mapstructure:"tracer" yaml:"tracer"`
 	Notification `mapstructure:"notification" yaml:"notification"`
+	ExchangeFlow
 }
 
 func PrintConfig(v interface{}, indent string) {
@@ -126,6 +132,9 @@ func NewConfig() (*Config, error) {
 		cfg.Database.Host = cfg.Database.HostLocal
 		cfg.GRPC.Host = cfg.GRPC.HostLocal
 	}
+
+	cfg.ExchangeFlow.Exchange = cfg.Exchange
+	cfg.ExchangeFlow.GRPC = cfg.GRPC
 
 	return cfg, nil
 }
