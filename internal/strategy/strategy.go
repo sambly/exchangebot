@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/sambly/exchangeService/pkg/exchange"
+	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/prices"
@@ -18,6 +19,7 @@ import (
 type Strategy interface {
 	Start(ctx context.Context) error
 	GetTelegramMenu() model.WindowHandler
+	OnMarket(ms exModel.MarketsStat)
 }
 
 type Option func(*ControllerStrategy)
@@ -83,6 +85,12 @@ func (cs *ControllerStrategy) build() error {
 func (cs *ControllerStrategy) AddStrategy(strategy Strategy) *ControllerStrategy {
 	cs.Strategies = append(cs.Strategies, strategy)
 	return cs
+}
+
+func (cs *ControllerStrategy) OnMarket(ms exModel.MarketsStat) {
+	for _, strategy := range cs.Strategies {
+		strategy.OnMarket(ms)
+	}
 }
 
 func (cs *ControllerStrategy) StartAll(ctx context.Context) error {

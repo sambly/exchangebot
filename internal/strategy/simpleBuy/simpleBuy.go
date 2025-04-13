@@ -5,10 +5,13 @@ import (
 	"fmt"
 
 	"github.com/sambly/exchangeService/pkg/exchange"
+	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy/base"
+	"github.com/sambly/exchangebot/internal/strategy/orders"
+	"github.com/sambly/exchangebot/internal/strategy/sales"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
 
@@ -21,6 +24,8 @@ type StrategySimpleBuy struct {
 	OrderController *order.Controller
 
 	StrategyBaseResult chan base.StrategyBaseResult
+	Orders             map[string][]orders.StrategyOrder
+	Sale               sales.Sales
 }
 
 func NewStrategy(
@@ -28,6 +33,7 @@ func NewStrategy(
 	assetsPrices *prices.AsetsPrices,
 	orderController *order.Controller,
 	paperWallet *exchange.PaperWallet,
+	// TODO сделать иницциализацию Orders
 
 ) (*StrategySimpleBuy, error) {
 	cfg, err := NewConfig()
@@ -86,4 +92,11 @@ func (str *StrategySimpleBuy) execute(baseResult base.StrategyBaseResult) error 
 	}()
 
 	return nil
+}
+
+func (str *StrategySimpleBuy) OnMarket(ms exModel.MarketsStat) {
+	if _, ok := str.Orders[ms.Pair]; ok {
+		//  TODO или мне  возвращать новый массив измененный или передавать туда указатель и там менять вопрос
+		str.Sale.Execute(ms, str.Orders[ms.Pair])
+	}
 }

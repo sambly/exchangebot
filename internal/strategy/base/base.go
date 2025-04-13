@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
@@ -122,4 +123,8 @@ func (str *StrategyBase) notifySubscribers(result StrategyBaseResult) {
 
 func (str *StrategyBase) GetTelegramMenu() model.WindowHandler {
 	return str.TelegramMenu
+}
+
+func (str *StrategyBase) OnMarket(ms exModel.MarketsStat) {
+
 }

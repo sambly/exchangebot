@@ -14,7 +14,7 @@ func NewConfig() (*Config, error) {
 
 	var config Config
 
-	configPath := "internal/strategy/simpleAsk/config.yaml"
+	configPath := "internal/strategy/sales/simple/config.yaml"
 
 	fileData, err := os.ReadFile(configPath)
 	if err != nil {
