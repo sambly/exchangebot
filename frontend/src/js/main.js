@@ -12,9 +12,68 @@ window.jQuery = window.$ = $
 import { lw_charts_orders, lw_charts_volume, widget_charts } from './charts.js';
 import { timeToLocal } from './help.js';
 
+import { createApp, h } from 'vue'
+import OrdersTable from '../components/OrdersTable.vue'
+import OrdersTableHistory from '../components/OrdersTableHistory.vue'
+
+import emitter from './eventBus';
+
+const app = createApp({
+    data() {
+      return {
+        orders: []
+      }
+    },
+    methods: {
+      updateOrders(newOrders) {
+        this.orders = newOrders
+      }
+    },
+    render() {
+      return h(OrdersTable, {
+        orders: this.orders
+      })
+    }
+  })
+
+  const vm = app.mount('#panel-trade-active')
+
+
+  window.forming_orders_active = function(orders) {
+    vm.updateOrders(orders);
+  }
+
+
+  const appHistory = createApp({
+    data() {
+      return {
+        orders: []
+      }
+    },
+    methods: {
+      updateOrders(newOrders) {
+        this.orders = newOrders
+      }
+    },
+    render() {
+      return h(OrdersTableHistory, {
+        orders: this.orders
+      })
+    }
+  })
+
+  const vmHistory = appHistory.mount('#panel-trade-history')
+
+
+  window.forming_orders_history = function(orders) {
+    vmHistory.updateOrders(orders);
+  }
+
+
 
 
 $(function () {
+    
 
     const grafanaUrl = import.meta.env.VITE_GRAFANA_URL;
     document.getElementById('grafana-link').href = grafanaUrl;
@@ -23,45 +82,35 @@ $(function () {
 
     //#############################################################################  webSocket #############################################################################
 
+
     var Url = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/trade/ws";
-    var socket = new WebSocket(Url);
-    socket.onopen = function () {
-        console.log("connected ws");
-    };
+    const socket = new WebSocket(Url);
 
     socket.onmessage = function (e) {
-
-        var data = JSON.parse(e.data); 
-
-        if (typeof data === 'object' && data.hasOwnProperty('order')) {
-            let order = data.order;
-            let orderRow = document.querySelector('tr.order-active[value="' + order.ID + '"]');
-            let profitElement = orderRow.querySelector('td[name="order-a-profit"]');
-
-            profitElement.textContent = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
-            profitElement.style.color = color_text_profit(order.Profit);
-        }
-
-
-        if (typeof data === 'object' && data.hasOwnProperty('pnl')) {
-            let pnl = data.pnl;
-            let tradesPnl = document.querySelector('#tradesPnl');
-            tradesPnl.textContent = pnl.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
-            tradesPnl.style.color = color_text_profit(pnl);
-        }
-
+      const data = JSON.parse(e.data);
+    
+      if (data.orderUpdate) {
+        emitter.emit('order:update', data.orderUpdate);
+      }
+      if (data.orderAdd) {
+        emitter.emit('order:add', data.orderAdd);
+      }
+      if (data.orderDelete) {
+        emitter.emit('order:remove', data.orderDelete);
+      } 
+      if (data.pnl) {
+        emitter.emit('pnl:update', data.pnl);
+      }
     };
 
-
-    // если возникла ошибка
     socket.onerror = (error) => {
         console.log(`WebSocket Error: ${error.message}`);
     };
 
-    // если соединение закрыто
     socket.onclose = (event) => {
         console.log("Connection closed");
     };
+
 
     //#############################################################################  webSocket #############################################################################
 
@@ -200,28 +249,7 @@ $(function () {
 
         });
     });
-    // Закрыть все сделки
-    $('#btnTradeClose').click(function (e) {
-        e.preventDefault();
-        let res =confirm('Вы подтверждаете закрытие всех сделок?');
-        if (res!=true) return;
-        $.ajax({
-            url: 'closeAllDeal',
-            type: 'POST',
-            method: 'POST',
-            cache: false,
-            processData: false,
-            success: function (response) {
-                forming_orders_active(response.OrdersActive);
-                forming_orders_history(response.OrdersHistory);
-
-            },
-            error: function (response) {
-            },
-
-        });
-    });   
-    
+      
     // Применить фильтры
     $('#btn-apply-filter').click(function () {
         // Объем 
@@ -410,7 +438,7 @@ function forming_tickers_list_All() {
     change_pair(document.querySelector('#pairs').value);
 }
 
-function change_pair(pair) {
+export  function change_pair(pair) {
 
     var start = performance.now();
 
@@ -474,183 +502,74 @@ function change_pair(pair) {
 
 }
 
-function forming_orders_active(orders) {
+// function forming_orders_history(orders) {
 
-    const tbody = document.querySelector("#tbody-trade-active");
-    tbody.innerHTML = '';
-    const th = document.querySelectorAll("thead[name=trade-active] th");
-    const countOrders = document.querySelector("#tradesCount");
+//     const tbody = document.querySelector("#tbody-trade-history");
+//     tbody.innerHTML = '';
+//     const th = document.querySelectorAll("thead[name=trade-history] th");
 
-    let orderList = [];
-    for (let key in orders) {
-        if (orders.hasOwnProperty(key)) {
-            for (let order of orders[key]) {
-            orderList.push(order)
-            }
-        }
-    }
+//     let orderList = [];
+//     for (let key in orders) {
+//         if (orders.hasOwnProperty(key)) {
+//             for (let order of orders[key]) {
+//             orderList.push(order)
+//             }
+//         }
+//     }
 
-    if (orderList.length==0) {
-        countOrders.innerHTML = 0;
-        return
-    } else {
-        countOrders.innerHTML = orderList.length;
-    }
+//     if (orderList.length==0) {
+//         return
+//     } 
 
-    // Сортировка orderList по времени (от более новой записи к менее)
-    orderList.sort((a, b) => {
-        return new Date(b.Time) - new Date(a.Time);
-    });
+//     // Сортировка orderList по времени (от более новой записи к менее)
+//     orderList.sort((a, b) => {
+//         return new Date(b.Time) - new Date(a.Time);
+//     });
 
-    for (let order of orderList) {
+//     for (let order of orderList) {
 
-        let row = tbody.insertRow(-1);
-        row.className = "order-active";
-        row.setAttribute("value", order.ID);
+//         let row = tbody.insertRow(-1);
+//         row.className = "order-history d-flex align-items-center";
+//         row.setAttribute("value", order.ID);
 
-        // 1 Col Side
-        let cell = row.insertCell();
-        cell.innerHTML = order.Side;
-        cell.style.color = color_side(order.Side)
-        cell.setAttribute("name", "order-a-side");
-        // 2 Col Pair
-        cell = row.insertCell();
-        cell.innerHTML = order.Pair;
-        cell.setAttribute("name", "order-a-pair");
-        // 3 Col Price
-        cell = row.insertCell();
-        cell.innerHTML = order.PriceCreated;
-        cell.setAttribute("name", "order-a-price");
-        // 4 Col Profit
-        cell = row.insertCell();
-        cell.innerHTML = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
-        cell.style.color = color_text_profit(order.Profit)
-        cell.setAttribute("name", "order-a-profit");
-        // 5 Col TimeCreated
-        cell = row.insertCell();
-        cell.innerHTML = new Date(order.TimeCreated).toLocaleString("en-GB");
-        cell.setAttribute("name", "order-a-timeCreat");
-        // 6 Col - закрыть позицию 
-        cell = row.insertCell();
-        let btnCl = document.createElement('button');
-        btnCl.setAttribute("type", 'button');
-        btnCl.setAttribute('class', 'btn-close');
-        btnCl.setAttribute('name', 'btn-close-position');
-        btnCl.setAttribute('value', order.ID);
-        cell.appendChild(btnCl);
+//         // 1 Col Side
+//         let cell = row.insertCell();
+//         cell.innerHTML = order.Side;
+//         cell.style.color = color_side(order.Side)
+//         cell.setAttribute("name", "order-h-side");
+//         // 2 Col Pair
+//         cell = row.insertCell();
+//         cell.innerHTML = order.Pair;
+//         cell.setAttribute("name", "order-h-pair");
+//         // 3 Col - Price
+//         cell = row.insertCell();
+//         cell.innerHTML = `${order.PriceCreated} <br> ${order.Price}`;
+//         cell.setAttribute("name", "order-h-pair");
+//         // 4 Col TimeCreated
+//         cell = row.insertCell();
+//         cell.innerHTML = `${new Date(order.TimeCreated).toLocaleString("en-GB")} <br> ${new Date(order.Time).toLocaleString("en-GB")}`;
+//         cell.setAttribute("name", "order-h-timeCreat");
+//         // 5 Col - профит 
+//         cell = row.insertCell();
+//         cell.innerHTML = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
+//         cell.style.color = color_text_profit(order.Profit)
+//     };
 
-    };
+//     // выбор определенной пары
+//     let rows = tbody.rows;
+//     for (let row of rows) {
+//         row.addEventListener("click", () => {
+//             let pair = row.querySelector('[name="order-h-pair"]').innerHTML;
+//             change_pair(pair);
+//             show_chart_orders();
+//             chart_frome_orders_update(orderList).then(() => {
+//             }).catch(error => {
+//                 console.error('Ошибка при выполнении функции chart_frome_orders_update:', error);
+//             });
+//         });
+//     };
 
-    // выбор определенной пары
-    let rows = tbody.rows;
-    for (let row of rows) {
-        row.addEventListener("click", () => {
-            let pair = row.querySelector('[name="order-a-pair"]').innerHTML;
-            change_pair(pair);
-            show_chart_orders();
-            chart_frome_orders_update(orderList).then(() => {
-            }).catch(error => {
-                console.error('Ошибка при выполнении функции chart_frome_orders_update:', error);
-            });
-
-        });
-    };
-
-    // Закрытие позиции
-    let btnsClose = document.querySelectorAll('.btn-close');
-    btnsClose.forEach((btn, index) => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-
-            $.ajax({
-                url: 'closeDeal',
-                type: 'POST',
-                method: 'POST',
-                cache: false,
-                contentType: ' text/html; charset=utf-8',
-                processData: false,
-                data: e.target.value,
-                success: function (orders) {
-                    forming_orders_active(orders.OrdersActive);
-                    forming_orders_history(orders.OrdersHistory);
-                },
-                error: function (response) {
-                    console.log("SUK2");
-                    console.log(response);
-                },
-            });
-        });
-    });
-}
-
-function forming_orders_history(orders) {
-
-    const tbody = document.querySelector("#tbody-trade-history");
-    tbody.innerHTML = '';
-    const th = document.querySelectorAll("thead[name=trade-history] th");
-
-    let orderList = [];
-    for (let key in orders) {
-        if (orders.hasOwnProperty(key)) {
-            for (let order of orders[key]) {
-            orderList.push(order)
-            }
-        }
-    }
-
-    if (orderList.length==0) {
-        return
-    } 
-
-    // Сортировка orderList по времени (от более новой записи к менее)
-    orderList.sort((a, b) => {
-        return new Date(b.Time) - new Date(a.Time);
-    });
-
-    for (let order of orderList) {
-
-        let row = tbody.insertRow(-1);
-        row.className = "order-history d-flex align-items-center";
-        row.setAttribute("value", order.ID);
-
-        // 1 Col Side
-        let cell = row.insertCell();
-        cell.innerHTML = order.Side;
-        cell.style.color = color_side(order.Side)
-        cell.setAttribute("name", "order-h-side");
-        // 2 Col Pair
-        cell = row.insertCell();
-        cell.innerHTML = order.Pair;
-        cell.setAttribute("name", "order-h-pair");
-        // 3 Col - Price
-        cell = row.insertCell();
-        cell.innerHTML = `${order.PriceCreated} <br> ${order.Price}`;
-        cell.setAttribute("name", "order-h-pair");
-        // 4 Col TimeCreated
-        cell = row.insertCell();
-        cell.innerHTML = `${new Date(order.TimeCreated).toLocaleString("en-GB")} <br> ${new Date(order.Time).toLocaleString("en-GB")}`;
-        cell.setAttribute("name", "order-h-timeCreat");
-        // 5 Col - профит 
-        cell = row.insertCell();
-        cell.innerHTML = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
-        cell.style.color = color_text_profit(order.Profit)
-    };
-
-    // выбор определенной пары
-    let rows = tbody.rows;
-    for (let row of rows) {
-        row.addEventListener("click", () => {
-            let pair = row.querySelector('[name="order-h-pair"]').innerHTML;
-            change_pair(pair);
-            show_chart_orders();
-            chart_frome_orders_update(orderList).then(() => {
-            }).catch(error => {
-                console.error('Ошибка при выполнении функции chart_frome_orders_update:', error);
-            });
-        });
-    };
-
-}
+// }
 
 function update_top_data(pair) {
     $.ajax({
@@ -766,7 +685,7 @@ async function chart_volume_update() {
 
 }
 
-async function chart_frome_orders_update(orders) {
+export async function chart_frome_orders_update(orders) {
 
     return new Promise((resolve, reject) => {
 
@@ -1179,7 +1098,7 @@ function show_volume_panel() {
     $("#panel-chart-orders").hide();
 }
 
-function show_chart_orders() {
+export function show_chart_orders() {
 
     $("#chart-price").hide();
     $("#panel-chart-volume").hide();
