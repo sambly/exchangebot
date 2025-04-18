@@ -27,15 +27,6 @@
   width: 625px;
 }
 
-#table-trade-history {
-  table-layout: fixed;
-  width: 100%;
-}
-
-#table-trade-history tbody {
-  max-height: 300px;
-}
-
 tbody {
   display: block;
   overflow-y: auto;
@@ -135,31 +126,6 @@ tbody td {
 #table-delta th:nth-child(8),
 #table-delta td:nth-child(8) {
   width: 70px;
-}
-
-#table-trade-history th:nth-child(1),
-#table-trade-history td:nth-child(1) {
-  width: 20%;
-}
-
-#table-trade-history th:nth-child(2),
-#table-trade-history td:nth-child(2) {
-  width: 20%;
-}
-
-#table-trade-history th:nth-child(3),
-#table-trade-history td:nth-child(3) {
-  width: 20%;
-}
-
-#table-trade-history th:nth-child(4),
-#table-trade-history td:nth-child(4) {
-  width: 20%;
-}
-
-#table-trade-history th:nth-child(5),
-#table-trade-history td:nth-child(5) {
-  width: 20%;
 }
 
 

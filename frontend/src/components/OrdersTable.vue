@@ -53,8 +53,9 @@
 </template>
 
 <script>
-import { reactive, computed, watch, ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import emitter from '@/js/eventBus';
+import { useOrdersStore } from '@/stores/orders';
 import {
   change_pair,
   show_chart_orders,
@@ -62,37 +63,14 @@ import {
 } from '@/js/main.js';
 
 export default {
-  props: ['orders'],
 
-  setup(props) {
-    const orderMap = reactive(new Map());
+  setup() {
+    const ordersStore = useOrdersStore();
     const pnl = ref(0);
 
-    // Обновляем Map при изменении props.orders
-    function fillOrderMap(orders) {
-      orderMap.clear();
-
-      const source = Array.isArray(orders)
-        ? orders
-        : Object.values(orders || {}).flat();
-
-      for (const order of source) {
-        orderMap.set(order.ID, order);
-      }
-    }
-
-    // Следим за props.orders и сразу вызываем при старте
-    watch(
-      () => props.orders,
-      (newOrders) => {
-        fillOrderMap(newOrders);
-      },
-      { immediate: true }
-    );
-
-    // computed для списка ордеров (приведен к массиву)
-    const orderList = computed(() =>
-      Array.from(orderMap.values()).sort((a, b) => new Date(b.TimeCreated) - new Date(a.TimeCreated))
+    // Получаем список ордеров из хранилища
+    const orderList = computed(() => 
+      [...ordersStore.active].sort((a, b) => new Date(b.TimeCreated) - new Date(a.TimeCreated))
     );
 
     onMounted(() => {
@@ -111,24 +89,17 @@ export default {
 
     // Обновление ордера
     function handleOrderUpdate(order) {
-      if (orderMap.has(order.ID)) {
-        const old = orderMap.get(order.ID);
-        orderMap.set(order.ID, { ...old, ...order });
-      }
+      ordersStore.updateOrder(order);
     }
 
     // Добавление нового ордера
     function handleOrderAdd(order) {
-      if (!orderMap.has(order.ID)) {
-        orderMap.set(order.ID, order);
-      }
+      ordersStore.addOrder(order);
     }
 
-    // Удаление ордера по ID
+    // Удаление ордера
     function handleOrderRemove(order) {
-      if (orderMap.has(order.ID)) {
-        orderMap.delete(order.ID);
-      }
+      ordersStore.removeOrder(order.ID);
     }
 
 
@@ -136,45 +107,43 @@ export default {
       pnl.value = value;
     }
 
-    function handleClose(orderId) {
-      $.ajax({
-        url: 'closeDeal',
-        type: 'POST',
-        method: 'POST',
-        cache: false,
-        contentType: 'text/html; charset=utf-8',
-        processData: false,
-        data: orderId,
-        success: (orders) => {
-          fillOrderMap(orders.OrdersActive);
-          // TODO здесь эта функция кажись не вызывается 
-          window.forming_orders_history?.(orders.OrdersHistory);
-        },
-        error: (response) => {
-          console.error('Ошибка при закрытии позиции', response);
-        },
-      });
+    async function handleClose(orderId) {
+      try {
+        const response = await $.ajax({
+          url: 'closeDeal',
+          type: 'POST',
+          method: 'POST',
+          cache: false,
+          contentType: 'text/html; charset=utf-8',
+          processData: false,
+          data: orderId
+        });
+        
+        ordersStore.setActive(response.OrdersActive || []);
+        ordersStore.setHistory(response.OrdersHistory || []);
+      } catch (error) {
+        console.error('Ошибка при закрытии позиции', error);
+      }
     }
 
-    function handleCloseAll() {
-
-      let res =confirm('Вы подтверждаете закрытие всех сделок?');
-      if (res!=true) return;
-      $.ajax({
+    async function handleCloseAll() {
+      const res = confirm('Вы подтверждаете закрытие всех сделок?');
+      if (!res) return;
+      
+      try {
+        const response = await $.ajax({
           url: 'closeAllDeal',
           type: 'POST',
           method: 'POST',
           cache: false,
-          processData: false,
-          success: function (orders) {
-            fillOrderMap(orders.OrdersActive);
-            window.forming_orders_history?.(orders.OrdersHistory);
-          },
-          error: function (response) {
-            // TODO здесь эта функция кажись не вызывается 
-            console.error('Ошибка при закрытии всех позиций', response);
-          },
-      });
+          processData: false
+        });
+        
+        ordersStore.setActive(response.OrdersActive || []);
+        ordersStore.setHistory(response.OrdersHistory || []);
+      } catch (error) {
+        console.error('Ошибка при закрытии всех позиций', error);
+      }
     }
 
     function handleRowClick(pair) {

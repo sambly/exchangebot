@@ -1,6 +1,6 @@
 <template>
       <!-- Таблица -->
-      <table id="table-trade-history" class="table table-hover table-borderless table-light">
+      <table class="table table-hover table-borderless table-light table-trade-history">
         <thead>
           <tr>
             <th>Тип</th>
@@ -37,8 +37,8 @@
 
 
 <script>
-import { reactive, computed, watch, ref, onMounted, onUnmounted } from 'vue';
-import emitter from '@/js/eventBus';
+import { computed } from 'vue';
+import { useOrdersStore } from '@/stores/orders';
 import {
   change_pair,
   show_chart_orders,
@@ -46,36 +46,14 @@ import {
 } from '@/js/main.js';
 
 export default {
-  props: ['orders'],
 
-  setup(props) {
-    const orderMap = reactive(new Map());
+  setup() {
 
-    // Обновляем Map при изменении props.orders
-    function fillOrderMap(orders) {
-      orderMap.clear();
-
-      const source = Array.isArray(orders)
-        ? orders
-        : Object.values(orders || {}).flat();
-
-      for (const order of source) {
-        orderMap.set(order.ID, order);
-      }
-    }
-
-    // Следим за props.orders и сразу вызываем при старте
-    watch(
-      () => props.orders,
-      (newOrders) => {
-        fillOrderMap(newOrders);
-      },
-      { immediate: true }
-    );
-
-    // computed для списка ордеров (приведен к массиву)
-    const orderList = computed(() =>
-      Array.from(orderMap.values()).sort((a, b) => new Date(b.TimeCreated) - new Date(a.TimeCreated))
+    const store = useOrdersStore();
+    // Получаем отсортированный список из хранилища
+    const orderList = computed(() => 
+      [...store.history].sort((a, b) => 
+        new Date(b.TimeCreated) - new Date(a.TimeCreated))
     );
 
 
@@ -121,3 +99,43 @@ export default {
 };
 
 </script>
+
+
+<style scoped>
+
+.table-ttable-trade-history {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.table-ttable-trade-history{
+  max-height: 300px;
+}  
+
+
+.table-trade-history th:nth-child(1),
+.table-trade-history td:nth-child(1) {
+  width: 20%;
+}
+
+.table-trade-history th:nth-child(2),
+.table-trade-history td:nth-child(2) {
+  width: 20%;
+}
+
+.table-trade-history th:nth-child(3),
+.table-trade-history td:nth-child(3) {
+  width: 20%;
+}
+
+.table-trade-history th:nth-child(4),
+.table-trade-history td:nth-child(4) {
+  width: 20%;
+}
+
+.table-trade-history th:nth-child(5),
+.table-trade-history td:nth-child(5) {
+  width: 20%;
+}
+
+</style>

@@ -16,61 +16,37 @@ import { createApp, h } from 'vue'
 import OrdersTable from '../components/OrdersTable.vue'
 import OrdersTableHistory from '../components/OrdersTableHistory.vue'
 
+import { createPinia } from 'pinia';
+import { useOrdersStore } from '../stores/orders.js';
+
+
 import emitter from './eventBus';
 
-const app = createApp({
-    data() {
-      return {
-        orders: []
-      }
-    },
-    methods: {
-      updateOrders(newOrders) {
-        this.orders = newOrders
-      }
-    },
-    render() {
-      return h(OrdersTable, {
-        orders: this.orders
-      })
-    }
-  })
+// Инициализация Pinia
+const pinia = createPinia();
 
-  const vm = app.mount('#panel-trade-active')
+// Приложение для активных ордеров
+const activeApp = createApp({
+  render: () => h(OrdersTable)
+});
+activeApp.use(pinia);
+activeApp.mount('#panel-trade-active');
 
+// Приложение для истории ордеров
+const historyApp = createApp({
+  render: () => h(OrdersTableHistory)
+});
+historyApp.use(pinia);
+historyApp.mount('#panel-trade-history');
 
-  window.forming_orders_active = function(orders) {
-    vm.updateOrders(orders);
-  }
+// Глобальные функции обновления ордеров
+window.forming_orders_active = function(orders) {
+  useOrdersStore().setActive(orders);
+};
 
-
-  const appHistory = createApp({
-    data() {
-      return {
-        orders: []
-      }
-    },
-    methods: {
-      updateOrders(newOrders) {
-        this.orders = newOrders
-      }
-    },
-    render() {
-      return h(OrdersTableHistory, {
-        orders: this.orders
-      })
-    }
-  })
-
-  const vmHistory = appHistory.mount('#panel-trade-history')
-
-
-  window.forming_orders_history = function(orders) {
-    vmHistory.updateOrders(orders);
-  }
-
-
-
+window.forming_orders_history = function(orders) {
+  useOrdersStore().setHistory(orders);
+};
 
 $(function () {
     
@@ -501,75 +477,6 @@ export  function change_pair(pair) {
     console.log('Время выполнения change_pair = ' + time);
 
 }
-
-// function forming_orders_history(orders) {
-
-//     const tbody = document.querySelector("#tbody-trade-history");
-//     tbody.innerHTML = '';
-//     const th = document.querySelectorAll("thead[name=trade-history] th");
-
-//     let orderList = [];
-//     for (let key in orders) {
-//         if (orders.hasOwnProperty(key)) {
-//             for (let order of orders[key]) {
-//             orderList.push(order)
-//             }
-//         }
-//     }
-
-//     if (orderList.length==0) {
-//         return
-//     } 
-
-//     // Сортировка orderList по времени (от более новой записи к менее)
-//     orderList.sort((a, b) => {
-//         return new Date(b.Time) - new Date(a.Time);
-//     });
-
-//     for (let order of orderList) {
-
-//         let row = tbody.insertRow(-1);
-//         row.className = "order-history d-flex align-items-center";
-//         row.setAttribute("value", order.ID);
-
-//         // 1 Col Side
-//         let cell = row.insertCell();
-//         cell.innerHTML = order.Side;
-//         cell.style.color = color_side(order.Side)
-//         cell.setAttribute("name", "order-h-side");
-//         // 2 Col Pair
-//         cell = row.insertCell();
-//         cell.innerHTML = order.Pair;
-//         cell.setAttribute("name", "order-h-pair");
-//         // 3 Col - Price
-//         cell = row.insertCell();
-//         cell.innerHTML = `${order.PriceCreated} <br> ${order.Price}`;
-//         cell.setAttribute("name", "order-h-pair");
-//         // 4 Col TimeCreated
-//         cell = row.insertCell();
-//         cell.innerHTML = `${new Date(order.TimeCreated).toLocaleString("en-GB")} <br> ${new Date(order.Time).toLocaleString("en-GB")}`;
-//         cell.setAttribute("name", "order-h-timeCreat");
-//         // 5 Col - профит 
-//         cell = row.insertCell();
-//         cell.innerHTML = order.Profit.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' });
-//         cell.style.color = color_text_profit(order.Profit)
-//     };
-
-//     // выбор определенной пары
-//     let rows = tbody.rows;
-//     for (let row of rows) {
-//         row.addEventListener("click", () => {
-//             let pair = row.querySelector('[name="order-h-pair"]').innerHTML;
-//             change_pair(pair);
-//             show_chart_orders();
-//             chart_frome_orders_update(orderList).then(() => {
-//             }).catch(error => {
-//                 console.error('Ошибка при выполнении функции chart_frome_orders_update:', error);
-//             });
-//         });
-//     };
-
-// }
 
 function update_top_data(pair) {
     $.ajax({
