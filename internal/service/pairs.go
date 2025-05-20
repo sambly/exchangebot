@@ -17,13 +17,18 @@ func GetPairs(ctx context.Context, fromFile bool, exch exchange.Exchange) ([]str
 }
 
 func GetPairsFile(fileName string) ([]string, error) {
-	var pairs []string
-	file, err := os.Open(fileName)
+
+	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("error opening file: %v", err)
+		return nil, fmt.Errorf("error opening/creating file: %v", err)
 	}
 	defer file.Close()
 
+	if stat, _ := file.Stat(); stat.Size() == 0 {
+		return []string{}, fmt.Errorf("file - %s is empty", fileName)
+	}
+
+	var pairs []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		pairs = append(pairs, scanner.Text())
