@@ -72,6 +72,7 @@ WORKDIR /app
 
 COPY --from=builder /app/exchangebot .
 COPY --from=builder /app/configs /app/configs
+COPY --from=builder /app/config.yaml /app/config.yaml
 
 VOLUME /app/log
 
