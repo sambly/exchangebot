@@ -1,5 +1,5 @@
 # Этап сборки фронтенда
-FROM node:22-alpine AS frontend
+FROM node:23-alpine AS frontend
 
 # Рабочая директорая
 WORKDIR /app/frontend
@@ -27,7 +27,7 @@ RUN yarn build
 
 
 # Этап сборки Go-приложения
-FROM golang:1.22.5-alpine AS builder
+FROM golang:1.24.3-alpine AS builder
 
 # Установка необходимого для сборки
 RUN apk add --no-cache git
@@ -37,14 +37,7 @@ WORKDIR /app
 
 COPY go.mod go.sum ./
 
-# Установка переменных окружения как аргументов сборки
 ARG GITHUB_TOKEN
-ARG ENVIRONMENT
-ARG BUILD_TARGET=cobra
-
-# Установка переменных окружения
-ENV GOPRIVATE=github.com/sambly
-ENV GITHUB_TOKEN=${GITHUB_TOKEN}
 ENV ENVIRONMENT=docker
 
 # Настройка git с использованием переменной GITHUB_TOKEN
@@ -61,10 +54,10 @@ COPY cmd ./cmd
 COPY embed.go ./
 COPY ./configs ./configs
 
-RUN go build -o ./exchangebot ./cmd/${BUILD_TARGET}
+RUN go build -o ./exchangebot ./cmd/cobra
 
 # Финальный образ для запуска
-FROM alpine:3.18
+FROM alpine:3.21
 
 # Установка зависимостей для запуска Go сервера
 RUN apk add --no-cache ca-certificates

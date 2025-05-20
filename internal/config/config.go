@@ -9,9 +9,7 @@ import (
 )
 
 type App struct {
-	// Config app
 	ServerName    string `mapstructure:"server-name" yaml:"server-name"`
-	BuildTarget   string `mapstructure:"build-target" yaml:"build-target"`
 	ExchangeType  string `mapstructure:"exchange-type" yaml:"exchange-type"`
 	PairsFromFile bool   `mapstructure:"pairs-from-file" yaml:"pairs-from-file"`
 }

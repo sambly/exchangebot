@@ -85,7 +85,7 @@ func preRun(cmd *cobra.Command, args []string) {
 			log.Fatalf("Error loading .env file, %s", err)
 		}
 	}
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	viper.AutomaticEnv()
 
 	// Запись в viper конфигурационных значений из файла

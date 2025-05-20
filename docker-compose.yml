@@ -1,26 +1,25 @@
-version: '3.8'
+name: exchangebot-base
 
 services:
   exchange_app:
+    container_name: exchangebot  
     build:
       context: .
       args:
         GITHUB_TOKEN: ${GITHUB_TOKEN}
-        BUILD_TARGET: ${BUILD_TARGET:-ncli}
         VITE_GRAFANA_URL: ${VITE_GRAFANA_URL:-grafana}
+    image: sambly/exchangebot:${EXCHANGE_BOT_TAG:-latest}  
     ports:
       - "${HOST_PORT:-8080}:${CONTAINER_PORT:-80}"
     volumes:
       - ./log:/app/log 
     environment:
       ENVIRONMENT: docker
-      CONTENT_EMBED: true
-      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
-      OTEL_SERVICE_NAME: exchange-app      
     env_file:
       - .env
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     networks:
       - exchange
     
@@ -33,6 +32,12 @@ services:
       - "${DB_PORT_HOST:-3307}:${DB_PORT:-3306}"
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysql --silent -u root -p$$MYSQL_ROOT_PASSWORD -e 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 100s        
     networks:
       - exchange
 
