@@ -53,6 +53,7 @@ COPY internal ./internal
 COPY cmd ./cmd
 COPY embed.go ./
 COPY ./configs ./configs
+COPY ./config.yaml ./config.yaml
 
 RUN go build -o ./exchangebot ./cmd/cobra
 
