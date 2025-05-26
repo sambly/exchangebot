@@ -28,6 +28,11 @@ var tlgLogger = logger.AddFieldsEmpty()
 
 func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, error) {
 
+	if cfg.User == "" || cfg.Token == "" {
+		tlgLogger.Info("Telegram = nil, no cfg available")
+		return nil, nil
+	}
+
 	user, _ := strconv.ParseInt(cfg.User, 10, 64)
 	poller := &tele.LongPoller{Timeout: 10 * time.Second}
 	menu := manager.NewMenuManager(app, user)
@@ -65,7 +70,11 @@ func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, 
 	return tlg, nil
 }
 
-func (t Telegram) Start(ctx context.Context) error {
+func (t *Telegram) Start(ctx context.Context) error {
+
+	if t == nil {
+		return nil
+	}
 	menu := t.menu
 	// Запускаем обработчики всех кнопок
 	menu.InitHandlers(t.bot)

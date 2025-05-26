@@ -116,8 +116,6 @@ run-simple-docker:
                -e WEB_CONTENT_EMBED=true \
                -e EXCHANGE_API_KEY=$(EXCHANGE_API_KEY) \
                -e EXCHANGE_SECRET_KEY=$(EXCHANGE_SECRET_KEY) \
-               -e TLG_TOKEN=$(TLG_TOKEN) \
-               -e TLG_USER=$(TLG_USER) \
                -e DB_TYPE=sqlite \
 			   -e DB_HOST_DOCKER=127.0.0.1 \
                -p 80:80 exchangebot
