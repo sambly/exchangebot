@@ -8,7 +8,7 @@ include .env
 export $(shell sed 's/=.*//' .env)
 
 # Имя проекта
-PROJECT_NAME := exchangebot-app
+PROJECT_NAME := exchangebot
 
 # Закрытый репозиторий
 PRIVATE_REPO := github.com/sambly/exchangeService
@@ -105,21 +105,17 @@ BUILD_ARGS_DOCKER = \
     --build-arg VITE_GRAFANA_URL=$(VITE_GRAFANA_URL)
 
 build-simple-docker:
-	docker build $(BUILD_ARGS_DOCKER) -t exchange_app .
+	docker build $(BUILD_ARGS_DOCKER) -t exchangebot .
 
 run-simple-docker:
-	docker run -e SERVER_NAME=exchange_only_docker \
+	docker run \
+			   --rm \
+	  		   -v ./log:/app/log \
 	           -e ENVIRONMENT=docker \
-               -e EXCHANGE_TYPE=exchange \
-               -e CONTENT_EMBED=true \
-               -e API_KEY_BINANCE=$(API_KEY_BINANCE) \
-               -e API_SECRET_BINANCE=$(API_SECRET_BINANCE) \
-               -e TELEGRAM_TOKEN=$(TELEGRAM_TOKEN) \
-               -e TELEGRAM_USER=$(TELEGRAM_USER) \
+               -e APP_EXCHANGE_TYPE=exchange \
+               -e WEB_CONTENT_EMBED=true \
+               -e EXCHANGE_API_KEY=$(EXCHANGE_API_KEY) \
+               -e EXCHANGE_SECRET_KEY=$(EXCHANGE_SECRET_KEY) \
                -e DB_TYPE=sqlite \
-               -p 80:80 exchange_app
-
-
-
-
-			
+			   -e DB_HOST_DOCKER=127.0.0.1 \
+               -p 80:80 exchangebot
