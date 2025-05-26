@@ -18,13 +18,13 @@
 - В первый раз может потребоваться вход  
 `docker login`
 - Создание docker  образа  
-`docker build -t exchange_app .`
+`docker build -t exchangebot .`
 - Запуск с arg    
-`docker build --build-arg GITHUB_TOKEN=<your_github_token> -t exchange_app .`
+`docker build --build-arg GITHUB_TOKEN=<your_github_token> -t exchangebot .`
 - Запуск контейнера Docker: Эта команда запускает контейнер из образа в интерактивном режиме (-it). Флаг --rm удаляет контейнер после его остановки  
-`docker run --rm -it sambly/exchange_app`
+`docker run --rm -it sambly/exchangebot`
 - Отправить docker в docker-hub  
-`docker push sambly/exchange_app:latest`
+`docker push sambly/exchangebot:latest`
 - Просто запустить docker без docker-compose с уже введеными аргументами  
 `make build-simple-docker`  
 `make run-simple-docker`

@@ -2,6 +2,7 @@ package base
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
@@ -17,6 +18,19 @@ type StrategyBase struct {
 
 	Periods      map[string]time.Duration
 	AssetsPrices *prices.AsetsPrices
+
+	subscribers []chan StrategyBaseResult
+}
+
+type StrategyBaseResult struct {
+	Executed bool
+	Data     BaseResult
+}
+
+type BaseResult struct {
+	Pair          string
+	Period        string
+	ChangePercent float64
 }
 
 func NewStrategy(assetsPrices *prices.AsetsPrices, periods map[string]time.Duration, pairs []string, notify *notification.Notification) (*StrategyBase, error) {
@@ -62,7 +76,7 @@ func (str *StrategyBase) changePrices() {
 	}
 
 	for _, pair := range str.Config.Pairs {
-		for period, _ := range str.Periods {
+		for period := range str.Periods {
 			assets := str.AssetsPrices
 
 			if _, ok := assets.ChangePricesDataset[pair]; !ok {
@@ -73,14 +87,44 @@ func (str *StrategyBase) changePrices() {
 				// Отправка сообщения об изменении цены
 				if assets.ChangePrices[pair][period].ChangePercent >= str.Config.WeightProcents[period] {
 					str.NotificationWeightPercent(pair, period, assets.ChangePrices[pair][period].ChangePercent)
+					result := StrategyBaseResult{
+						Executed: true,
+						Data: BaseResult{
+							Pair:          pair,
+							Period:        period,
+							ChangePercent: assets.ChangePrices[pair][period].ChangePercent,
+						},
+					}
+					// Уведомляем подписчиков
+					str.notifySubscribers(result)
 				}
 			}
 		}
 	}
 }
 
-func (str *StrategyBase) OnMarket(ms exModel.MarketsStat) {}
+func (str *StrategyBase) Subscribe(ch chan StrategyBaseResult) {
+	str.subscribers = append(str.subscribers, ch)
+}
+
+func (str *StrategyBase) notifySubscribers(result StrategyBaseResult) {
+	for _, sub := range str.subscribers {
+		sub := sub
+		go func(sub chan StrategyBaseResult) {
+			select {
+			case sub <- result:
+				// Успешно отправили
+			case <-time.After(1 * time.Second):
+				fmt.Println("Timeout sending result to subscriber, skipping...")
+			}
+		}(sub)
+	}
+}
 
 func (str *StrategyBase) GetTelegramMenu() model.WindowHandler {
 	return str.TelegramMenu
+}
+
+func (str *StrategyBase) OnMarket(ms exModel.MarketsStat) {
+
 }

@@ -37,11 +37,23 @@ func (web *Web) updateFull(w http.ResponseWriter, _ *http.Request) {
 func (web *Web) formingPage(w http.ResponseWriter, _ *http.Request) {
 
 	configPath := filepath.Join("configs", "strategy.yaml")
+	var optionByte []byte
+
 	// Список стратегий
-	optionByte, err := os.ReadFile(configPath)
-	if err != nil {
-		appWebLogger.Errorf("error readfile: %v", err)
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		if err := os.WriteFile(configPath, []byte{}, 0644); err != nil {
+			appWebLogger.Errorf("failed to create strategy file: %v", err)
+			return
+		}
+		optionByte = []byte{}
+	} else {
+		optionByte, err = os.ReadFile(configPath)
+		if err != nil {
+			appWebLogger.Errorf("failed to read strategy file: %v", err)
+			return
+		}
 	}
+
 	var option map[string]interface{}
 	if err := yaml.Unmarshal(optionByte, &option); err != nil {
 		appWebLogger.Errorf("error yaml unmarshal: %v", err)
