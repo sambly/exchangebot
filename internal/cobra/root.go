@@ -85,6 +85,7 @@ func preRun(cmd *cobra.Command, args []string) {
 			log.Fatalf("Error loading .env file, %s", err)
 		}
 	}
+	viper.SetEnvPrefix("EXCHANGEBOT")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	viper.AutomaticEnv()
 
@@ -232,15 +233,17 @@ func run(cmd *cobra.Command, args []string) error {
 		return app.Run(gCtx)
 	})
 
+	fmt.Println("Приложение fexchangebot запушено")
+
 	if err := g.Wait(); err != nil && gCtx.Err() != context.Canceled {
-		mainLogger.Fatalf("ошибка при завершении приложения exchangebot-app: %v", err)
+		mainLogger.Fatalf("Ошибка при завершении приложения exchangebot: %v", err)
 	}
 
 	if err := telemetry.OpenTelemetryWaitShutdown(); err != nil {
-		mainLogger.Fatalf("ошибка при завершении open-telemetry: %v", err)
+		mainLogger.Fatalf("Ошибка при завершении open-telemetry: %v", err)
 	}
 
-	mainLogger.Info("приложение exchangebot-app завершено")
-
+	mainLogger.Info("Приложение exchangebot завершено")
+	fmt.Println("Приложение fexchangebot завершено")
 	return nil
 }
