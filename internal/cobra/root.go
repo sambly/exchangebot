@@ -5,6 +5,7 @@ package cobra
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -233,17 +234,18 @@ func run(cmd *cobra.Command, args []string) error {
 		return app.Run(gCtx)
 	})
 
-	fmt.Println("Приложение fexchangebot запушено")
+	err = g.Wait()
 
-	if err := g.Wait(); err != nil && gCtx.Err() != context.Canceled {
-		mainLogger.Fatalf("Ошибка при завершении приложения exchangebot: %v", err)
+	telemetryErr := telemetry.OpenTelemetryWaitShutdown()
+	if telemetryErr != nil {
+		mainLogger.Errorf("telemetry shutdown error: %v", telemetryErr)
 	}
 
-	if err := telemetry.OpenTelemetryWaitShutdown(); err != nil {
-		mainLogger.Fatalf("Ошибка при завершении open-telemetry: %v", err)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		mainLogger.Errorf("exchangebot error: %v", err)
 	}
 
 	mainLogger.Info("Приложение exchangebot завершено")
-	fmt.Println("Приложение fexchangebot завершено")
+	fmt.Println("Приложение exchangebot завершено")
 	return nil
 }
