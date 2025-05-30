@@ -85,7 +85,8 @@ func (app *Web) routes() *http.ServeMux {
 
 	mux.HandleFunc("/trade/closeAllDeal", app.basicAuth(instrumentedHandler("/trade/closeAllDeal", app.closeAllDeal)))
 
-	mux.HandleFunc("/trade/grafana", app.basicAuth(instrumentedHandler("/trade/grafana", app.grafana)))
+	//mux.HandleFunc("/trade/grafana", app.basicAuth(instrumentedHandler("/trade/grafana", app.grafana)))
+	mux.HandleFunc("/trade/grafana/", app.basicAuth(app.grafana))
 
 	// Сервер статических файлов
 	fileServer := http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content)))
