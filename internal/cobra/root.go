@@ -79,7 +79,6 @@ func Execute() {
 func preRun(cmd *cobra.Command, args []string) {
 
 	// Запись в viper конфигурационных значений из env
-	// TODO здесь надо использовать какой то другой тэг, который бы обозначал что мы удаленно запускаем
 	if os.Getenv("ENVIRONMENT") != "docker" {
 		// Загружаем файл .env, если запуск происходит локально
 		if err := godotenv.Load(".env"); err != nil {
@@ -122,9 +121,14 @@ func run(cmd *cobra.Command, args []string) error {
 
 	mainLogger.Info("запуск приложения exchangebot-app")
 
-	err = telemetry.SetupOpenTelemetry(ctx, cfg.OtelExporterEndpoint, cfg.OtelServiceName)
-	if err != nil {
-		mainLogger.Fatalf("failed to initialize OpenTelemetry: %v", err)
+	if cfg.EnableOpenTelemetry {
+		err = telemetry.SetupOpenTelemetry(ctx, cfg.OtelExporterEndpoint, cfg.OtelServiceName)
+		if err != nil {
+			mainLogger.Fatalf("failed to initialize OpenTelemetry: %v", err)
+		}
+	} else {
+		telemetry.SetupOpenTelemetryNoop()
+		mainLogger.Info("OpenTelemetry отключен")
 	}
 
 	binance, err := exchange.NewBinance(ctx,

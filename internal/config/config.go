@@ -53,8 +53,8 @@ type GRPC struct {
 	Port       string `mapstructure:"port" yaml:"port"`
 }
 
-// TODO
 type Tracer struct {
+	EnableOpenTelemetry  bool   `mapstructure:"enable-open-telemetry" yaml:"enable-open-telemetry"`
 	OtelExporterEndpoint string `mapstructure:"otel-exporter-otlp-endpoint" yaml:"otel-exporter-otlp-endpoint"`
 	OtelServiceName      string `mapstructure:"otel-service-name" yaml:"otel-service-name"`
 }

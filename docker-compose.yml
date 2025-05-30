@@ -13,9 +13,13 @@ services:
       - "${EXCHANGEBOT_HOST_PORT:-8080}:${EXCHANGEBOT_CONTAINER_PORT:-80}"
     volumes:
       - ./log:/app/log 
-      - ./configs:/app/configs      
+      - ./configs:/app/configs
+      - ./internal/strategy:/app/internal/strategy          
     environment:
       ENVIRONMENT: docker
+      EXCHANGEBOT_TRACER_ENABLE_OPEN_TELEMETRY: true 
+      EXCHANGEBOT_TRACER_OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      EXCHANGEBOT_TRACER_OTEL_SERVICE_NAME: exchangebot       
     env_file:
       - .env
     depends_on:
@@ -60,6 +64,39 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    networks:
+      - exchange
+
+  otel-collector:
+    container_name: otel-collector     
+    image: otel/opentelemetry-collector-contrib:0.101.0
+    command:
+      - "--config"
+      - "/otel-local-config.yaml"
+    volumes:
+      - ./configs-service/tracer/collector.config.yaml:/otel-local-config.yaml
+    ports:
+      - 4317:4317
+    depends_on:
+      jaeger:
+        condition: service_started
+    networks:
+      - exchange 
+
+  jaeger:
+    container_name: jaeger      
+    image: jaegertracing/all-in-one:latest
+    restart: unless-stopped
+    ports:
+      - 16686:16686
+      - 16685:16685
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "localhost:16686"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
     networks:
       - exchange
 
