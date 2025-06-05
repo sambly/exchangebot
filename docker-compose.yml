@@ -50,11 +50,10 @@ services:
   prometheus:
     container_name: prometheus  
     image: prom/prometheus
-    restart: unless-stopped
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./configs-service/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "9090:9090"
+      - "9090:9090"  
     networks:
       - exchange
 
