@@ -4,9 +4,8 @@ app:
     exchange-type: exchange
     pairs-from-file: true 
 web:
-    production: false
-    proxy-server: false
-    proxy-port: ""
+    use-tls: false
+    listen-port: "80"
     host: ""
     content-embed: true
     username-auth: ""

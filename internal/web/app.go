@@ -3,7 +3,6 @@ package web
 import (
 	"context"
 	"embed"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -20,12 +19,12 @@ type Web struct {
 	server *http.Server
 	App    *application.Application
 	Sockets
-	production   bool
-	proxy        bool
-	proxyPort    string
+
+	listenPort   string
+	hostname     string
+	useTLS       bool
 	contentEmbed bool
 	content      embed.FS
-	hostWeb      string
 	auth         auth
 }
 
@@ -67,13 +66,14 @@ func (c *Sockets) SendDataRun(ctx context.Context) {
 
 func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, cfg config.Web, content embed.FS) *Web {
 	web := &Web{
-		App:          app,
-		production:   cfg.Production,
-		proxy:        cfg.ProxyServer,
-		proxyPort:    cfg.ProxyPort,
+		App: app,
+
+		listenPort: cfg.ListenPort,
+		hostname:   cfg.Host,
+		useTLS:     cfg.UseTLC,
+
 		contentEmbed: cfg.ContentEmbed,
 		content:      content,
-		hostWeb:      cfg.Host,
 	}
 	web.Sockets = Sockets{
 		clients:        make(map[*websocket.Conn]bool),
@@ -89,24 +89,19 @@ func NewWeb(app *application.Application, socketsMessage *notification.SocketsMe
 func (w *Web) Run(ctx context.Context) error {
 	w.Sockets.SendDataRun(ctx)
 
-	// Создаем канал для передачи ошибок сервера
 	serverErrChan := make(chan error, 1)
 
 	go func() {
 		var err error
-		if w.production {
-			if w.proxy {
-				err = w.runProductionServerProxy()
-			} else {
-				err = w.runProductionServer()
-			}
+		if w.useTLS {
+			err = w.serveTLS()
 		} else {
-			err = w.runLocalServer()
+			err = w.serve()
 		}
 		serverErrChan <- err
 	}()
 	var err error
-	// Ожидание завершения контекста или ошибки сервера
+
 	select {
 	case <-ctx.Done():
 		// Завершение работы сервера
@@ -119,7 +114,7 @@ func (w *Web) Run(ctx context.Context) error {
 	case serverErr := <-serverErrChan:
 		if serverErr != nil {
 			err = serverErr
-			appWebLogger.Errorf("произошла ошибка во время работы сервера: %v", err)
+			appWebLogger.Errorf("ошибка во время работы сервера: %v", err)
 		}
 	}
 
@@ -128,15 +123,14 @@ func (w *Web) Run(ctx context.Context) error {
 	return err
 }
 
-func (w *Web) runProductionServer() error {
+func (w *Web) serveTLS() error {
 
-	appWebLogger.Info("Запуск сервера: production")
-	fmt.Println("Запуск сервера: production")
+	appWebLogger.Info("Запуск HTTP TLS сервера ")
 
 	certManager := &autocert.Manager{
 		Cache:      autocert.DirCache("certs"),
 		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(w.hostWeb),
+		HostPolicy: autocert.HostWhitelist(w.hostname),
 	}
 
 	srv := &http.Server{
@@ -152,25 +146,11 @@ func (w *Web) runProductionServer() error {
 	return srv.ListenAndServeTLS("", "")
 }
 
-func (w *Web) runProductionServerProxy() error {
+func (w *Web) serve() error {
 
-	appWebLogger.Infof("Запуск сервера: через proxy server, port:%s ", w.proxyPort)
-	fmt.Printf("Запуск сервера: через proxy server, port:%s\n", w.proxyPort)
+	appWebLogger.Infof("Запуск HTTP сервера port:%s ", w.listenPort)
 	srv := &http.Server{
-		Addr:    ":" + w.proxyPort,
-		Handler: w.routes(),
-	}
-	w.server = srv
-	return srv.ListenAndServe()
-}
-
-func (w *Web) runLocalServer() error {
-
-	appWebLogger.Info("Запуск сервера: local")
-	fmt.Println("Запуск сервера: local")
-
-	srv := &http.Server{
-		Addr:    ":80",
+		Addr:    ":" + w.listenPort,
 		Handler: w.routes(),
 	}
 	w.server = srv

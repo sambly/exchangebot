@@ -10,7 +10,7 @@ services:
         VITE_GRAFANA_URL: ${VITE_GRAFANA_URL:-grafana}
     image: sambly/exchangebot:${EXCHANGE_BOT_TAG:-latest}  
     ports:
-      - "${EXCHANGEBOT_HOST_PORT:-8080}:${EXCHANGEBOT_CONTAINER_PORT:-80}"
+      - "${EXCHANGEBOT_HOST_PORT:-8080}:${EXCHANGEBOT_WEB_LISTEN_PORT:-80}"
     volumes:
       - ./log:/app/log 
       - ./configs:/app/configs

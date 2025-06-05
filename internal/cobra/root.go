@@ -51,11 +51,10 @@ func init() {
 	RootCmd.PersistentFlags().String("app-exchange-type", "exchange", "select exchange type exchange or grpc")
 	RootCmd.PersistentFlags().Bool("app-pairs-from-file", false, "брать пары из файла")
 
-	RootCmd.PersistentFlags().Bool("web-production", true, "запуск сервера в режиме production, запуск возможен напрямую или через proxy")
-	RootCmd.PersistentFlags().Bool("web-proxy-server", false, "запуск через proxy, необходимо также чтобы production = true")
-	RootCmd.PersistentFlags().String("web-proxy-port", "444", "proxy port")
+	RootCmd.PersistentFlags().Bool("web-use-tls", false, "запуск через встроенный tls")
+	RootCmd.PersistentFlags().String("web-listen-port", "80", "isten-port")
 	RootCmd.PersistentFlags().String("web-host", "", "host-web")
-	RootCmd.PersistentFlags().Bool("web-content-embed", false, "в режиме production=true выставить тоже в true, все web файлы объединяет в один бинарник")
+	RootCmd.PersistentFlags().Bool("web-content-embed", false, "все web файлы объединяет в один бинарник")
 	RootCmd.PersistentFlags().String("web-username-auth", "", "username-auth")
 	RootCmd.PersistentFlags().String("web-password-auth", "", "password-auth")
 
@@ -238,6 +237,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return app.Run(gCtx)
 	})
 
+	fmt.Println("Приложение exchangebot запущено")
 	err = g.Wait()
 
 	telemetryErr := telemetry.OpenTelemetryWaitShutdown()
