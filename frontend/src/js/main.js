@@ -19,6 +19,8 @@ $(function () {
     const grafanaUrl = import.meta.env.VITE_GRAFANA_URL;
     document.getElementById('grafana-link').href = grafanaUrl;
 
+    document.getElementById('jaeger-link').href = "jaeger";
+
     forming_page();
 
     //#############################################################################  webSocket #############################################################################

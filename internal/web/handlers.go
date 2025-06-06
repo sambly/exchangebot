@@ -243,3 +243,10 @@ func (web *Web) grafana(w http.ResponseWriter, r *http.Request) {
 
 	proxy.ServeHTTP(w, r)
 }
+
+func (web *Web) jaeger(w http.ResponseWriter, r *http.Request) {
+	target := "http://jaeger:16686/"
+	proxyURL, _ := url.Parse(target)
+	proxy := httputil.NewSingleHostReverseProxy(proxyURL)
+	proxy.ServeHTTP(w, r)
+}
