@@ -1,6 +1,9 @@
 package notification
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 type Notifier interface {
 	Send(message string)
@@ -23,30 +26,23 @@ func NewNotificationService(enable bool) *Notification {
 func (n *Notification) AddService(service Notifier) {
 	n.Services = append(n.Services, service)
 }
-
 func (n *Notification) Start(ctx context.Context) error {
-	go func() {
-		for {
-			select {
-			case msg, ok := <-n.Message:
-				if !ok {
-					// Канал закрыт, выходим из горутины
-					return
-				}
-				if n.Enable {
-					for _, service := range n.Services {
-						service.Send(msg)
-					}
-				}
-
-			case <-ctx.Done():
-				// Контекст отменен, завершаем работу
-				return
+	for {
+		select {
+		case msg, ok := <-n.Message:
+			if !ok {
+				return fmt.Errorf("message channel Notification was unexpectedly closed")
 			}
+			if n.Enable {
+				for _, service := range n.Services {
+					service.Send(msg)
+				}
+			}
+
+		case <-ctx.Done():
+			return ctx.Err()
 		}
-	}()
-	<-ctx.Done()
-	return nil
+	}
 }
 
 func (n *Notification) SendMessage(message string) {

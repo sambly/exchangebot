@@ -106,7 +106,7 @@ func (t *Telegram) Start(ctx context.Context) error {
 	t.bot.Stop()
 
 	tlgLogger.Infof("Telegram stopped gracefully. Server name - %s", t.app.Settings.ServerName)
-	return nil
+	return ctx.Err()
 }
 
 func (t *Telegram) Send(message string) {

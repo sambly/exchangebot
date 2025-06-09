@@ -2,12 +2,13 @@ package strategy
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 
 	"github.com/sambly/exchangeService/pkg/exchange"
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/prices"
@@ -33,6 +34,10 @@ type ControllerStrategy struct {
 	OrderController *order.Controller
 	PaperWallet     *exchange.PaperWallet
 }
+
+var strategyLogger = logger.AddFields(map[string]interface{}{
+	"package": "strategy",
+})
 
 func NewControllerStrategy(
 	assetsPrices *prices.AsetsPrices,
@@ -101,12 +106,17 @@ func (cs *ControllerStrategy) StartAll(ctx context.Context) error {
 
 		go func() {
 			defer wg.Done()
-			if err := strategy.Start(ctx); err != nil {
-				fmt.Printf("Failed to start strategy: %v\n", err)
+			if err := strategy.Start(ctx); err != nil && ctx.Err() != context.Canceled {
+				strategyLogger.Errorf("Failed strategy: %v\n", err)
 			}
 		}()
 	}
 
 	wg.Wait()
-	return nil
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	} else {
+		return errors.New("failed all strategies")
+	}
 }

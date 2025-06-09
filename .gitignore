@@ -27,3 +27,6 @@ certs/*
 configs/*
 !configs/example/
 !configs/example/*
+internal/strategy/**/config.yaml
+!internal/strategy/**/config.example.yaml
+

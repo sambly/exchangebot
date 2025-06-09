@@ -226,8 +226,26 @@ func (web *Web) getChDelta(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (web *Web) grafana(w http.ResponseWriter, r *http.Request) {
-
+	// fmt.Println("REQUEST TO:", r.URL.Path, r.URL.RawQuery)
 	target := "http://grafana:3000/"
+	proxyURL, _ := url.Parse(target)
+	proxy := httputil.NewSingleHostReverseProxy(proxyURL)
+
+	// // Если запрос - WebSocket, меняем Director для корректного перенаправления
+	// if strings.ToLower(r.Header.Get("Upgrade")) == "websocket" {
+	// 	proxy.Director = func(req *http.Request) {
+	// 		req.URL.Scheme = proxyURL.Scheme
+	// 		req.URL.Host = proxyURL.Host
+	// 		req.URL.Path = r.URL.Path
+	// 		req.Header = r.Header
+	// 	}
+	// }
+
+	proxy.ServeHTTP(w, r)
+}
+
+func (web *Web) jaeger(w http.ResponseWriter, r *http.Request) {
+	target := "http://jaeger:16686/"
 	proxyURL, _ := url.Parse(target)
 	proxy := httputil.NewSingleHostReverseProxy(proxyURL)
 	proxy.ServeHTTP(w, r)

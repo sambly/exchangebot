@@ -1,6 +1,7 @@
 package simplebuy
 
 import (
+	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -11,18 +12,21 @@ type Config struct {
 }
 
 func NewConfig() (*Config, error) {
-
 	var config Config
 
-	configPath := "internal/strategy/simpleAsk/config.yaml"
+	primaryPath := "internal/strategy/simpleBuy/config.yaml"
+	fallbackPath := "internal/strategy/simpleBuy/config.example.yaml"
 
-	fileData, err := os.ReadFile(configPath)
+	fileData, err := os.ReadFile(primaryPath)
 	if err != nil {
-		return nil, err
+		fileData, err = os.ReadFile(fallbackPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read both config.yaml and config.example.yaml: %w", err)
+		}
 	}
 
 	if err := yaml.Unmarshal(fileData, &config); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 	return &config, nil
 }

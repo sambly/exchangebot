@@ -153,58 +153,5 @@ func (app *Application) Run(ctx context.Context) error {
 	appLogger.Infof("Время выполнения предварительной загрузки данных: %v ", duration)
 	appLogger.Infof("Время старта: %v ", timeStart)
 
-	//Для предварительного заполения цен всех пар, может сделать меньше время, просто добавляет погрешность для 10m
-	tickerIntervalInit := time.Second * 10 // Здесь выставить 40
-	tickerInit := time.NewTicker(tickerIntervalInit)
-
-	tickerInterval3m := time.Second * 60 * 3
-	ticker3m := time.NewTicker(tickerInterval3m)
-
-	tickerInterval15m := time.Second * 60 * 15
-	ticker15m := time.NewTicker(tickerInterval15m)
-
-	tickerInterval1h := time.Second * 60 * 60
-	ticker1h := time.NewTicker(tickerInterval1h)
-
-	tickerInterval4h := time.Second * 60 * 60 * 4
-	ticker4h := time.NewTicker(tickerInterval4h)
-
-	for {
-		select {
-		case <-gCtx.Done():
-			// Останавливаем все тикеры при завершении контекста
-			tickerInit.Stop()
-			ticker3m.Stop()
-			ticker15m.Stop()
-			ticker1h.Stop()
-			ticker4h.Stop()
-			return g.Wait()
-
-		case <-tickerInit.C:
-			// app.AssetsPrices.UpdateChanges("")
-			tickerInit.Stop()
-
-		case <-ticker3m.C:
-			// app.AssetsPrices.UpdateChanges("ch3m")
-
-		case <-ticker15m.C:
-			// app.AssetsPrices.UpdateChanges("ch15m")
-
-		case <-ticker1h.C:
-			// app.AssetsPrices.UpdateChanges("ch1h")
-			// err := app.Account.UpdateAssets()
-			// if err != nil {
-			// 	fmt.Printf("%v", err)
-			// 	return err
-			// }
-
-		case <-ticker4h.C:
-			// app.AssetsPrices.UpdateChanges("ch4h")
-			// err := app.Account.UpdateAssets()
-			// if err != nil {
-			// 	fmt.Printf("%v", err)
-			// 	return err
-			// }
-		}
-	}
+	return g.Wait()
 }

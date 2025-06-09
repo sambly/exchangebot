@@ -41,6 +41,11 @@ COPY ./config.yaml ./config.yaml
 
 RUN go build -o ./exchangebot ./cmd/cobra
 
+# конфиги стратегий 
+RUN mkdir -p /app/only_strategies && \
+    find internal/strategy -type f \( -name "config.yaml" -o -name "config.example.yaml" \) \
+    -exec cp --parents {} /app/only_strategies \;
+
 # Финальный образ
 FROM alpine:3.21
 
@@ -54,6 +59,7 @@ WORKDIR /app
 COPY --from=builder /app/exchangebot .
 COPY --from=builder /app/configs /app/configs
 COPY --from=builder /app/config.yaml /app/config.yaml
+COPY --from=builder /app/only_strategies /app
 
 VOLUME /app/log
 EXPOSE 80

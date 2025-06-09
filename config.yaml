@@ -1,14 +1,11 @@
 app:
     server-name: exchange-bot
-    # cobra or ncli
-    build-target: cobra
     # exchange or grpc    
     exchange-type: exchange
     pairs-from-file: true 
 web:
-    production: false
-    proxy-server: false
-    proxy-port: ""
+    use-tls: false
+    listen-port: "80"
     host: ""
     content-embed: true
     username-auth: ""
@@ -39,5 +36,7 @@ log:
     production: false
 notification:
     enable: false
-
-
+tracer:
+    enable-open-telemetry: false
+    otel-exporter-otlp-endpoint: ""
+    otel-service-name: ""

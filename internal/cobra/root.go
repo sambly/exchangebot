@@ -5,6 +5,7 @@ package cobra
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -50,11 +51,10 @@ func init() {
 	RootCmd.PersistentFlags().String("app-exchange-type", "exchange", "select exchange type exchange or grpc")
 	RootCmd.PersistentFlags().Bool("app-pairs-from-file", false, "брать пары из файла")
 
-	RootCmd.PersistentFlags().Bool("web-production", true, "запуск сервера в режиме production, запуск возможен напрямую или через proxy")
-	RootCmd.PersistentFlags().Bool("web-proxy-server", false, "запуск через proxy, необходимо также чтобы production = true")
-	RootCmd.PersistentFlags().String("web-proxy-port", "444", "proxy port")
+	RootCmd.PersistentFlags().Bool("web-use-tls", false, "запуск через встроенный tls")
+	RootCmd.PersistentFlags().String("web-listen-port", "80", "isten-port")
 	RootCmd.PersistentFlags().String("web-host", "", "host-web")
-	RootCmd.PersistentFlags().Bool("web-content-embed", false, "в режиме production=true выставить тоже в true, все web файлы объединяет в один бинарник")
+	RootCmd.PersistentFlags().Bool("web-content-embed", false, "все web файлы объединяет в один бинарник")
 	RootCmd.PersistentFlags().String("web-username-auth", "", "username-auth")
 	RootCmd.PersistentFlags().String("web-password-auth", "", "password-auth")
 
@@ -78,13 +78,13 @@ func Execute() {
 func preRun(cmd *cobra.Command, args []string) {
 
 	// Запись в viper конфигурационных значений из env
-	// TODO здесь надо использовать какой то другой тэг, который бы обозначал что мы удаленно запускаем
 	if os.Getenv("ENVIRONMENT") != "docker" {
 		// Загружаем файл .env, если запуск происходит локально
 		if err := godotenv.Load(".env"); err != nil {
 			log.Fatalf("Error loading .env file, %s", err)
 		}
 	}
+	viper.SetEnvPrefix("EXCHANGEBOT")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	viper.AutomaticEnv()
 
@@ -120,9 +120,14 @@ func run(cmd *cobra.Command, args []string) error {
 
 	mainLogger.Info("запуск приложения exchangebot-app")
 
-	err = telemetry.SetupOpenTelemetry(ctx, cfg.OtelExporterEndpoint, cfg.OtelServiceName)
-	if err != nil {
-		mainLogger.Fatalf("failed to initialize OpenTelemetry: %v", err)
+	if cfg.EnableOpenTelemetry {
+		err = telemetry.SetupOpenTelemetry(ctx, cfg.OtelExporterEndpoint, cfg.OtelServiceName)
+		if err != nil {
+			mainLogger.Fatalf("failed to initialize OpenTelemetry: %v", err)
+		}
+	} else {
+		telemetry.SetupOpenTelemetryNoop()
+		mainLogger.Info("OpenTelemetry отключен")
 	}
 
 	binance, err := exchange.NewBinance(ctx,
@@ -232,15 +237,19 @@ func run(cmd *cobra.Command, args []string) error {
 		return app.Run(gCtx)
 	})
 
-	if err := g.Wait(); err != nil && gCtx.Err() != context.Canceled {
-		mainLogger.Fatalf("ошибка при завершении приложения exchangebot-app: %v", err)
+	fmt.Println("Приложение exchangebot запущено")
+	err = g.Wait()
+
+	telemetryErr := telemetry.OpenTelemetryWaitShutdown()
+	if telemetryErr != nil {
+		mainLogger.Errorf("telemetry shutdown error: %v", telemetryErr)
 	}
 
-	if err := telemetry.OpenTelemetryWaitShutdown(); err != nil {
-		mainLogger.Fatalf("ошибка при завершении open-telemetry: %v", err)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		mainLogger.Errorf("exchangebot error: %v", err)
 	}
 
-	mainLogger.Info("приложение exchangebot-app завершено")
-
+	mainLogger.Info("Приложение exchangebot завершено")
+	fmt.Println("Приложение exchangebot завершено")
 	return nil
 }
