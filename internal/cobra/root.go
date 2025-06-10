@@ -198,7 +198,6 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	app, err := application.NewApp(
-		ctx,
 		binance,
 		dataFeed,
 		settings,

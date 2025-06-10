@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sambly/exchangeService/pkg/exchange"
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
@@ -30,8 +29,7 @@ type ControllerStrategy struct {
 	Periods         map[string]time.Duration
 	Pairs           []string
 	AssetsPrices    *prices.AsetsPrices
-	OrderController *order.Controller
-	PaperWallet     *exchange.PaperWallet
+	OrderController *order.OrderService
 }
 
 var strategyLogger = logger.AddFields(map[string]interface{}{
@@ -43,8 +41,7 @@ func NewControllerStrategy(
 	periods map[string]time.Duration,
 	pairs []string,
 	notify *notification.Notification,
-	orderController *order.Controller,
-	paperWallet *exchange.PaperWallet,
+	orderController *order.OrderService,
 	options ...Option) (*ControllerStrategy, error) {
 
 	ctrlStr := &ControllerStrategy{
