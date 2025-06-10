@@ -5,7 +5,6 @@ go 1.22.5
 require (
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/glebarez/sqlite v1.11.0
-	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/joho/godotenv v1.5.1
 	github.com/prometheus/client_golang v1.11.1
@@ -35,6 +34,7 @@ require (
 	github.com/glebarez/go-sqlite v1.21.2 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect

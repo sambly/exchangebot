@@ -9,10 +9,12 @@ import (
 	"github.com/sambly/exchangeService/pkg/telemetry"
 	"github.com/sambly/exchangebot/internal/account"
 	"github.com/sambly/exchangebot/internal/config"
+	"github.com/sambly/exchangebot/internal/database"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
+	"github.com/sambly/exchangebot/internal/paperwallet"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy"
 	"golang.org/x/sync/errgroup"
@@ -22,24 +24,23 @@ import (
 type Application struct {
 	Settings model.Settings
 	Config   *config.Config
-	database *gorm.DB
 
 	Notification *notification.Notification
 
 	exchange exchange.Exchange
 	dataFeed *exchange.DataFeed
 
-	Account            *account.Account
-	AssetsPrices       *prices.AsetsPrices
-	OrderController    *order.Controller
-	PaperWallet        *exchange.PaperWallet
+	Account      *account.Account
+	AssetsPrices *prices.AsetsPrices
+
+	OrderController    *order.OrderService
+	PaperWallet        *paperwallet.PaperWallet
 	ControllerStrategy *strategy.ControllerStrategy
 }
 
 var appLogger = logger.AddFieldsEmpty()
 
 func NewApp(
-	ctx context.Context,
 	exch exchange.Exchange,
 	dataFeed *exchange.DataFeed,
 	settings model.Settings,
@@ -48,7 +49,10 @@ func NewApp(
 	cfg *config.Config,
 	notification *notification.Notification) (*Application, error) {
 
-	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, db)
+	orderDB := database.NewOrderDb(db)
+	pricesDB := database.NewPricesDb(db)
+
+	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, pricesDB)
 
 	baseLimitAsset := 1.0
 
@@ -56,13 +60,13 @@ func NewApp(
 	if err != nil {
 		return nil, err
 	}
-	paperWallet := exchange.NewPaperWallet(ctx)
-	orderController, err := order.NewController(ctx, paperWallet, db, socketsMessage, assetsPrices)
+	paperWallet := paperwallet.NewPaperWallet()
+	orderController, err := order.NewOrderService(orderDB, paperWallet, socketsMessage, assetsPrices)
 	if err != nil {
 		return nil, err
 	}
 
-	controllerStrategy, err := strategy.NewControllerStrategy(assetsPrices, settings.ChangePeriods, settings.Pairs, notification, orderController, paperWallet)
+	controllerStrategy, err := strategy.NewControllerStrategy(assetsPrices, settings.ChangePeriods, settings.Pairs, notification, orderController)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +76,6 @@ func NewApp(
 		Config:   cfg,
 		exchange: exch,
 		dataFeed: dataFeed,
-		database: db,
 
 		AssetsPrices:       assetsPrices,
 		Account:            account,
