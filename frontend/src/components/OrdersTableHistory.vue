@@ -103,12 +103,12 @@ export default {
 
 <style scoped>
 
-.table-ttable-trade-history {
+.table-trade-history {
   table-layout: fixed;
   width: 100%;
 }
 
-.table-ttable-trade-history{
+.table-trade-history tbody{
   max-height: 300px;
 }  
 
