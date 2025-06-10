@@ -84,6 +84,9 @@ func (c *Controller) CreateOrderMarket(deal model.Deal, size float64) (*exModel.
 		return nil, err
 	}
 
+	messageOrder, _ := json.Marshal(map[string]interface{}{"orderAdd": order})
+	c.socketsMessage.SendData(messageOrder)
+
 	mkStat := c.assetsPrices.MarketsStat[pair]
 	chData := c.assetsPrices.ChangePrices[pair]
 	dFast := c.assetsPrices.ChangeDelta[pair]
@@ -131,6 +134,9 @@ func (c *Controller) ClosePosition(id int64) error {
 	if err != nil {
 		return err
 	}
+	messageOrder, _ := json.Marshal(map[string]interface{}{"orderDelete": order})
+	c.socketsMessage.SendData(messageOrder)
+
 	return nil
 }
 
@@ -150,7 +156,7 @@ func (c *Controller) OnMarket(ms exModel.MarketsStat) {
 				order.Profit = (order.PriceCreated / ms.Price * 100) - 100
 			}
 			// Обновления цены webSocket
-			messageOrder, _ := json.Marshal(map[string]interface{}{"order": order})
+			messageOrder, _ := json.Marshal(map[string]interface{}{"orderUpdate": order})
 			c.socketsMessage.SendData(messageOrder)
 		}
 
