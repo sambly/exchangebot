@@ -50,6 +50,7 @@
 - Применение команд на примере update   
 windows (если запусккать просто через run) `go run ./cmd/cobra update --production-log=true`   
 docker  `/app # ./exchangebot update --debug-log=true`
+- Записать пары в файл pairs.txt   `go run ./cmd/cobra pairs-to-file`
 
 
 

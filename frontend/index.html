@@ -12,8 +12,9 @@
 </head>
 
 <body>
-
   <div class="container-fluid">
+
+    <!-- <div id="vue-orders-app"></div>  -->
 
     <div class="row">
 
@@ -295,7 +296,6 @@
             <button type="button" class="btnTradeHistory btn btn-secondary active" id="btn-trade-active">Активные</button>
             <button type="button" class="btnTradeHistory btn btn-secondary" id="btn-trade-history">История </button>
           </div>
-
         </div>
 
 
@@ -303,77 +303,12 @@
 
           <div class="col">
             <div class="bg-light border rounded-3" style="height: 400px;">
-              
-
-              <div class="d-flex mt-3">
-                <div class="d-flex gap-1 ms-3">Сделок 
-                    <div class="text-primary" id="tradesCount" style="font-weight: bold;"></div>
-                </div>
-                <div class="d-flex gap-1 ms-3">PNL 
-                    <div id="tradesPnl" style="font-weight: bold;"></div>
-                </div>
-                <div class="d-flex ms-auto" style="margin-right: 5rem !important;">
-                  <button class="btn-close-deal-all" id="btnTradeClose">
-                    <img src="/src/svg/btn_close_all.svg" alt="clDealAll" title="Закрыть все сделки">
-                  </button>
-                </div>
-              </div>
-            
-
+             
               <div class="panel-trade mt-3">
 
-                <div class="collapse" id="panel-trade-active">
-                  <table id="table-trade-active" class="table table-hover table-borderless table-light">
-                    <thead name="thead-trade-active">
-                      <tr>
-                        <th scope="col">
-                          Тип
-                        </th>
-                        <th scope="col">
-                          Пара
-                        </th>
-                        <th scope="col">
-                          Цена
-                        </th>
-                        <th scope="col">
-                          Профит
-                        </th>
-                        <th scope="col">
-                          Дата
-                        </th>
-                        <th scope="col">
-                          Закрыть
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody class="pt-2" id="tbody-trade-active"></tbody>
-                  </table>
-                </div>
-
-                <div class="collapse" id="panel-trade-history">
-                  <table id="table-trade-history" class="table table-hover table-borderless table-light">
-                    <thead name="thead-trade-history">
-                      <tr>
-                        <th scope="col">
-                          Тип
-                        </th>
-                        <th scope="col">
-                          Пара
-                        </th>
-                        <th scope="col">
-                          Цена
-                        </th>
-                        <th scope="col">
-                          Дата
-                        </th>
-                        <th scope="col">
-                          Профит
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody class="pt-2" id="tbody-trade-history"></tbody>
-                  </table>
-                </div>
+                <div class="collapse" id="panel-trade-active"></div>     
+                <div class="collapse" id="panel-trade-history"></div>  
+                
               </div>
             </div>
           </div>

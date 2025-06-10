@@ -11,8 +11,8 @@ import (
 	"strconv"
 
 	"github.com/gorilla/websocket"
-	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/model"
+	"github.com/sambly/exchangebot/internal/order"
 	"gopkg.in/yaml.v3"
 )
 
@@ -156,9 +156,9 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 func (web *Web) closeAllDeal(w http.ResponseWriter, _ *http.Request) {
 
 	// Делаем глубокую копию OrdersActive
-	OrdersActiveCopy := make(map[string][]*exModel.Order)
+	OrdersActiveCopy := make(map[string][]*order.Order)
 	for key, value := range web.App.PaperWallet.OrdersActive {
-		OrdersActiveCopy[key] = make([]*exModel.Order, len(value))
+		OrdersActiveCopy[key] = make([]*order.Order, len(value))
 		for i, order := range value {
 			// Делаем копию каждого элемента
 			orderCopy := *order

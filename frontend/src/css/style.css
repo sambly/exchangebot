@@ -27,18 +27,6 @@
   width: 625px;
 }
 
-#table-trade-active,
-#table-trade-history {
-  table-layout: fixed;
-  width: 100%;
-}
-
-#table-trade-active tbody,
-#table-trade-history tbody {
-  max-height: 300px;
-
-}
-
 tbody {
   display: block;
   overflow-y: auto;
@@ -141,63 +129,6 @@ tbody td {
 }
 
 
-#table-trade-active th:nth-child(1),
-#table-trade-active td:nth-child(1) {
-  width: 10%;
-}
-
-#table-trade-active th:nth-child(2),
-#table-trade-active td:nth-child(2) {
-  width: 20%;
-}
-
-#table-trade-active th:nth-child(3),
-#table-trade-active td:nth-child(3) {
-  width: 20%;
-}
-
-#table-trade-active th:nth-child(4),
-#table-trade-active td:nth-child(4) {
-  width: 20%;
-}
-
-#table-trade-active th:nth-child(5),
-#table-trade-active td:nth-child(5) {
-  width: 20%;
-}
-
-#table-trade-active th:nth-child(6),
-#table-trade-active td:nth-child(6) {
-  width: 10%;
-}
-
-
-#table-trade-history th:nth-child(1),
-#table-trade-history td:nth-child(1) {
-  width: 20%;
-}
-
-#table-trade-history th:nth-child(2),
-#table-trade-history td:nth-child(2) {
-  width: 20%;
-}
-
-#table-trade-history th:nth-child(3),
-#table-trade-history td:nth-child(3) {
-  width: 20%;
-}
-
-#table-trade-history th:nth-child(4),
-#table-trade-history td:nth-child(4) {
-  width: 20%;
-}
-
-#table-trade-history th:nth-child(5),
-#table-trade-history td:nth-child(5) {
-  width: 20%;
-}
-
-
 @media (max-width: 767px) {
   /* стили для xs-устройств */
   
@@ -284,7 +215,6 @@ tbody td {
   background-color: #e1eff9;
 }
 
-
 .tooltip {
   position: absolute;
   background-color: #333;
@@ -293,7 +223,6 @@ tbody td {
   border-radius: 5px;
   z-index: 9999;
 }
-
 
 /* Стили для скролла */
 ::-webkit-scrollbar {
@@ -305,14 +234,6 @@ tbody td {
 } 
 ::-webkit-scrollbar-thumb {
 	box-shadow: inset 0 0 6px #c6c7c8; 
-}
-
-
-.btn-close-deal-all {
-  border: none; /* Убирает границу кнопки */
-  background: none; /* Убирает фон кнопки */
-  padding: 0; /* Убирает отступы внутри кнопки */
-  cursor: pointer; /* Делает курсор указателем при наведении */
 }
 
 .button-control .btn {

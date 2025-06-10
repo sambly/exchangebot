@@ -5,13 +5,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sambly/exchangebot/internal/database"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/model"
-	"gorm.io/gorm"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
 )
+
+type Repository interface {
+	InsertCandle(candle exModel.Candle, period string) error
+	InsertCandles(candles []exModel.Candle, period string) error
+	GetCandlesByPeriod(period string) ([]exModel.Candle, error)
+	SelectMarketStateTimev2(timeRounding time.Time) ([]exModel.Candle, error)
+	SelectDeltaPeriod(pair string, period string) ([]model.ChangeDeltaForCandle, error)
+}
 
 type ChangePrices struct {
 	LastPrice     float64
@@ -43,7 +49,7 @@ type ChangeDeltaDataset struct {
 }
 
 type AsetsPrices struct {
-	database *gorm.DB
+	repo Repository
 
 	Pairs        []string
 	Periods      map[string]time.Duration
@@ -67,7 +73,7 @@ type AsetsPrices struct {
 
 var pricesLogger = logger.AddFieldsEmpty()
 
-func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time.Duration, db *gorm.DB) *AsetsPrices {
+func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time.Duration, repo Repository) *AsetsPrices {
 	asetsPrices := &AsetsPrices{
 		Pairs:        pairs,
 		Periods:      periodsChange,
@@ -83,7 +89,7 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 		ChangeDelta:        make(map[string]map[string]*ChangeDelta),
 		ChangeDeltaDataset: make(map[string]map[string]*ChangeDeltaDataset),
 
-		database: db,
+		repo: repo,
 	}
 
 	for _, pair := range pairs {
@@ -158,7 +164,7 @@ func (ap *AsetsPrices) InitChangePrices() {
 	// Интервал времени текущее время - время макс. периода
 	timeRoundingMax := ap.UpdateTime.Add(-max)
 
-	candles, err := database.SelectMarketStateTimev2(ap.database, timeRoundingMax)
+	candles, err := ap.repo.SelectMarketStateTimev2(timeRoundingMax)
 	if err != nil {
 		pricesLogger.Errorf("error SelectMarketStateTimev2: %v", err)
 		return
@@ -224,7 +230,7 @@ func (ap *AsetsPrices) InitChangeDelta() {
 	}
 	// умножаем на два для сравнения двух периодов
 	timeRoundingMax := ap.UpdateTime.Add(-max * 2)
-	candles, err := database.SelectMarketStateTimev2(ap.database, timeRoundingMax)
+	candles, err := ap.repo.SelectMarketStateTimev2(timeRoundingMax)
 	if err != nil {
 		pricesLogger.Errorf("error SelectMarketStateTimev2: %v", err)
 		return
@@ -326,7 +332,7 @@ func (ap *AsetsPrices) UpdateChangeDelta() error {
 
 	timeStart := time.Now()
 
-	candles, err := database.SelectMarketStateTimev2(ap.database, ap.UpdateTime.Add(-1*time.Minute))
+	candles, err := ap.repo.SelectMarketStateTimev2(ap.UpdateTime.Add(-1 * time.Minute))
 	if err != nil {
 		pricesLogger.Errorf("error SelectMarketStateTimev2: %v", err)
 		return err
@@ -441,7 +447,7 @@ func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDeltaF
 
 	timeStart := time.Now()
 
-	changeDelta, err := database.SelectDeltaPeriod(ap.database, pair, period)
+	changeDelta, err := ap.repo.SelectDeltaPeriod(pair, period)
 	if err != nil {
 		return nil, err
 	}
