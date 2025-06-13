@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sambly/exchangeService/pkg/exchange"
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy/base"
-	"github.com/sambly/exchangebot/internal/strategy/orders"
 	"github.com/sambly/exchangebot/internal/strategy/sales"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
@@ -21,19 +19,17 @@ type StrategySimpleBuy struct {
 	TelegramMenu *StrategySimpleBuyMenu
 
 	AssetsPrices    *prices.AsetsPrices
-	OrderController *order.Controller
+	OrderController *order.OrderService
 
 	StrategyBaseResult chan base.StrategyBaseResult
-	Orders             map[string][]orders.StrategyOrder
+	Orders             map[string][]*order.Order
 	Sale               sales.Sales
 }
 
 func NewStrategy(
 	notify *notification.Notification,
 	assetsPrices *prices.AsetsPrices,
-	orderController *order.Controller,
-	paperWallet *exchange.PaperWallet,
-	// TODO сделать иницциализацию Orders
+	orderController *order.OrderService,
 
 ) (*StrategySimpleBuy, error) {
 	cfg, err := NewConfig()
@@ -46,13 +42,19 @@ func NewStrategy(
 		AssetsPrices:       assetsPrices,
 		OrderController:    orderController,
 		StrategyBaseResult: make(chan base.StrategyBaseResult),
+		Orders:             make(map[string][]*order.Order),
 	}
 	return str, nil
 }
 
 func (s *StrategySimpleBuy) WithTelegramMenu() *StrategySimpleBuy {
-	tlgMenu := NewStrategyMenu("SimpleBuy стратегия", "strategiesSimpleBuy", s)
+	tlgMenu := NewStrategyMenu(s.Config.Name, s.Config.IDName, s)
 	s.TelegramMenu = tlgMenu
+	return s
+}
+
+func (s *StrategySimpleBuy) WithSaleStrategy(sale sales.Sales) *StrategySimpleBuy {
+	s.Sale = sale
 	return s
 }
 
@@ -64,6 +66,7 @@ func (str *StrategySimpleBuy) Start(ctx context.Context) error {
 	for {
 		select {
 		case baseResult := <-str.StrategyBaseResult:
+			// TODO добавить сюда ctx
 			if err := str.execute(baseResult); err != nil {
 				return err
 			}
@@ -78,16 +81,22 @@ func (str *StrategySimpleBuy) execute(baseResult base.StrategyBaseResult) error 
 		return nil
 	}
 	go func() {
-		order, err := str.TelegramMenu.SendMessageBuy(baseResult)
+		orderNew, err := str.TelegramMenu.SendMessageBuy(baseResult)
 		if err != nil {
 			fmt.Printf("Ошибка SendMessageBuy %v\n", err)
 			return
 		}
 
-		if order == nil {
+		if orderNew == nil {
 			fmt.Println("Таймаут - ордер не создан")
 		} else {
-			fmt.Println("Ордер создан:", order)
+			if _, ok := str.Orders[orderNew.Pair]; !ok {
+				str.Orders[orderNew.Pair] = []*order.Order{orderNew}
+			} else {
+				str.Orders[orderNew.Pair] = append(str.Orders[orderNew.Pair], orderNew)
+			}
+
+			fmt.Println("Ордер создан:", orderNew)
 		}
 	}()
 
@@ -95,8 +104,24 @@ func (str *StrategySimpleBuy) execute(baseResult base.StrategyBaseResult) error 
 }
 
 func (str *StrategySimpleBuy) OnMarket(ms exModel.MarketsStat) {
-	if _, ok := str.Orders[ms.Pair]; ok {
-		//  TODO или мне  возвращать новый массив измененный или передавать туда указатель и там менять вопрос
-		str.Sale.Execute(ms, str.Orders[ms.Pair])
+
+	if str.Sale == nil {
+		return
 	}
+
+	orders, ok := str.Orders[ms.Pair]
+	if !ok {
+		return
+	}
+
+	var remainingOrders []*order.Order
+	// если позиция закрыта удаляем ордер из слайса ордеров стратегии
+	for _, order := range orders {
+		if !str.Sale.Execute(ms, order) {
+			remainingOrders = append(remainingOrders, order)
+		}
+	}
+
+	str.Orders[ms.Pair] = remainingOrders
+
 }

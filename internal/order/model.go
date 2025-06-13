@@ -1,6 +1,10 @@
 package order
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/datatypes"
+)
 
 type SideType string
 type OrderType string
@@ -36,4 +40,24 @@ type Order struct {
 	Price        float64         `gorm:"column:price"`
 	Quantity     float64         `gorm:"column:quantity"`
 	Profit       float64         `gorm:"column:profit"`
+	Strategy     string          `gorm:"column:strategy"`
+}
+
+type OrderInfo struct {
+	ID           uint           `gorm:"primarykey;autoIncrement"`
+	IdOrder      uint           `gorm:"column:id_order"`
+	Frame        string         `gorm:"column:frame"`
+	Strategy     string         `gorm:"column:strategy"`
+	Comment      string         `gorm:"column:comment"`
+	MarketsStat  datatypes.JSON `gorm:"column:markets_stat"`
+	ChangePrices datatypes.JSON `gorm:"column:change_prices"`
+	DeltaFast    datatypes.JSON `gorm:"column:delta_fast"`
+}
+
+type Deal struct {
+	Pair     string
+	SideType SideType
+	Frame    string
+	Strategy string
+	Comment  string
 }

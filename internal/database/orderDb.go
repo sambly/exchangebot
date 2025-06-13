@@ -3,7 +3,6 @@ package database
 import (
 	"fmt"
 
-	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/order"
 	"gorm.io/gorm"
 )
@@ -16,8 +15,8 @@ func NewOrderDb(db *gorm.DB) *OrderDb {
 	return &OrderDb{db: db}
 }
 
-func (r *OrderDb) GetAll() ([]order.Order, error) {
-	var orders []order.Order
+func (r *OrderDb) GetAll() ([]*order.Order, error) {
+	var orders []*order.Order
 	if err := r.db.Find(&orders).Error; err != nil {
 		return nil, err
 	}
@@ -43,7 +42,7 @@ func (r *OrderDb) ClosePosition(id int64, updateData *order.Order) error {
 	return nil
 }
 
-func (r *OrderDb) CreateInfo(ordersInfo *model.OrderInfo) error {
+func (r *OrderDb) CreateInfo(ordersInfo *order.OrderInfo) error {
 	// TODO здесь надо использовать указатель в качестве аргумента или нет
 	return r.db.Create(&ordersInfo).Error
 }

@@ -94,7 +94,7 @@ func (p *PaperWallet) CreateOrderMarket(side order.SideType, pair string, size f
 	if size == 0 {
 		return &order.Order{}, ErrInvalidQuantity
 	}
-
+	// TODO здесь мне не очень нравится что данные берем с marketStat, актуальные они точно? или может другой способ сделать
 	marketStat, ok := p.MarketsStat[pair]
 	if !ok {
 		return nil, fmt.Errorf("market data not available for pair: %s", pair)

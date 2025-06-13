@@ -1,4 +1,4 @@
-package simplebuy
+package simplesale
 
 import (
 	"fmt"
@@ -8,18 +8,19 @@ import (
 )
 
 type Config struct {
-	Name               string `yaml:"name"`
-	IDName             string `yaml:"idName"`
-	Description        string `yaml:"description"`
-	StrategyEnable     bool   `yaml:"strategyEnable"`
-	NotificationEnable bool   `yaml:"notificationEnable"`
+	Name           string `yaml:"name"`
+	IDName         string `yaml:"idName"`
+	Description    string `yaml:"description"`
+	StrategyEnable bool   `yaml:"strategyEnable"`
+
+	Procent float32 `yaml:"procent"`
 }
 
 func NewConfig() (*Config, error) {
 	var config Config
 
-	primaryPath := "internal/strategy/simpleBuy/config.yaml"
-	fallbackPath := "internal/strategy/simpleBuy/config.example.yaml"
+	primaryPath := "internal/strategy/sales/simplesale/config.yaml"
+	fallbackPath := "internal/strategy/sales/simplesale/config.example.yaml"
 
 	fileData, err := os.ReadFile(primaryPath)
 	if err != nil {

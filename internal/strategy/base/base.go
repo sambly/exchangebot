@@ -23,6 +23,7 @@ type StrategyBase struct {
 }
 
 type StrategyBaseResult struct {
+	//TODO  Executed зачем ?
 	Executed bool
 	Data     BaseResult
 }
@@ -52,7 +53,7 @@ func NewStrategy(assetsPrices *prices.AsetsPrices, periods map[string]time.Durat
 }
 
 func (s *StrategyBase) WithTelegramMenu() *StrategyBase {
-	tlgMenu := NewStrategyMenu("Base стратегия", "strategiesBase", s)
+	tlgMenu := NewStrategyMenu(s.Config.Name, s.Config.IDName, s)
 	s.TelegramMenu = tlgMenu
 	return s
 }
@@ -71,7 +72,7 @@ func (str *StrategyBase) Start(ctx context.Context) error {
 
 func (str *StrategyBase) changePrices() {
 
-	if !str.Config.NotificationEnable {
+	if !str.Config.StrategyEnable {
 		return
 	}
 
@@ -84,9 +85,11 @@ func (str *StrategyBase) changePrices() {
 			}
 
 			if assets.ChangePricesDataset[pair][period].Fill {
-				// Отправка сообщения об изменении цены
 				if assets.ChangePrices[pair][period].ChangePercent >= str.Config.WeightProcents[period] {
-					str.NotificationWeightPercent(pair, period, assets.ChangePrices[pair][period].ChangePercent)
+					// Отправка сообщения об изменении цены
+					if str.Config.NotificationEnable {
+						str.NotificationWeightPercent(pair, period, assets.ChangePrices[pair][period].ChangePercent)
+					}
 					result := StrategyBaseResult{
 						Executed: true,
 						Data: BaseResult{

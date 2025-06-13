@@ -25,6 +25,7 @@
           <th>Пара</th>
           <th>Цена</th>
           <th>Профит</th>
+          <th>Стратегия</th>
           <th>Дата</th>
           <th>Закрыть</th>
         </tr>
@@ -42,6 +43,7 @@
           <td :style="{ color: colorProfit(order.Profit) }">
             {{ formatProfit(order.Profit) }}
           </td>
+          <td>{{ order.Strategy }}</td>
           <td>{{ formatTime(order.TimeCreated) }}</td>
           <td>
             <button class="btn-close" type="button" @click.stop="handleClose(order.ID)"></button>
@@ -227,13 +229,19 @@ export default {
 
 .table-trade-active th:nth-child(5),
 .table-trade-active td:nth-child(5) {
-  width: 20%;
+  width: 10%;
 }
 
 .table-trade-active th:nth-child(6),
 .table-trade-active td:nth-child(6) {
   width: 10%;
 }
+
+.table-trade-active th:nth-child(7),
+.table-trade-active td:nth-child(7) {
+  width: 10%;
+}
+
 
 .btn-close-deal-all {
   border: none; /* Убирает границу кнопки */

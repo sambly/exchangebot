@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	exModel "github.com/sambly/exchangeService/pkg/model"
-	dealModel "github.com/sambly/exchangebot/internal/model"
+	"github.com/sambly/exchangebot/internal/order"
 	strbase "github.com/sambly/exchangebot/internal/strategy/base"
 	"github.com/sambly/exchangebot/internal/telegram/menu/base"
 	"github.com/sambly/exchangebot/internal/telegram/menu/global"
@@ -55,7 +54,7 @@ func (m *StrategySimpleBuyMenu) Show(c tele.Context, handler model.MenuHandler) 
 	handler.SetCurrentMenu(userID, m.Show, nil)
 	handler.DeleteUserMessages(c, userID)
 
-	text := "Настройки Base стратегии:\n"
+	text := fmt.Sprintf("Настройки стратегии: %s\n", m.Strategy.Config.Name)
 	if m.Strategy.Config.NotificationEnable {
 		text += "Уведомления: включены"
 	} else {
@@ -77,7 +76,7 @@ func (m *StrategySimpleBuyMenu) Show(c tele.Context, handler model.MenuHandler) 
 	return nil
 }
 
-func (m *StrategySimpleBuyMenu) SendMessageBuy(baseResult strbase.StrategyBaseResult) (*exModel.Order, error) {
+func (m *StrategySimpleBuyMenu) SendMessageBuy(baseResult strbase.StrategyBaseResult) (*order.Order, error) {
 	uniqueID := uuid.New().String()[:8]
 	fmt.Println("Unic - ", uniqueID)
 	btn := tele.Btn{
@@ -100,7 +99,7 @@ func (m *StrategySimpleBuyMenu) SendMessageBuy(baseResult strbase.StrategyBaseRe
 		return nil, err
 	}
 
-	resultChan := make(chan *exModel.Order)
+	resultChan := make(chan *order.Order)
 	done := make(chan struct{})
 
 	timer := time.NewTimer(5 * time.Minute)
@@ -118,11 +117,14 @@ func (m *StrategySimpleBuyMenu) SendMessageBuy(baseResult strbase.StrategyBaseRe
 		case <-done:
 			return nil
 		default:
-			deal := dealModel.Deal{
-				Pair:     parts[0],
-				SideType: "buy",
+
+			pair := parts[0]
+
+			deal := order.Deal{
+				Pair:     pair,
+				SideType: order.SideTypeBuy,
 				Frame:    parts[1],
-				Strategy: "simplebuy",
+				Strategy: m.Strategy.Config.IDName,
 				Comment:  parts[2],
 			}
 
@@ -142,7 +144,7 @@ func (m *StrategySimpleBuyMenu) SendMessageBuy(baseResult strbase.StrategyBaseRe
 			return c.Respond(&tele.CallbackResponse{Text: "Покупка обработана ✅", ShowAlert: true})
 		}
 	}
-
+	// TODO удалять обработчик после выполнения или разобраться как это работает
 	m.b.Handle(&btn, handler)
 
 	// Горутина для таймаута

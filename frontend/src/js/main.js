@@ -185,10 +185,10 @@ $(function () {
         let sideType
 
         if (e.target.id == "panel-trdae-open-deal") {
-            sideType = "buy";
+            sideType = "BUY";
         }
         if (e.target.id == "panel-trdae-close-deal") {
-            sideType = "sell";
+            sideType = "SELL";
         }
 
         // default
@@ -296,7 +296,7 @@ function forming_page() {
             let selectStrategy = document.querySelector('#panel-trade-strategy');
 
             for (let optionName in strategyDescription) {
-                let option = new Option(optionName, "");
+                let option = new Option(optionName, optionName);
                 option.setAttribute("title", strategyDescription[optionName].description);
                 selectStrategy.prepend(option);
             }

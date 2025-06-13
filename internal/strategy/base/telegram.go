@@ -1,6 +1,8 @@
 package base
 
 import (
+	"fmt"
+
 	"github.com/sambly/exchangebot/internal/telegram/menu/base"
 	"github.com/sambly/exchangebot/internal/telegram/menu/global"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
@@ -48,7 +50,7 @@ func (m *StrategyBaseMenu) Show(c tele.Context, handler model.MenuHandler) error
 	handler.SetCurrentMenu(userID, m.Show, nil)
 	handler.DeleteUserMessages(c, userID)
 
-	text := "Настройки Base стратегии:\n"
+	text := fmt.Sprintf("Настройки стратегии: %s\n", m.Strategy.Config.Name)
 	if m.Strategy.Config.NotificationEnable {
 		text += "Уведомления: включены"
 	} else {

@@ -8,7 +8,6 @@ import (
 	"github.com/glebarez/sqlite"
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/config"
-	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/order"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -71,7 +70,7 @@ func DbInit(cfg config.Database) (*gorm.DB, error) {
 	if err := db.Table(ordersTable).AutoMigrate(&order.Order{}); err != nil {
 		return db, err
 	}
-	if err := db.Table(ordersInfoTable).AutoMigrate(&model.OrderInfo{}); err != nil {
+	if err := db.Table(ordersInfoTable).AutoMigrate(&order.OrderInfo{}); err != nil {
 		return db, err
 	}
 

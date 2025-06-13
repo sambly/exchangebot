@@ -12,6 +12,7 @@ import (
 	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy/base"
+	"github.com/sambly/exchangebot/internal/strategy/sales/simplesale"
 	simplebuy "github.com/sambly/exchangebot/internal/strategy/simpleBuy"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
@@ -51,7 +52,6 @@ func NewControllerStrategy(
 		Pairs:           pairs,
 		Notification:    notify,
 		OrderController: orderController,
-		PaperWallet:     paperWallet,
 	}
 
 	for _, option := range options {
@@ -73,12 +73,19 @@ func (cs *ControllerStrategy) build() error {
 	baseStrategy.WithTelegramMenu()
 	cs.AddStrategy(baseStrategy)
 
-	simpleBuyStrategy, err := simplebuy.NewStrategy(cs.Notification, cs.AssetsPrices, cs.OrderController, cs.PaperWallet)
+	simpleBuyStrategy, err := simplebuy.NewStrategy(cs.Notification, cs.AssetsPrices, cs.OrderController)
 	if err != nil {
 		return err
 	}
+
+	simpleSaleStrategy, err := simplesale.NewStrategy(cs.OrderController)
+	if err != nil {
+		return err
+	}
+
 	simpleBuyStrategy.WithTelegramMenu()
 	baseStrategy.Subscribe(simpleBuyStrategy.StrategyBaseResult)
+	simpleBuyStrategy.WithSaleStrategy(simpleSaleStrategy)
 	cs.AddStrategy(simpleBuyStrategy)
 
 	return nil
