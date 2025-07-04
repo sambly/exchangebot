@@ -1,6 +1,14 @@
 package simplebuy
 
 import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/sambly/exchangebot/internal/order"
+	strbase "github.com/sambly/exchangebot/internal/strategy/base"
 	"github.com/sambly/exchangebot/internal/telegram/menu/base"
 	"github.com/sambly/exchangebot/internal/telegram/menu/global"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
@@ -16,15 +24,17 @@ var (
 	}
 
 	// Inline кнопки
-	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif"}
-	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif"}
-
-	inlineButtons = [][]tele.Btn{
+	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif_simple_buy"}
+	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif_simple_buy"}
+	inlineButtons           = [][]tele.Btn{
 		{btnEnableNotifications, btnDisableNotifications},
 	}
 )
 
 type StrategySimpleBuyMenu struct {
+	b       *tele.Bot
+	handler model.MenuHandler
+
 	*base.BaseMenu
 	Strategy *StrategySimpleBuy
 }
@@ -48,7 +58,7 @@ func (m *StrategySimpleBuyMenu) Show(c tele.Context, handler model.MenuHandler) 
 	handler.SetCurrentMenu(userID, m.Show, nil)
 	handler.DeleteUserMessages(c, userID)
 
-	text := "Настройки Base стратегии:\n"
+	text := fmt.Sprintf("Настройки стратегии: %s\n", m.Strategy.Config.Name)
 	if m.Strategy.Config.NotificationEnable {
 		text += "Уведомления: включены"
 	} else {
@@ -68,8 +78,79 @@ func (m *StrategySimpleBuyMenu) Show(c tele.Context, handler model.MenuHandler) 
 	return nil
 }
 
+func (m *StrategySimpleBuyMenu) SendMessageBuy(ctx context.Context, baseResult strbase.StrategyBaseResult) (order.Order, error) {
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	unique := "buy_btn_" + uuid.New().String()[:8]
+	btn := tele.Btn{
+		Unique: unique,
+		Text:   "Купить",
+		Data: fmt.Sprintf("%s|%s|%.2f",
+			baseResult.Data.Pair,
+			baseResult.Data.Period,
+			baseResult.Data.ChangePercent),
+	}
+	localMarkup := &tele.ReplyMarkup{}
+	localMarkup.Inline(localMarkup.Row(btn))
+
+	text := fmt.Sprintf("Будете совершать покупку?\nПара: %s\nПериод: %s\nИзменение: %.2f%%",
+		baseResult.Data.Pair, baseResult.Data.Period, baseResult.Data.ChangePercent)
+
+	msg, err := m.b.Send(&tele.User{ID: m.handler.GetUser()}, text, localMarkup)
+	if err != nil {
+		return order.Order{}, err
+	}
+
+	defer func() {
+		_ = m.b.Delete(msg)
+	}()
+
+	resultChan := make(chan order.Order, 1)
+
+	// Обработчик кнопки
+	handler := func(c tele.Context) error {
+		data := c.Callback().Data
+		parts := strings.Split(data, "|")
+		deal := order.Deal{
+			Pair:     parts[0],
+			Frame:    parts[1],
+			Comment:  parts[2],
+			SideType: order.SideTypeBuy,
+			Size:     1.0,
+			Strategy: m.Strategy.Config.IDName,
+		}
+
+		order, err := m.Strategy.OrderController.CreateOrderMarket(deal)
+		if err != nil {
+			return c.Respond(&tele.CallbackResponse{Text: "Ошибка создания ордера", ShowAlert: true})
+		}
+
+		select {
+		case resultChan <- order:
+		default:
+		}
+
+		return c.Respond(&tele.CallbackResponse{Text: "Покупка обработана ✅", ShowAlert: true})
+
+	}
+
+	m.handler.RegisterCallback(unique, handler)
+	defer m.handler.UnregisterCallback(btn.Unique)
+
+	select {
+	case order := <-resultChan:
+		return order, nil
+	case <-ctx.Done():
+		return order.Order{}, ctx.Err()
+	}
+}
+
 // Handle обрабатывает кнопки меню стратегий
 func (m *StrategySimpleBuyMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
+
+	m.b = b
+	m.handler = handler
 	// Обработчик кнопки входа в меню стратегий
 	b.Handle(&m.ButtonsHandler.EntryButton, func(c tele.Context) error {
 		return m.Show(c, handler)
@@ -81,8 +162,7 @@ func (m *StrategySimpleBuyMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 	})
 
 	b.Handle(&btnDisableNotifications, func(c tele.Context) error {
-		m.Strategy.Config.NotificationEnable = true
+		m.Strategy.Config.NotificationEnable = false
 		return c.Respond(&tele.CallbackResponse{Text: "Уведомления отключены ❌", ShowAlert: true})
 	})
-
 }

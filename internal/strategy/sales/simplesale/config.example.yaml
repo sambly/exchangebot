@@ -1,0 +1,10 @@
+# Имя стратегии
+name: SaleSimple
+# Id стратегии
+idName: salesimple
+# Описание стратегии
+description: Продажа при достижении изменения цены на определенный процент
+# Включение стратегии
+strategyEnable : true
+
+procent: 1.0

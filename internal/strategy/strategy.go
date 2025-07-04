@@ -12,13 +12,15 @@ import (
 	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy/base"
+	"github.com/sambly/exchangebot/internal/strategy/sales/simplesale"
+	simplebuy "github.com/sambly/exchangebot/internal/strategy/simpleBuy"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
 
 type Strategy interface {
-	OnMarket(ms exModel.MarketsStat)
 	Start(ctx context.Context) error
 	GetTelegramMenu() model.WindowHandler
+	OnMarket(ms exModel.MarketsStat)
 }
 
 type Option func(*ControllerStrategy)
@@ -45,14 +47,19 @@ func NewControllerStrategy(
 	options ...Option) (*ControllerStrategy, error) {
 
 	ctrlStr := &ControllerStrategy{
-		AssetsPrices: assetsPrices,
-		Periods:      periods,
-		Pairs:        pairs,
-		Notification: notify,
+		AssetsPrices:    assetsPrices,
+		Periods:         periods,
+		Pairs:           pairs,
+		Notification:    notify,
+		OrderController: orderController,
 	}
 
 	for _, option := range options {
 		option(ctrlStr)
+	}
+
+	if err := ctrlStr.build(); err != nil {
+		return nil, err
 	}
 
 	return ctrlStr, nil
@@ -64,21 +71,38 @@ func (cs *ControllerStrategy) build() error {
 		return err
 	}
 	baseStrategy.WithTelegramMenu()
-	cs.WithStrategy(baseStrategy)
+	cs.AddStrategy(baseStrategy)
+
+	simpleBuyStrategy, err := simplebuy.NewStrategy(cs.Notification, cs.AssetsPrices, cs.OrderController)
+	if err != nil {
+		return err
+	}
+
+	simpleSaleStrategy, err := simplesale.NewStrategy(cs.OrderController)
+	if err != nil {
+		return err
+	}
+
+	simpleBuyStrategy.WithTelegramMenu()
+	baseStrategy.Subscribe(simpleBuyStrategy.StrategyBaseResult)
+	simpleBuyStrategy.WithSaleStrategy(simpleSaleStrategy)
+	cs.AddStrategy(simpleBuyStrategy)
+
 	return nil
 }
 
-func (cs *ControllerStrategy) WithStrategy(strategy Strategy) *ControllerStrategy {
+func (cs *ControllerStrategy) AddStrategy(strategy Strategy) *ControllerStrategy {
 	cs.Strategies = append(cs.Strategies, strategy)
 	return cs
 }
 
-func (cs *ControllerStrategy) StartAll(ctx context.Context) error {
-
-	if err := cs.build(); err != nil {
-		return err
+func (cs *ControllerStrategy) OnMarket(ms exModel.MarketsStat) {
+	for _, strategy := range cs.Strategies {
+		strategy.OnMarket(ms)
 	}
+}
 
+func (cs *ControllerStrategy) StartAll(ctx context.Context) error {
 	var wg sync.WaitGroup
 	for _, strategy := range cs.Strategies {
 		strategy := strategy

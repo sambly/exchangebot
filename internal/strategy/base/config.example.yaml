@@ -1,15 +1,24 @@
+# Имя стратегии
+name: Base
+# Id стратегии
+idName: base
+# Описание стратегии
+description: Отслеживание цены за период для пар, формирование уведомлений и сигналов для других стратегий
+# Включение стратегии
+strategyEnable : true
 # Включение уведомлений 
-notificationEnable: false
+notificationEnable: true
+
 # Проверить все пары
 allPairs: true
-
+# Выбор определенных пар 
 pairs:
   - BTCUSDT
   - XRPUSDT
   - SOLUSDT
   - BNBUSDT
   - GALAUSDT
-
+# Уставки процентов за периоды
 weightProcents:
   1m: 1.0
   3m: 45.0

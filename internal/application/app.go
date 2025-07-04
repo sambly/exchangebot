@@ -125,7 +125,7 @@ func (app *Application) Run(ctx context.Context) error {
 		func(market exModel.MarketsStat) {
 			app.AssetsPrices.OnMarket(market)
 			app.OrderController.OnMarket(market)
-			//app.Strategy.OnMarket(market)
+			app.ControllerStrategy.OnMarket(market)
 		},
 	}
 

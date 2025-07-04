@@ -8,10 +8,15 @@ import (
 )
 
 type Config struct {
-	Pairs              []string           `yaml:"pairs"`
-	AllPairs           bool               `yaml:"allPairs"`
-	WeightProcents     map[string]float64 `yaml:"weightProcents"`
-	NotificationEnable bool               `yaml:"notificationEnable"`
+	Name               string `yaml:"name"`
+	IDName             string `yaml:"idName"`
+	Description        string `yaml:"description"`
+	StrategyEnable     bool   `yaml:"strategyEnable"`
+	NotificationEnable bool   `yaml:"notificationEnable"`
+
+	Pairs          []string           `yaml:"pairs"`
+	AllPairs       bool               `yaml:"allPairs"`
+	WeightProcents map[string]float64 `yaml:"weightProcents"`
 }
 
 func NewConfig() (*Config, error) {

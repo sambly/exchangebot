@@ -8,6 +8,7 @@
             <th>Цена</th>
             <th>Дата</th>           
             <th>Профит</th>
+            <th>Стратегия</th>
           </tr>
         </thead>
         <tbody class="pt-2">
@@ -29,7 +30,11 @@
             </td>
             <td :style="{ color: colorProfit(order.Profit) }">
               {{ formatProfit(order.Profit) }}
-            </td>       
+            </td>
+            <td>
+              <div>{{ order.StrategyBuy }}</div>
+              <div>{{order.StrategySell }}</div>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -135,7 +140,12 @@ export default {
 
 .table-trade-history th:nth-child(5),
 .table-trade-history td:nth-child(5) {
-  width: 20%;
+  width: 10%;
+}
+
+.table-trade-history th:nth-child(6),
+.table-trade-history td:nth-child(6) {
+  width: 10%;
 }
 
 </style>

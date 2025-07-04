@@ -1,6 +1,8 @@
 package base
 
 import (
+	"fmt"
+
 	"github.com/sambly/exchangebot/internal/telegram/menu/base"
 	"github.com/sambly/exchangebot/internal/telegram/menu/global"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
@@ -16,8 +18,8 @@ var (
 	}
 
 	// Inline кнопки
-	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif"}
-	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif"}
+	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif_base"}
+	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif_base"}
 
 	inlineButtons = [][]tele.Btn{
 		{btnEnableNotifications, btnDisableNotifications},
@@ -48,7 +50,7 @@ func (m *StrategyBaseMenu) Show(c tele.Context, handler model.MenuHandler) error
 	handler.SetCurrentMenu(userID, m.Show, nil)
 	handler.DeleteUserMessages(c, userID)
 
-	text := "Настройки Base стратегии:\n"
+	text := fmt.Sprintf("Настройки стратегии: %s\n", m.Strategy.Config.Name)
 	if m.Strategy.Config.NotificationEnable {
 		text += "Уведомления: включены"
 	} else {
@@ -81,7 +83,7 @@ func (m *StrategyBaseMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 	})
 
 	b.Handle(&btnDisableNotifications, func(c tele.Context) error {
-		m.Strategy.Config.NotificationEnable = true
+		m.Strategy.Config.NotificationEnable = false
 		return c.Respond(&tele.CallbackResponse{Text: "Уведомления отключены ❌", ShowAlert: true})
 	})
 
