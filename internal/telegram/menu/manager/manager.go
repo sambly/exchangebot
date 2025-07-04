@@ -9,6 +9,7 @@ import (
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 	"github.com/sambly/exchangebot/internal/telegram/menu/settings"
 	"github.com/sambly/exchangebot/internal/telegram/menu/strategies"
+	"github.com/sambly/exchangebot/internal/telegram/utils"
 	tele "gopkg.in/telebot.v3"
 )
 
@@ -22,18 +23,18 @@ type UserSession struct {
 
 // MenuManager управляет всеми меню бота.
 type MenuManager struct {
-	User     int64
-	Main     *entry.MainMenu
-	Account  *account.AccountMenu
-	Strategy *strategies.StrategyMenu
-	Settings *settings.SettingsMenu
-	// TODO Здесь возможно надо делать mutex
-	UserState map[int64]*UserSession // Хранит состояния пользователей
-
+	User int64
+	// TODO сделать mutex
+	UserState  map[int64]*UserSession // Хранит состояния пользователей
+	CbRegistry *utils.CallbackRegistry
+	Main       *entry.MainMenu
+	Account    *account.AccountMenu
+	Strategy   *strategies.StrategyMenu
+	Settings   *settings.SettingsMenu
 }
 
 // NewMenuManager создаёт все меню.
-func NewMenuManager(app *application.Application, user int64) *MenuManager {
+func NewMenuManager(app *application.Application, user int64, cbRegistry *utils.CallbackRegistry) *MenuManager {
 	mainMenu := entry.NewMainMenu("Главное меню:", "main")
 	accountMenu := account.NewAccountMenu("Аккаунт:", "account", app.Account, app.AssetsPrices)
 	strategiesMenu := strategies.NewStrategyMenu("Стратегии:", "strategies", app.ControllerStrategy)
@@ -44,12 +45,13 @@ func NewMenuManager(app *application.Application, user int64) *MenuManager {
 	mainMenu.AddButtons(false, settingsMenu.ButtonsHandler.EntryButton)
 
 	return &MenuManager{
-		User:      user,
-		Main:      mainMenu,
-		Account:   accountMenu,
-		Strategy:  strategiesMenu,
-		Settings:  settingsMenu,
-		UserState: make(map[int64]*UserSession),
+		User:       user,
+		UserState:  make(map[int64]*UserSession),
+		CbRegistry: cbRegistry,
+		Main:       mainMenu,
+		Account:    accountMenu,
+		Strategy:   strategiesMenu,
+		Settings:   settingsMenu,
 	}
 }
 
@@ -193,4 +195,12 @@ func (m *MenuManager) DeleteAllUserMessages(b *tele.Bot) {
 	if len(messages) > 0 {
 		_ = b.DeleteMany(messages)
 	}
+}
+
+func (m *MenuManager) RegisterCallback(unique string, handler tele.HandlerFunc) error {
+	return m.CbRegistry.Register(unique, handler)
+}
+
+func (m *MenuManager) UnregisterCallback(unique string) {
+	m.CbRegistry.Unregister(unique)
 }

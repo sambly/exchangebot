@@ -40,7 +40,8 @@ type Order struct {
 	Price        float64         `gorm:"column:price"`
 	Quantity     float64         `gorm:"column:quantity"`
 	Profit       float64         `gorm:"column:profit"`
-	Strategy     string          `gorm:"column:strategy"`
+	StrategyBuy  string          `gorm:"column:strategy_buy"`
+	StrategySell string          `gorm:"column:strategy_sell"`
 }
 
 type OrderInfo struct {
@@ -57,6 +58,7 @@ type OrderInfo struct {
 type Deal struct {
 	Pair     string
 	SideType SideType
+	Size     float64
 	Frame    string
 	Strategy string
 	Comment  string

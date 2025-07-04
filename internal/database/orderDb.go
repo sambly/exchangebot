@@ -43,6 +43,5 @@ func (r *OrderDb) ClosePosition(id int64, updateData *order.Order) error {
 }
 
 func (r *OrderDb) CreateInfo(ordersInfo *order.OrderInfo) error {
-	// TODO здесь надо использовать указатель в качестве аргумента или нет
 	return r.db.Create(&ordersInfo).Error
 }

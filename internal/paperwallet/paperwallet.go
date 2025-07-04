@@ -87,9 +87,14 @@ func (p *PaperWallet) GetHistoryOrdersBySymbol(symbol string) []*order.Order {
 	return p.OrdersHistory[symbol]
 }
 
-func (p *PaperWallet) CreateOrderMarket(side order.SideType, pair string, size float64) (*order.Order, error) {
+func (p *PaperWallet) CreateOrderMarket(deal order.Deal) (*order.Order, error) {
 	p.Lock()
 	defer p.Unlock()
+
+	pair := deal.Pair
+	size := deal.Size
+	side := deal.SideType
+	strategy := deal.Strategy
 
 	if size == 0 {
 		return &order.Order{}, ErrInvalidQuantity
@@ -103,6 +108,7 @@ func (p *PaperWallet) CreateOrderMarket(side order.SideType, pair string, size f
 		return nil, fmt.Errorf("nil market data for pair: %s", pair)
 	}
 
+	// TODO Ну и вообще брать данные с MarketsStat потокобезопасно?
 	order := order.Order{
 		TimeCreated:  p.MarketsStat[pair].Time,
 		Time:         p.MarketsStat[pair].Time,
@@ -114,13 +120,14 @@ func (p *PaperWallet) CreateOrderMarket(side order.SideType, pair string, size f
 		Price:        p.MarketsStat[pair].Price,
 		Quantity:     size,
 		Profit:       0,
+		StrategyBuy:  strategy,
 	}
 
 	p.AddOrderActive(&order)
 	return &order, nil
 }
 
-func (p *PaperWallet) ClosePosition(id int64) (*order.Order, error) {
+func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, error) {
 	p.Lock()
 	defer p.Unlock()
 
@@ -139,6 +146,7 @@ func (p *PaperWallet) ClosePosition(id int64) (*order.Order, error) {
 				if o.Side == order.SideTypeSell {
 					o.Profit = (o.PriceCreated / o.Price * 100) - 100
 				}
+				o.StrategySell = deal.Strategy
 				p.AddOrderHistory(o)
 				p.RemoveOrderActive(o.Pair, o.ID)
 

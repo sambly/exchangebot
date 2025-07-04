@@ -13,6 +13,8 @@ type MenuHandler interface {
 	SaveMessage(userID int64, msg *tele.Message)
 	DeleteUserMessages(c tele.Context, userID int64)
 	ActivateBntBack(userID int64) MenuHandler
+	RegisterCallback(unique string, handler tele.HandlerFunc) error
+	UnregisterCallback(unique string)
 }
 
 type WindowHandler interface {

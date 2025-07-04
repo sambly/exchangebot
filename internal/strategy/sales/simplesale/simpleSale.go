@@ -26,10 +26,11 @@ func NewStrategy(
 	return str, nil
 }
 
-func (str *StrategySimpleSale) Execute(ms exModel.MarketsStat, order *order.Order) (result bool) {
-	if (ms.Price/order.PriceCreated)*100-100 >= float64(str.Config.Procent) {
-		if err := str.OrderController.ClosePosition(order.ID); err != nil {
-			fmt.Printf("error - %v", err)
+func (str *StrategySimpleSale) Execute(ms exModel.MarketsStat, o order.Order) (result bool) {
+	if (ms.Price/o.PriceCreated)*100-100 >= float64(str.Config.Procent) {
+		deal := order.Deal{Strategy: str.Config.IDName}
+		if err := str.OrderController.ClosePosition(o.ID, deal); err != nil {
+			fmt.Printf("error XXXXXXX - %v", err)
 			return false
 		}
 		return true

@@ -27,8 +27,8 @@ type TradeState interface {
 	RemoveOrderActive(pair string, id int64)
 	GetOrdersActive() (orders map[string][]*Order)
 	GetOrdersHistory() (orders map[string][]*Order)
-	CreateOrderMarket(side SideType, pair string, size float64) (*Order, error)
-	ClosePosition(id int64) (*Order, error)
+	CreateOrderMarket(deal Deal) (*Order, error)
+	ClosePosition(id int64, deal Deal) (*Order, error)
 	SetCountOrdersActive(count int)
 	GetActiveOrdersBySymbol(symbol string) []*Order
 	GetHistoryOrdersBySymbol(symbol string) []*Order
@@ -41,7 +41,10 @@ type OrderService struct {
 	repo  Repository
 	state TradeState
 
-	orders []*Order
+	// orders - все ордера, которые есть в системе
+	// ordersDependencies - функции, которые будут вызваны при обновлении ордера(для обновления ордеров в стратегиях)
+	orders             []*Order
+	ordersDependencies []func(Order)
 
 	assetsPrices   *prices.AsetsPrices
 	socketsMessage *notification.SocketsMessage
@@ -86,21 +89,19 @@ func NewOrderService(
 	return ctrl, nil
 }
 
-func (os *OrderService) CreateOrderMarket(deal Deal, size float64) (*Order, error) {
+func (os *OrderService) CreateOrderMarket(deal Deal) (Order, error) {
 	os.mtx.Lock()
 	defer os.mtx.Unlock()
 
 	pair := deal.Pair
 
-	order, err := os.state.CreateOrderMarket(deal.SideType, pair, size)
+	order, err := os.state.CreateOrderMarket(deal)
 	if err != nil {
-		return nil, err
+		return Order{}, err
 	}
 
-	order.Strategy = deal.Strategy
-
 	if err := os.repo.Create(order); err != nil {
-		return nil, err
+		return Order{}, err
 	}
 
 	os.orders = append(os.orders, order)
@@ -108,8 +109,9 @@ func (os *OrderService) CreateOrderMarket(deal Deal, size float64) (*Order, erro
 	messageOrder, _ := json.Marshal(map[string]interface{}{"orderAdd": order})
 	os.socketsMessage.SendData(messageOrder)
 
-	orderLogger.Debugf("Creating market order for pair: %s, side: %s, size: %f", pair, deal.SideType, size)
+	orderLogger.Debugf("Creating market order for pair: %s, side: %s, size: %f", pair, deal.SideType, deal.Size)
 
+	// Проверить потокобезопаность
 	mkStat := os.assetsPrices.MarketsStat[pair]
 	chData := os.assetsPrices.ChangePrices[pair]
 	dFast := os.assetsPrices.ChangeDelta[pair]
@@ -137,19 +139,18 @@ func (os *OrderService) CreateOrderMarket(deal Deal, size float64) (*Order, erro
 		DeltaFast:    dFastJSON,
 	}
 
-	// TODO если не создаться orderInfo , то не будет возвращен order , что не правильно думаю
 	if err := os.repo.CreateInfo(orderInfo); err != nil {
-		return nil, err
+		orderLogger.Errorf("error CreateInfo : %v", err)
 	}
 
-	return order, err
+	return *order, nil
 }
 
-func (os *OrderService) ClosePosition(id int64) error {
+func (os *OrderService) ClosePosition(id int64, deal Deal) error {
 	os.mtx.Lock()
 	defer os.mtx.Unlock()
 
-	order, err := os.state.ClosePosition(id)
+	order, err := os.state.ClosePosition(id, deal)
 	if err != nil {
 		return err
 	}
@@ -165,6 +166,8 @@ func (os *OrderService) ClosePosition(id int64) error {
 		}
 	}
 
+	os.updateOrdersDependencies(*order)
+
 	messageOrder, _ := json.Marshal(map[string]interface{}{"orderDelete": order})
 	os.socketsMessage.SendData(messageOrder)
 
@@ -172,6 +175,8 @@ func (os *OrderService) ClosePosition(id int64) error {
 }
 
 func (os *OrderService) OnMarket(ms exModel.MarketsStat) {
+	os.mtx.Lock()
+	defer os.mtx.Unlock()
 
 	activeOrders := os.state.GetActiveOrdersBySymbol(ms.Pair)
 	if len(activeOrders) > 0 {
@@ -189,5 +194,22 @@ func (os *OrderService) OnMarket(ms exModel.MarketsStat) {
 		_, profit := os.state.CalculatePNL()
 		messageOrder, _ := json.Marshal(map[string]interface{}{"pnl": profit})
 		os.socketsMessage.SendData(messageOrder)
+	}
+}
+
+func (os *OrderService) AddOrdersDependencies(funcDep func(Order)) {
+	os.mtx.Lock()
+	defer os.mtx.Unlock()
+
+	if funcDep == nil {
+		return
+	}
+
+	os.ordersDependencies = append(os.ordersDependencies, funcDep)
+}
+
+func (os *OrderService) updateOrdersDependencies(order Order) {
+	for _, dep := range os.ordersDependencies {
+		dep(order)
 	}
 }

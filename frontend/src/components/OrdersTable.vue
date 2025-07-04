@@ -43,7 +43,7 @@
           <td :style="{ color: colorProfit(order.Profit) }">
             {{ formatProfit(order.Profit) }}
           </td>
-          <td>{{ order.Strategy }}</td>
+          <td>{{ order.StrategyBuy }}</td>
           <td>{{ formatTime(order.TimeCreated) }}</td>
           <td>
             <button class="btn-close" type="button" @click.stop="handleClose(order.ID)"></button>

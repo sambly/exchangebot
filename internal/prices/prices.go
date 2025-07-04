@@ -34,13 +34,13 @@ type DatasetChangePrices struct {
 	Time  time.Time
 }
 type ChangeDelta struct {
-	Time      time.Time
-	Volume    float64
-	VolumeBuy float64
-	VolumeAsk float64
-	Trades    float64
-	TradesBuy float64
-	TradesAsk float64
+	Time      time.Time `json:"-"`
+	Volume    float64   `json:"Volume"`
+	VolumeBuy float64   `json:"VolumeBuy"`
+	VolumeAsk float64   `json:"VolumeAsk"`
+	Trades    float64   `json:"Trades"`
+	TradesBuy float64   `json:"TradesBuy"`
+	TradesAsk float64   `json:"TradesAsk"`
 }
 
 type ChangeDeltaDataset struct {
@@ -377,7 +377,6 @@ func (ap *AsetsPrices) UpdateChangeDelta() error {
 				for index, item := range data.dataset {
 
 					if index < len(data.dataset)/2 {
-						itemFirst.Time = item.Time
 						itemFirst.Volume += item.Volume
 						itemFirst.VolumeBuy += item.VolumeBuy
 						itemFirst.VolumeAsk += item.VolumeAsk
@@ -387,7 +386,6 @@ func (ap *AsetsPrices) UpdateChangeDelta() error {
 					}
 
 					if index >= len(data.dataset)/2 {
-						itemLast.Time = item.Time
 						itemLast.Volume += item.Volume
 						itemLast.VolumeBuy += item.VolumeBuy
 						itemLast.VolumeAsk += item.VolumeAsk

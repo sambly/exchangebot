@@ -118,8 +118,8 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	size := 1.0
-	_, err := web.App.OrderController.CreateOrderMarket(deal, size)
+	deal.Size = 1.0
+	_, err := web.App.OrderController.CreateOrderMarket(deal)
 	if err != nil {
 		appWebLogger.Errorf("error CreateOrderMarket: %v", err)
 	}
@@ -139,8 +139,9 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, _ := strconv.ParseInt(string(bodyByte), 10, 64)
+	deal := order.Deal{Strategy: "manual"}
 
-	if err := web.App.OrderController.ClosePosition(id); err != nil {
+	if err := web.App.OrderController.ClosePosition(id, deal); err != nil {
 		appWebLogger.Errorf("error ClosePosition: %v", err)
 	}
 
@@ -164,10 +165,10 @@ func (web *Web) closeAllDeal(w http.ResponseWriter, _ *http.Request) {
 			OrdersActiveCopy[key][i] = &orderCopy
 		}
 	}
-
+	deal := order.Deal{Strategy: "manual"}
 	for _, orders := range OrdersActiveCopy {
 		for _, order := range orders {
-			if err := web.App.OrderController.ClosePosition(order.ID); err != nil {
+			if err := web.App.OrderController.ClosePosition(order.ID, deal); err != nil {
 				appWebLogger.Errorf("error ClosePosition: %v", err)
 			}
 		}

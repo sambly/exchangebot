@@ -83,7 +83,7 @@ func (m *StrategyBaseMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 	})
 
 	b.Handle(&btnDisableNotifications, func(c tele.Context) error {
-		m.Strategy.Config.NotificationEnable = true
+		m.Strategy.Config.NotificationEnable = false
 		return c.Respond(&tele.CallbackResponse{Text: "Уведомления отключены ❌", ShowAlert: true})
 	})
 

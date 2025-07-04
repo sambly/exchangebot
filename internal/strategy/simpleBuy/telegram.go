@@ -1,6 +1,7 @@
 package simplebuy
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -25,7 +26,9 @@ var (
 	// Inline кнопки
 	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif_simple_buy"}
 	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif_simple_buy"}
-	btnsNotify              = []tele.Btn{btnEnableNotifications, btnDisableNotifications}
+	inlineButtons           = [][]tele.Btn{
+		{btnEnableNotifications, btnDisableNotifications},
+	}
 )
 
 type StrategySimpleBuyMenu struct {
@@ -44,6 +47,7 @@ func NewStrategyMenu(name, id string, str *StrategySimpleBuy) *StrategySimpleBuy
 
 	menu.AddButtonRows(replyButtons...)
 	menu.WithEntryButton(entryButton)
+	menu.AddButtonRowsInline(inlineButtons...)
 
 	return menu
 }
@@ -65,8 +69,6 @@ func (m *StrategySimpleBuyMenu) Show(c tele.Context, handler model.MenuHandler) 
 		return err
 	}
 
-	m.InlineMarkup.Inline(m.InlineMarkup.Row(btnsNotify...))
-
 	// Кнопки inline отправляем отдельно
 	if len(m.InlineButtons) > 0 {
 		if err := c.Send("Выберите действие:", m.InlineMarkup); err != nil {
@@ -76,100 +78,79 @@ func (m *StrategySimpleBuyMenu) Show(c tele.Context, handler model.MenuHandler) 
 	return nil
 }
 
-func (m *StrategySimpleBuyMenu) SendMessageBuy(baseResult strbase.StrategyBaseResult) (*order.Order, error) {
-	uniqueID := uuid.New().String()[:8]
-	fmt.Println("Unic - ", uniqueID)
+func (m *StrategySimpleBuyMenu) SendMessageBuy(ctx context.Context, baseResult strbase.StrategyBaseResult) (order.Order, error) {
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	unique := "buy_btn_" + uuid.New().String()[:8]
 	btn := tele.Btn{
-		Unique: "buy_btn_" + uniqueID, // Уникальное название
+		Unique: unique,
 		Text:   "Купить",
-		Data: fmt.Sprintf("%s|%s|%.2f|%s",
+		Data: fmt.Sprintf("%s|%s|%.2f",
 			baseResult.Data.Pair,
 			baseResult.Data.Period,
-			baseResult.Data.ChangePercent,
-			uniqueID),
+			baseResult.Data.ChangePercent),
 	}
-
-	m.InlineMarkup.Inline(m.InlineMarkup.Row([]tele.Btn{btn}...))
+	localMarkup := &tele.ReplyMarkup{}
+	localMarkup.Inline(localMarkup.Row(btn))
 
 	text := fmt.Sprintf("Будете совершать покупку?\nПара: %s\nПериод: %s\nИзменение: %.2f%%",
 		baseResult.Data.Pair, baseResult.Data.Period, baseResult.Data.ChangePercent)
 
-	msg, err := m.b.Send(&tele.User{ID: m.handler.GetUser()}, text, m.InlineMarkup)
+	msg, err := m.b.Send(&tele.User{ID: m.handler.GetUser()}, text, localMarkup)
 	if err != nil {
-		return nil, err
+		return order.Order{}, err
 	}
 
-	resultChan := make(chan *order.Order)
-	done := make(chan struct{})
+	defer func() {
+		_ = m.b.Delete(msg)
+	}()
 
-	timer := time.NewTimer(5 * time.Minute)
+	resultChan := make(chan order.Order, 1)
 
 	// Обработчик кнопки
 	handler := func(c tele.Context) error {
 		data := c.Callback().Data
 		parts := strings.Split(data, "|")
+		deal := order.Deal{
+			Pair:     parts[0],
+			Frame:    parts[1],
+			Comment:  parts[2],
+			SideType: order.SideTypeBuy,
+			Size:     1.0,
+			Strategy: m.Strategy.Config.IDName,
+		}
 
-		if len(parts) != 4 || parts[3] != uniqueID {
-			return nil
+		order, err := m.Strategy.OrderController.CreateOrderMarket(deal)
+		if err != nil {
+			return c.Respond(&tele.CallbackResponse{Text: "Ошибка создания ордера", ShowAlert: true})
 		}
 
 		select {
-		case <-done:
-			return nil
+		case resultChan <- order:
 		default:
-
-			pair := parts[0]
-
-			deal := order.Deal{
-				Pair:     pair,
-				SideType: order.SideTypeBuy,
-				Frame:    parts[1],
-				Strategy: m.Strategy.Config.IDName,
-				Comment:  parts[2],
-			}
-
-			order, err := m.Strategy.OrderController.CreateOrderMarket(deal, 1.0)
-			if err != nil {
-				return c.Respond(&tele.CallbackResponse{Text: "Ошибка создания ордера", ShowAlert: true})
-			}
-
-			// Отправляем ордер в канал и завершаем ожидание
-			select {
-			case resultChan <- order:
-			default:
-			}
-			close(done)
-
-			_ = m.b.Delete(&tele.Message{ID: msg.ID, Chat: &tele.Chat{ID: c.Chat().ID}})
-			return c.Respond(&tele.CallbackResponse{Text: "Покупка обработана ✅", ShowAlert: true})
 		}
+
+		return c.Respond(&tele.CallbackResponse{Text: "Покупка обработана ✅", ShowAlert: true})
+
 	}
-	// TODO удалять обработчик после выполнения или разобраться как это работает
-	m.b.Handle(&btn, handler)
 
-	// Горутина для таймаута
-	go func() {
-		<-timer.C
-		close(done)
-	}()
+	m.handler.RegisterCallback(unique, handler)
+	defer m.handler.UnregisterCallback(btn.Unique)
 
-	// Ожидание результата либо таймаута
 	select {
 	case order := <-resultChan:
-		timer.Stop()
 		return order, nil
-	case <-done:
-		timer.Stop()
-		_ = m.b.Delete(&tele.Message{ID: msg.ID, Chat: &tele.Chat{ID: m.handler.GetUser()}})
-		return nil, nil
+	case <-ctx.Done():
+		return order.Order{}, ctx.Err()
 	}
 }
 
 // Handle обрабатывает кнопки меню стратегий
 func (m *StrategySimpleBuyMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 
-	m.handler = handler
 	m.b = b
+	m.handler = handler
 	// Обработчик кнопки входа в меню стратегий
 	b.Handle(&m.ButtonsHandler.EntryButton, func(c tele.Context) error {
 		return m.Show(c, handler)
@@ -181,7 +162,7 @@ func (m *StrategySimpleBuyMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 	})
 
 	b.Handle(&btnDisableNotifications, func(c tele.Context) error {
-		m.Strategy.Config.NotificationEnable = true
+		m.Strategy.Config.NotificationEnable = false
 		return c.Respond(&tele.CallbackResponse{Text: "Уведомления отключены ❌", ShowAlert: true})
 	})
 }

@@ -6,5 +6,5 @@ import (
 )
 
 type Sales interface {
-	Execute(ms exModel.MarketsStat, order *order.Order) (result bool)
+	Execute(ms exModel.MarketsStat, order order.Order) (result bool)
 }

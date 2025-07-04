@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sambly/exchangebot/internal/application"
@@ -11,13 +12,15 @@ import (
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/telegram/menu/manager"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
+	"github.com/sambly/exchangebot/internal/telegram/utils"
 
 	tele "gopkg.in/telebot.v3"
 )
 
 type Telegram struct {
-	bot  *tele.Bot
-	menu *manager.MenuManager
+	bot             *tele.Bot
+	menu            *manager.MenuManager
+	callbakRegistry *utils.CallbackRegistry
 	*config.Telegram
 	user int64
 
@@ -35,7 +38,8 @@ func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, 
 
 	user, _ := strconv.ParseInt(cfg.User, 10, 64)
 	poller := &tele.LongPoller{Timeout: 10 * time.Second}
-	menu := manager.NewMenuManager(app, user)
+	callbakRegistry := utils.NewCallbackRegistry()
+	menu := manager.NewMenuManager(app, user, callbakRegistry)
 
 	pref := tele.Settings{
 		Token:  cfg.Token,
@@ -60,11 +64,12 @@ func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, 
 	}
 
 	tlg := &Telegram{
-		bot:      bot,
-		menu:     menu,
-		app:      app,
-		Telegram: &cfg,
-		user:     user,
+		bot:             bot,
+		menu:            menu,
+		app:             app,
+		Telegram:        &cfg,
+		user:            user,
+		callbakRegistry: callbakRegistry,
 	}
 
 	return tlg, nil
@@ -78,6 +83,22 @@ func (t *Telegram) Start(ctx context.Context) error {
 	menu := t.menu
 	// Запускаем обработчики всех кнопок
 	menu.InitHandlers(t.bot)
+
+	// Универсальный обработчик  OnCallback по Unique
+	t.bot.Handle(tele.OnCallback, func(c tele.Context) error {
+		data := c.Callback().Data
+		if !strings.HasPrefix(data, "\f") {
+			return nil
+		}
+		parts := strings.Split(data, "|")
+		unique := strings.TrimPrefix(parts[0], "\f")
+		c.Callback().Data = strings.Join(parts[1:], "|")
+
+		if handler, ok := t.callbakRegistry.GetHandler(unique); ok {
+			return handler(c)
+		}
+		return nil
+	})
 
 	go t.bot.Start()
 	_, err := t.bot.Send(
