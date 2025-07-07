@@ -235,7 +235,7 @@ func run(cmd *cobra.Command, args []string) error {
 	g.Go(func() error {
 		return app.Run(gCtx)
 	})
-
+	mainLogger.Info("Приложение exchangebot запущено")
 	fmt.Println("Приложение exchangebot запущено")
 	err = g.Wait()
 

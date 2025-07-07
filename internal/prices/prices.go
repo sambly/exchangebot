@@ -325,7 +325,7 @@ func (ap *AsetsPrices) UpdateChangePrices() {
 	}
 	duration := time.Since(timeStart)
 
-	pricesLogger.Infof("Время выполнения UpdateChanges: %v ", duration)
+	pricesLogger.Debugf("Время выполнения UpdateChanges: %v ", duration)
 }
 
 func (ap *AsetsPrices) UpdateChangeDelta() error {
@@ -408,7 +408,7 @@ func (ap *AsetsPrices) UpdateChangeDelta() error {
 	}
 
 	duration := time.Since(timeStart)
-	pricesLogger.Infof("Время выполнения UpdateChangeDelta: %v ", duration)
+	pricesLogger.Debugf("Время выполнения UpdateChangeDelta: %v ", duration)
 
 	return nil
 }
@@ -469,7 +469,7 @@ func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDeltaF
 			clearChangeDelta = append(clearChangeDelta, changeDelta[i])
 		}
 		duration := time.Since(timeStart)
-		pricesLogger.Infof("Время выполнения GetDeltaPeriod: %v ", duration)
+		pricesLogger.Debugf("Время выполнения GetDeltaPeriod: %v ", duration)
 	}
 
 	return clearChangeDelta, nil
