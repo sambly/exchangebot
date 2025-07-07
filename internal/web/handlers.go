@@ -185,19 +185,22 @@ func (web *Web) closeAllDeal(w http.ResponseWriter, _ *http.Request) {
 func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 	conn, _ := upgrader.Upgrade(w, r, nil) // error ignored for sake of simplicity
 	defer conn.Close()
-	web.Sockets.clients[conn] = true        //Сохраняем соединение, используя его как ключ
-	defer delete(web.Sockets.clients, conn) // Удаляем соединение
+
+	web.Sockets.clients.Store(conn, true)
+	defer web.Sockets.clients.Delete(conn)
 	for {
 		mt, _, err := conn.ReadMessage()
 		if err != nil || mt == websocket.CloseMessage {
 			break // Выходим из цикла, если клиент пытается закрыть соединение или связь с клиентом прервана
 		}
 
-		for conn := range web.Sockets.clients {
-			if err := conn.WriteMessage(websocket.TextMessage, []byte("Hello")); err != nil {
+		web.Sockets.clients.Range(func(key, value interface{}) bool {
+			c := key.(*websocket.Conn)
+			if err := c.WriteMessage(websocket.TextMessage, []byte("Hello")); err != nil {
 				appWebLogger.Errorf("error Sockets: %v", err)
 			}
-		}
+			return true
+		})
 	}
 }
 

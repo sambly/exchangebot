@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/sambly/exchangebot/internal/application"
@@ -34,7 +35,7 @@ type auth struct {
 }
 
 type Sockets struct {
-	clients        map[*websocket.Conn]bool
+	clients        sync.Map
 	socketsMessage *notification.SocketsMessage
 }
 
@@ -43,19 +44,20 @@ var appWebLogger = logger.AddFields(map[string]interface{}{
 })
 
 func (c *Sockets) SendDataRun(ctx context.Context) {
-
 	go func(message chan []byte) {
 		for {
 			select {
 			case mes := <-message:
-				for conn := range c.clients {
+				c.clients.Range(func(key, value interface{}) bool {
+					conn := key.(*websocket.Conn)
 					err := conn.WriteMessage(websocket.TextMessage, mes)
 					if err != nil {
 						appWebLogger.Errorf("error writing message to websocket: %v", err)
 						conn.Close()
-						delete(c.clients, conn)
+						c.clients.Delete(conn)
 					}
-				}
+					return true
+				})
 			case <-ctx.Done():
 				appWebLogger.Info("Shutting down socket message processing")
 				return
@@ -76,7 +78,6 @@ func NewWeb(app *application.Application, socketsMessage *notification.SocketsMe
 		content:      content,
 	}
 	web.Sockets = Sockets{
-		clients:        make(map[*websocket.Conn]bool),
 		socketsMessage: socketsMessage,
 	}
 
