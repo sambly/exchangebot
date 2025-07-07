@@ -2,7 +2,6 @@ package simplebuy
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
@@ -70,8 +69,10 @@ func (str *StrategySimpleBuy) Start(ctx context.Context) error {
 	for {
 		select {
 		case baseResult := <-str.StrategyBaseResult:
-			if err := str.execute(ctx, baseResult); err != nil {
-				return err
+			if str.Config.StrategyEnable {
+				if err := str.execute(ctx, baseResult); err != nil {
+					return err
+				}
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -86,23 +87,16 @@ func (str *StrategySimpleBuy) execute(ctx context.Context, baseResult base.Strat
 	go func() {
 		orderNew, err := str.TelegramMenu.SendMessageBuy(ctx, baseResult)
 		if err != nil {
-			// TODO
-			fmt.Printf("Ошибка SendMessageBuy %v\n", err)
 			return
 		}
 
-		if orderNew.ID == 0 {
-			// TODO
-			fmt.Println("Таймаут - ордер не создан")
+		str.ordersMu.Lock()
+		if _, ok := str.Orders[orderNew.Pair]; !ok {
+			str.Orders[orderNew.Pair] = []order.Order{orderNew}
 		} else {
-			str.ordersMu.Lock()
-			if _, ok := str.Orders[orderNew.Pair]; !ok {
-				str.Orders[orderNew.Pair] = []order.Order{orderNew}
-			} else {
-				str.Orders[orderNew.Pair] = append(str.Orders[orderNew.Pair], orderNew)
-			}
-			str.ordersMu.Unlock()
+			str.Orders[orderNew.Pair] = append(str.Orders[orderNew.Pair], orderNew)
 		}
+		str.ordersMu.Unlock()
 	}()
 
 	return nil
@@ -110,6 +104,10 @@ func (str *StrategySimpleBuy) execute(ctx context.Context, baseResult base.Strat
 
 func (str *StrategySimpleBuy) OnMarket(ms exModel.MarketsStat) {
 	if str.Sale == nil {
+		return
+	}
+
+	if !str.Config.StrategyEnable {
 		return
 	}
 

@@ -8,11 +8,10 @@ import (
 )
 
 type Config struct {
-	Name               string `yaml:"name"`
-	IDName             string `yaml:"idName"`
-	Description        string `yaml:"description"`
-	StrategyEnable     bool   `yaml:"strategyEnable"`
-	NotificationEnable bool   `yaml:"notificationEnable"`
+	Name           string `yaml:"name"`
+	IDName         string `yaml:"idName"`
+	Description    string `yaml:"description"`
+	StrategyEnable bool   `yaml:"strategyEnable"`
 }
 
 func NewConfig() (*Config, error) {

@@ -24,10 +24,10 @@ var (
 	}
 
 	// Inline кнопки
-	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif_simple_buy"}
-	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif_simple_buy"}
-	inlineButtons           = [][]tele.Btn{
-		{btnEnableNotifications, btnDisableNotifications},
+	btnEnableStr  = tele.Btn{Text: "✅ Включить стратегию", Unique: "enable_str_simple_buy"}
+	btnDisablStr  = tele.Btn{Text: "❌ Отключить стратегию", Unique: "disable_str_simple_buy"}
+	inlineButtons = [][]tele.Btn{
+		{btnEnableStr, btnDisablStr},
 	}
 )
 
@@ -59,10 +59,10 @@ func (m *StrategySimpleBuyMenu) Show(c tele.Context, handler model.MenuHandler) 
 	handler.DeleteUserMessages(c, userID)
 
 	text := fmt.Sprintf("Настройки стратегии: %s\n", m.Strategy.Config.Name)
-	if m.Strategy.Config.NotificationEnable {
-		text += "Уведомления: включены"
+	if m.Strategy.Config.StrategyEnable {
+		text += "Стратегия: включена"
 	} else {
-		text += "Уведомления: отключены"
+		text += "Стратегия: отключена"
 	}
 
 	if err := c.Send(text, m.Markup); err != nil {
@@ -156,13 +156,13 @@ func (m *StrategySimpleBuyMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		return m.Show(c, handler)
 	})
 
-	b.Handle(&btnEnableNotifications, func(c tele.Context) error {
-		m.Strategy.Config.NotificationEnable = true
-		return c.Respond(&tele.CallbackResponse{Text: "Уведомления включены ✅", ShowAlert: true})
+	b.Handle(&btnEnableStr, func(c tele.Context) error {
+		m.Strategy.Config.StrategyEnable = true
+		return c.Respond(&tele.CallbackResponse{Text: "Стратегия включена ✅", ShowAlert: true})
 	})
 
-	b.Handle(&btnDisableNotifications, func(c tele.Context) error {
-		m.Strategy.Config.NotificationEnable = false
-		return c.Respond(&tele.CallbackResponse{Text: "Уведомления отключены ❌", ShowAlert: true})
+	b.Handle(&btnDisablStr, func(c tele.Context) error {
+		m.Strategy.Config.StrategyEnable = false
+		return c.Respond(&tele.CallbackResponse{Text: "Стратегия отключена ❌", ShowAlert: true})
 	})
 }

@@ -112,7 +112,6 @@ func (str *StrategyBase) Subscribe(ch chan StrategyBaseResult) {
 
 func (str *StrategyBase) notifySubscribers(result StrategyBaseResult) {
 	for _, sub := range str.subscribers {
-		sub := sub
 		go func(sub chan StrategyBaseResult) {
 			select {
 			case sub <- result:
