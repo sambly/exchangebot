@@ -24,26 +24,24 @@ type Repository interface {
 type TradeState interface {
 	AddOrderActive(o *Order)
 	AddOrderHistory(o *Order)
-	RemoveOrderActive(pair string, id int64)
-	GetOrdersActive() (orders map[string][]*Order)
-	GetOrdersHistory() (orders map[string][]*Order)
-	CreateOrderMarket(deal Deal) (*Order, error)
-	ClosePosition(id int64, deal Deal) (*Order, error)
-	SetCountOrdersActive(count int)
 	GetActiveOrdersBySymbol(symbol string) []*Order
 	GetHistoryOrdersBySymbol(symbol string) []*Order
+	GetOrdersActiveCopy() (orders map[string][]Order)
+	GetOrdersHistoryCopy() (orders map[string][]Order)
+	CreateOrderMarket(deal Deal) (*Order, error)
+	ClosePosition(id int64, deal Deal) (*Order, error)
 	CalculatePNL() (count int, profit float64)
 }
 
 type OrderService struct {
 	mtx sync.Mutex
 
-	repo  Repository
-	state TradeState
+	Repo  Repository
+	State TradeState
 
 	// orders - все ордера, которые есть в системе
 	// ordersDependencies - функции, которые будут вызваны при обновлении ордера(для обновления ордеров в стратегиях)
-	orders             []*Order
+	Orders             []*Order
 	ordersDependencies []func(Order)
 
 	assetsPrices   *prices.AsetsPrices
@@ -57,12 +55,12 @@ func NewOrderService(
 	assetsPrices *prices.AsetsPrices,
 ) (*OrderService, error) {
 
-	ctrl := &OrderService{
-		repo:           repo,
-		state:          state,
+	os := &OrderService{
+		Repo:           repo,
+		State:          state,
 		assetsPrices:   assetsPrices,
 		socketsMessage: socketsMessage,
-		orders:         make([]*Order, 0),
+		Orders:         make([]*Order, 0),
 	}
 
 	orders, err := repo.GetAll()
@@ -70,23 +68,17 @@ func NewOrderService(
 		return nil, err
 	}
 
-	ctrl.orders = orders
+	os.Orders = orders
 
-	countOrdersActive := 0
 	for _, o := range orders {
 		if o.Status == OrderStatusTypeActive {
 			state.AddOrderActive(o)
-			countOrdersActive++
 		}
-
 		if o.Status == OrderStatusTypeClose {
 			state.AddOrderHistory(o)
 		}
 	}
-
-	state.SetCountOrdersActive(countOrdersActive)
-
-	return ctrl, nil
+	return os, nil
 }
 
 func (os *OrderService) CreateOrderMarket(deal Deal) (Order, error) {
@@ -95,23 +87,23 @@ func (os *OrderService) CreateOrderMarket(deal Deal) (Order, error) {
 
 	pair := deal.Pair
 
-	order, err := os.state.CreateOrderMarket(deal)
+	order, err := os.State.CreateOrderMarket(deal)
 	if err != nil {
 		return Order{}, err
 	}
 
-	if err := os.repo.Create(order); err != nil {
+	if err := os.Repo.Create(order); err != nil {
 		return Order{}, err
 	}
 
-	os.orders = append(os.orders, order)
+	os.Orders = append(os.Orders, order)
 
 	messageOrder, _ := json.Marshal(map[string]interface{}{"orderAdd": order})
 	os.socketsMessage.SendData(messageOrder)
 
 	orderLogger.Debugf("Creating market order for pair: %s, side: %s, size: %f", pair, deal.SideType, deal.Size)
 
-	// Проверить потокобезопаность
+	// TODO Проверить потокобезопаность
 	mkStat := os.assetsPrices.MarketsStat[pair]
 	chData := os.assetsPrices.ChangePrices[pair]
 	dFast := os.assetsPrices.ChangeDelta[pair]
@@ -139,7 +131,7 @@ func (os *OrderService) CreateOrderMarket(deal Deal) (Order, error) {
 		DeltaFast:    dFastJSON,
 	}
 
-	if err := os.repo.CreateInfo(orderInfo); err != nil {
+	if err := os.Repo.CreateInfo(orderInfo); err != nil {
 		orderLogger.Errorf("error CreateInfo : %v", err)
 	}
 
@@ -150,18 +142,18 @@ func (os *OrderService) ClosePosition(id int64, deal Deal) error {
 	os.mtx.Lock()
 	defer os.mtx.Unlock()
 
-	order, err := os.state.ClosePosition(id, deal)
+	order, err := os.State.ClosePosition(id, deal)
 	if err != nil {
 		return err
 	}
 
-	if err := os.repo.ClosePosition(id, order); err != nil {
+	if err := os.Repo.ClosePosition(id, order); err != nil {
 		return err
 	}
 
-	for i, o := range os.orders {
+	for i, o := range os.Orders {
 		if o.ID == id {
-			os.orders[i] = order
+			os.Orders[i] = order
 			break
 		}
 	}
@@ -178,7 +170,7 @@ func (os *OrderService) OnMarket(ms exModel.MarketsStat) {
 	os.mtx.Lock()
 	defer os.mtx.Unlock()
 
-	activeOrders := os.state.GetActiveOrdersBySymbol(ms.Pair)
+	activeOrders := os.State.GetActiveOrdersBySymbol(ms.Pair)
 	if len(activeOrders) > 0 {
 		for _, order := range activeOrders {
 			order.Price = ms.Price
@@ -191,7 +183,7 @@ func (os *OrderService) OnMarket(ms exModel.MarketsStat) {
 			messageOrder, _ := json.Marshal(map[string]interface{}{"orderUpdate": order})
 			os.socketsMessage.SendData(messageOrder)
 		}
-		_, profit := os.state.CalculatePNL()
+		_, profit := os.State.CalculatePNL()
 		messageOrder, _ := json.Marshal(map[string]interface{}{"pnl": profit})
 		os.socketsMessage.SendData(messageOrder)
 	}

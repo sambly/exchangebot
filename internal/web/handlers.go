@@ -61,8 +61,8 @@ func (web *Web) formingPage(w http.ResponseWriter, _ *http.Request) {
 	maps := map[string]interface{}{
 		"Pairs":          web.App.AssetsPrices.Pairs,
 		"MarketsStat":    web.App.AssetsPrices.GetAllMarketsStat(),
-		"OrdersActive":   web.App.PaperWallet.GetOrdersActive(),
-		"OrdersHistory":  web.App.PaperWallet.GetOrdersHistory(),
+		"OrdersActive":   web.App.OrderController.State.GetOrdersActiveCopy(),
+		"OrdersHistory":  web.App.OrderController.State.GetOrdersHistoryCopy(),
 		"OptionStrategy": option,
 	}
 
@@ -124,7 +124,7 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 		appWebLogger.Errorf("error CreateOrderMarket: %v", err)
 	}
 
-	orderActives := web.App.PaperWallet.GetOrdersActive()
+	orderActives := web.App.OrderController.State.GetOrdersActiveCopy()
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(orderActives); err != nil {
@@ -145,7 +145,9 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 		appWebLogger.Errorf("error ClosePosition: %v", err)
 	}
 
-	orders := map[string]interface{}{"OrdersActive": web.App.PaperWallet.GetOrdersActive(), "OrdersHistory": web.App.PaperWallet.GetOrdersHistory()}
+	orders := map[string]interface{}{
+		"OrdersActive":  web.App.OrderController.State.GetOrdersActiveCopy(),
+		"OrdersHistory": web.App.OrderController.State.GetOrdersHistoryCopy()}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(orders); err != nil {
@@ -155,18 +157,8 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 
 func (web *Web) closeAllDeal(w http.ResponseWriter, _ *http.Request) {
 
-	// Делаем глубокую копию OrdersActive
-	OrdersActiveCopy := make(map[string][]*order.Order)
-	for key, value := range web.App.PaperWallet.OrdersActive {
-		OrdersActiveCopy[key] = make([]*order.Order, len(value))
-		for i, order := range value {
-			// Делаем копию каждого элемента
-			orderCopy := *order
-			OrdersActiveCopy[key][i] = &orderCopy
-		}
-	}
 	deal := order.Deal{Strategy: "manual"}
-	for _, orders := range OrdersActiveCopy {
+	for _, orders := range web.App.OrderController.State.GetOrdersActiveCopy() {
 		for _, order := range orders {
 			if err := web.App.OrderController.ClosePosition(order.ID, deal); err != nil {
 				appWebLogger.Errorf("error ClosePosition: %v", err)
@@ -174,7 +166,9 @@ func (web *Web) closeAllDeal(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 
-	orders := map[string]interface{}{"OrdersActive": web.App.PaperWallet.GetOrdersActive(), "OrdersHistory": web.App.PaperWallet.GetOrdersHistory()}
+	orders := map[string]interface{}{
+		"OrdersActive":  web.App.OrderController.State.GetOrdersActiveCopy(),
+		"OrdersHistory": web.App.OrderController.State.GetOrdersHistoryCopy()}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(orders); err != nil {

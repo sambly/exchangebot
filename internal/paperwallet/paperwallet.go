@@ -15,76 +15,115 @@ var (
 
 type PaperWallet struct {
 	sync.Mutex
-	OrdersActive  map[string][]*order.Order
-	OrdersHistory map[string][]*order.Order
+	ordersActive  map[string][]*order.Order
+	ordersHistory map[string][]*order.Order
 	MarketsStat   map[string]*model.MarketsStat
-	Pnl           *Pnl
+	pnl           *pnl
 }
 
-type Pnl struct {
-	CountOrdersActive int
-	Profit            float64
+type pnl struct {
+	countOrdersActive int
+	profit            float64
 }
 
 func NewPaperWallet() *PaperWallet {
 
 	return &PaperWallet{
-		OrdersActive:  make(map[string][]*order.Order),
-		OrdersHistory: make(map[string][]*order.Order),
-		MarketsStat:   make(map[string]*model.MarketsStat),
-		Pnl:           &Pnl{},
+		ordersActive:  make(map[string][]*order.Order),
+		ordersHistory: make(map[string][]*order.Order),
+		// TODO как то по другому передевать либо еще что то придумать
+		MarketsStat: make(map[string]*model.MarketsStat),
+		pnl:         &pnl{},
 	}
 }
 
 func (p *PaperWallet) AddOrderActive(o *order.Order) {
-	if _, ok := p.OrdersActive[o.Pair]; !ok {
-		p.OrdersActive[o.Pair] = []*order.Order{o}
+	p.Lock()
+	defer p.Unlock()
+	p.addOrderActive(o)
+}
+
+func (p *PaperWallet) addOrderActive(o *order.Order) {
+	if o == nil {
+		return
+	}
+	if _, ok := p.ordersActive[o.Pair]; !ok {
+		p.ordersActive[o.Pair] = []*order.Order{o}
 	} else {
-		p.OrdersActive[o.Pair] = append(p.OrdersActive[o.Pair], o)
+		p.ordersActive[o.Pair] = append(p.ordersActive[o.Pair], o)
 	}
 }
 
 func (p *PaperWallet) AddOrderHistory(o *order.Order) {
-	if _, ok := p.OrdersHistory[o.Pair]; !ok {
-		p.OrdersHistory[o.Pair] = []*order.Order{o}
+	p.Lock()
+	defer p.Unlock()
+	p.addOrderHistory(o)
+}
+
+func (p *PaperWallet) addOrderHistory(o *order.Order) {
+	if o == nil {
+		return
+	}
+	if _, ok := p.ordersHistory[o.Pair]; !ok {
+		p.ordersHistory[o.Pair] = []*order.Order{o}
 	} else {
-		p.OrdersHistory[o.Pair] = append(p.OrdersHistory[o.Pair], o)
+		p.ordersHistory[o.Pair] = append(p.ordersHistory[o.Pair], o)
 	}
 }
 
-func (p *PaperWallet) RemoveOrderActive(pair string, id int64) {
-	if orders, ok := p.OrdersActive[pair]; ok {
+func (p *PaperWallet) removeOrderActive(pair string, id int64) {
+	p.Lock()
+	defer p.Unlock()
+	if orders, ok := p.ordersActive[pair]; ok {
 		for i, order := range orders {
 			if id == order.ID {
-				p.OrdersActive[pair] = append(orders[:i], orders[i+1:]...)
+				p.ordersActive[pair] = append(orders[:i], orders[i+1:]...)
 				return
 			}
 		}
 	}
 }
 
-func (p *PaperWallet) GetOrdersActive() (orders map[string][]*order.Order) {
+func (p *PaperWallet) GetOrdersActiveCopy() map[string][]order.Order {
 	p.Lock()
 	defer p.Unlock()
-	return p.OrdersActive
+
+	ordersCopy := make(map[string][]order.Order, len(p.ordersActive))
+	for symbol, orders := range p.ordersActive {
+		symbolOrders := make([]order.Order, len(orders))
+		for i, o := range orders {
+			symbolOrders[i] = *o
+		}
+		ordersCopy[symbol] = symbolOrders
+	}
+	return ordersCopy
 }
 
-func (p *PaperWallet) GetOrdersHistory() (orders map[string][]*order.Order) {
+func (p *PaperWallet) GetOrdersHistoryCopy() map[string][]order.Order {
 	p.Lock()
 	defer p.Unlock()
-	return p.OrdersHistory
+
+	ordersCopy := make(map[string][]order.Order, len(p.ordersHistory))
+	for symbol, orders := range p.ordersHistory {
+		symbolOrders := make([]order.Order, len(orders))
+		for i, o := range orders {
+			symbolOrders[i] = *o
+		}
+		ordersCopy[symbol] = symbolOrders
+	}
+	return ordersCopy
 }
 
 func (p *PaperWallet) GetActiveOrdersBySymbol(symbol string) []*order.Order {
 	p.Lock()
 	defer p.Unlock()
-	return p.OrdersActive[symbol]
+	return p.ordersActive[symbol]
 }
 
 func (p *PaperWallet) GetHistoryOrdersBySymbol(symbol string) []*order.Order {
 	p.Lock()
 	defer p.Unlock()
-	return p.OrdersHistory[symbol]
+	return p.ordersHistory[symbol]
 }
 
 func (p *PaperWallet) CreateOrderMarket(deal order.Deal) (*order.Order, error) {
@@ -100,6 +139,7 @@ func (p *PaperWallet) CreateOrderMarket(deal order.Deal) (*order.Order, error) {
 		return &order.Order{}, ErrInvalidQuantity
 	}
 	// TODO здесь мне не очень нравится что данные берем с marketStat, актуальные они точно? или может другой способ сделать
+	// плюс не совсем корректно брать и время от туда , короче надо изучить
 	marketStat, ok := p.MarketsStat[pair]
 	if !ok {
 		return nil, fmt.Errorf("market data not available for pair: %s", pair)
@@ -123,7 +163,7 @@ func (p *PaperWallet) CreateOrderMarket(deal order.Deal) (*order.Order, error) {
 		StrategyBuy:  strategy,
 	}
 
-	p.AddOrderActive(&order)
+	p.addOrderActive(&order)
 	return &order, nil
 }
 
@@ -131,7 +171,7 @@ func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, er
 	p.Lock()
 	defer p.Unlock()
 
-	for pair, orders := range p.OrdersActive {
+	for pair, orders := range p.ordersActive {
 		for _, o := range orders {
 			if o.ID == id {
 				if p.MarketsStat[pair].Price == 0 || o.PriceCreated == 0 {
@@ -147,8 +187,8 @@ func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, er
 					o.Profit = (o.PriceCreated / o.Price * 100) - 100
 				}
 				o.StrategySell = deal.Strategy
-				p.AddOrderHistory(o)
-				p.RemoveOrderActive(o.Pair, o.ID)
+				p.addOrderHistory(o)
+				p.removeOrderActive(o.Pair, o.ID)
 
 				return o, nil
 			}
@@ -158,31 +198,20 @@ func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, er
 	return nil, nil
 }
 
-func (w *PaperWallet) SetCountOrdersActive(count int) {
-	w.Lock()
-	defer w.Unlock()
+func (p *PaperWallet) CalculatePNL() (count int, profit float64) {
+	p.Lock()
+	defer p.Unlock()
 
-	if w.Pnl == nil {
-		w.Pnl = &Pnl{}
-	}
-	w.Pnl.CountOrdersActive = count
-}
-
-// TODO проверить реализацию тяп ляп сделал
-func (w *PaperWallet) CalculatePNL() (count int, profit float64) {
-	w.Lock()
-	defer w.Unlock()
-
-	var totalProfit float64
 	countActive := 0
+	totalProfit := 0.0
 
-	for _, orders := range w.OrdersActive {
+	for _, orders := range p.ordersActive {
 		countActive += len(orders)
 		for _, order := range orders {
 			totalProfit += order.Profit
 		}
 	}
-	w.Pnl.CountOrdersActive = countActive
-	w.Pnl.Profit = totalProfit
-	return w.Pnl.CountOrdersActive, w.Pnl.Profit
+	p.pnl.countOrdersActive = countActive
+	p.pnl.profit = totalProfit
+	return countActive, totalProfit
 }
