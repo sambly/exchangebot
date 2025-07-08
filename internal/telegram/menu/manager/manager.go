@@ -2,6 +2,7 @@ package manager
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/sambly/exchangebot/internal/application"
 	"github.com/sambly/exchangebot/internal/telegram/menu/account"
@@ -23,9 +24,9 @@ type UserSession struct {
 
 // MenuManager управляет всеми меню бота.
 type MenuManager struct {
-	User int64
-	// TODO сделать mutex
+	User       int64
 	UserState  map[int64]*UserSession // Хранит состояния пользователей
+	mu         sync.RWMutex           // Mutex для синхронизации доступа к UserState
 	CbRegistry *utils.CallbackRegistry
 	Main       *entry.MainMenu
 	Account    *account.AccountMenu
@@ -71,7 +72,9 @@ func (m *MenuManager) InitHandlers(b *tele.Bot) {
 func (m *MenuManager) HandleText(c tele.Context) error {
 	userID := c.Sender().ID
 
+	m.mu.RLock()
 	session, exists := m.UserState[userID]
+	m.mu.RUnlock()
 	if !exists {
 		return m.Main.Show(c, m)
 	}
@@ -93,6 +96,7 @@ func (m *MenuManager) GetUser() int64 {
 
 // SetCurrentMenu устанавливает текущее и предыдущее меню.
 func (m *MenuManager) SetCurrentMenu(userID int64, newMenuFunc func(c tele.Context, handler model.MenuHandler) error, handleTextFunc func(c tele.Context) error) {
+	m.mu.Lock()
 	session, exists := m.UserState[userID]
 	if !exists {
 		session = &UserSession{}
@@ -106,12 +110,15 @@ func (m *MenuManager) SetCurrentMenu(userID int64, newMenuFunc func(c tele.Conte
 	session.ActiveBntBack = false
 	session.CurrentMenuFunc = newMenuFunc
 	session.HandleTextFunc = handleTextFunc
+	m.mu.Unlock()
 }
 
 // GetPreviousMenu вызывает сохраненное предыдущее меню.
 func (m *MenuManager) GetPreviousMenu(userID int64) func(c tele.Context, handler model.MenuHandler) error {
+	m.mu.Lock()
 	session, exists := m.UserState[userID]
 	if !exists || len(session.PreviousMenus) == 0 {
+		m.mu.Unlock()
 		return nil // Нет истории — некуда возвращаться
 	}
 
@@ -124,20 +131,25 @@ func (m *MenuManager) GetPreviousMenu(userID int64) func(c tele.Context, handler
 
 	// Делаем его текущим меню
 	session.CurrentMenuFunc = prevMenu
+	m.mu.Unlock()
 
 	return prevMenu
 }
 
 func (m *MenuManager) ResetPreviousMenu(userID int64) {
+	m.mu.Lock()
 	if session, exists := m.UserState[userID]; exists {
 		session.PreviousMenus = nil
 	}
+	m.mu.Unlock()
 }
 
 func (m *MenuManager) ActivateBntBack(userID int64) model.MenuHandler {
+	m.mu.Lock()
 	if session, exists := m.UserState[userID]; exists {
 		session.ActiveBntBack = true
 	}
+	m.mu.Unlock()
 	return m
 }
 
@@ -145,6 +157,7 @@ func (m *MenuManager) SaveMessage(userID int64, msg *tele.Message) {
 	if msg == nil {
 		return
 	}
+	m.mu.Lock()
 	session, exists := m.UserState[userID]
 	if !exists {
 		session = &UserSession{}
@@ -152,13 +165,16 @@ func (m *MenuManager) SaveMessage(userID int64, msg *tele.Message) {
 	}
 
 	session.Messages = append(session.Messages, *msg)
+	m.mu.Unlock()
 }
 
 func (m *MenuManager) DeleteUserMessages(c tele.Context, userID int64) {
 
 	var messages []tele.Editable
+	m.mu.Lock()
 	session, exists := m.UserState[userID]
 	if !exists {
+		m.mu.Unlock()
 		// TODO не знаю, надо ли здесь exists оставить или нет
 		fmt.Println("Был вызван exists")
 		return
@@ -175,11 +191,13 @@ func (m *MenuManager) DeleteUserMessages(c tele.Context, userID int64) {
 	}
 	_ = c.Bot().DeleteMany(messages)
 	session.Messages = nil
+	m.mu.Unlock()
 }
 
 func (m *MenuManager) DeleteAllUserMessages(b *tele.Bot) {
 	var messages []tele.Editable
 
+	m.mu.Lock()
 	for _, session := range m.UserState {
 		if len(session.Messages) == 0 {
 			continue // Пропускаем, если сообщений нет
@@ -190,6 +208,7 @@ func (m *MenuManager) DeleteAllUserMessages(b *tele.Bot) {
 		// Очищаем сохраненные сообщения
 		session.Messages = nil
 	}
+	m.mu.Unlock()
 
 	// Удаляем только если есть сообщения
 	if len(messages) > 0 {

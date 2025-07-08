@@ -90,11 +90,10 @@ func (m *AccountMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		userID := c.Sender().ID
 		handler.DeleteUserMessages(c, userID)
 
-		marketStat := m.AssetsPrices.MarketsStat
-
 		var out []string
 		for _, asset := range m.Account.Assets {
-			s := fmt.Sprintf("%s: %.1f💲  24ch: %-5.1f", asset.Name[:len(asset.Name)-len("USDT")], asset.CommonData.FullPrice, marketStat[asset.Name].Ch24)
+			marketStat, _ := m.AssetsPrices.GetMarketsStatForPair(asset.Name)
+			s := fmt.Sprintf("%s: %.1f💲  24ch: %-5.1f", asset.Name[:len(asset.Name)-len("USDT")], asset.CommonData.FullPrice, marketStat.Ch24)
 			out = append(out, s)
 		}
 
@@ -136,8 +135,8 @@ func (m *AccountMenu) HandleText(c tele.Context) error {
 	asset := strings.ToUpper(c.Text()) + "USDT"
 	assets := m.Account.Assets
 	assetsKey := m.Account.AssetsKey
-	marketStat := m.AssetsPrices.MarketsStat
-	change := m.AssetsPrices.ChangePrices
+	marketStat := m.AssetsPrices.GetAllMarketsStat()
+	change := m.AssetsPrices.GetAllChPrice()
 	if idx := slices.Index(assetsKey, asset); idx >= 0 {
 		fullPrice := assets[asset].CommonData.FullPrice
 		ch24 := marketStat[asset].Ch24

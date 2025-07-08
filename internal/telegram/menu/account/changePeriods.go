@@ -107,7 +107,7 @@ func (m *ChangePeriodsMenu) handlePeriod(c tele.Context, handler model.MenuHandl
 }
 
 func (m *ChangePeriodsMenu) getPeriods(period string) []string {
-	change := m.AssetsPrices.ChangePrices
+	change := m.AssetsPrices.GetAllChPrice()
 	var out []string
 	for _, asset := range m.Account.Assets {
 		if _, ok := change[asset.Name][period]; ok {

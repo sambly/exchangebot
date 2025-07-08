@@ -6,20 +6,26 @@ import (
 
 	"github.com/sambly/exchangeService/pkg/exchange"
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/prices"
 )
 
 type Account struct {
+	// TODO не реализован полноценно Mutex
 	sync.Mutex
 	exchange     exchange.Exchange
 	Notification *notification.Notification
 	AssetPrices  *prices.AssetsPrices
-	AssetsKey    []string                  // пары к USDT которые есть на на Spot, Flexible, Staking
-	Assets       map[string]*exModel.Asset // Сруктура пары к USDT
+	AssetsKey    []string                  // пары к USDT которые есть на Spot, Flexible, Staking
+	Assets       map[string]*exModel.Asset // Структура пары к USDT
 
 	BaseLimitAsset float64
 }
+
+var accLogger = logger.AddFields(map[string]interface{}{
+	"package": "account",
+})
 
 func NewAccount(exchange exchange.Exchange, assetPrices *prices.AssetsPrices) (*Account, error) {
 	acc := Account{
@@ -32,11 +38,10 @@ func NewAccount(exchange exchange.Exchange, assetPrices *prices.AssetsPrices) (*
 	return &acc, nil
 }
 
-func (acc *Account) UpdateAssets() (err error) {
-
-	// Обнуляем позиции для последующего обновления
+func (acc *Account) UpdateAssets() error {
 	acc.AssetsKey = make([]string, 0)
-	// Сбрасываем состояние On (наличие элемента в структуре)
+
+	// Сброс старых данных
 	for _, item := range acc.Assets {
 		item.On = false
 		item.CommonData = nil
@@ -64,9 +69,10 @@ func (acc *Account) UpdateAssets() (err error) {
 	acc.feederAssets(assetsStaking, "AssetStaking")
 
 	acc.AssetsKey = nil
-	// Если позиция удаленна , удаляем ее из App или меньше лимитной уставки
+
 	for key := range acc.Assets {
-		if !acc.Assets[key].On || acc.Assets[key].CommonData.FullPrice < acc.BaseLimitAsset {
+		asset := acc.Assets[key]
+		if !asset.On || asset.CommonData == nil || asset.CommonData.FullPrice < acc.BaseLimitAsset {
 			delete(acc.Assets, key)
 		} else {
 			acc.AssetsKey = append(acc.AssetsKey, key)
@@ -77,40 +83,49 @@ func (acc *Account) UpdateAssets() (err error) {
 }
 
 func (acc *Account) feederAssets(data []exModel.AssetData, typeData string) {
-
 	for _, value := range data {
-
 		valueAsset := value.AssetBase + "USDT"
+
 		if _, ok := acc.Assets[valueAsset]; !ok {
 			acc.Assets[valueAsset] = &exModel.Asset{Name: valueAsset}
 		}
-		acc.Assets[valueAsset].On = true
+		asset := acc.Assets[valueAsset]
+		asset.On = true
 
-		if _, ok := acc.AssetPrices.MarketsStat[valueAsset]; ok {
-			acc.Assets[valueAsset].Price = acc.AssetPrices.MarketsStat[valueAsset].Price
+		marketStat, err := acc.AssetPrices.GetMarketsStatForPair(valueAsset)
+		if err != nil {
+			accLogger.Warnf("Не удалось получить цену для %s: %v", valueAsset, err)
+			continue
 		}
+
+		asset.Price = marketStat.Price
+
 		assetData := &exModel.AssetData{
 			AssetBase: valueAsset,
 			Amount:    value.Amount,
-			FullPrice: acc.Assets[valueAsset].Price * value.Amount,
-		}
-		if acc.Assets[valueAsset].CommonData == nil {
-			acc.Assets[valueAsset].CommonData = &exModel.AssetData{AssetBase: valueAsset, Amount: 0, FullPrice: 0}
+			FullPrice: asset.Price * value.Amount,
 		}
 
-		if typeData == "AssetSpot" {
-			acc.Assets[valueAsset].SpotData = assetData
-			acc.Assets[valueAsset].CommonData.Amount = acc.Assets[valueAsset].CommonData.Amount + acc.Assets[valueAsset].SpotData.Amount
+		if asset.CommonData == nil {
+			asset.CommonData = &exModel.AssetData{
+				AssetBase: valueAsset,
+				Amount:    0,
+				FullPrice: 0,
+			}
 		}
-		if typeData == "AssetFlexible" {
-			acc.Assets[valueAsset].FlexibleData = assetData
-			acc.Assets[valueAsset].CommonData.Amount = acc.Assets[valueAsset].CommonData.Amount + acc.Assets[valueAsset].FlexibleData.Amount
+
+		switch typeData {
+		case "AssetSpot":
+			asset.SpotData = assetData
+			asset.CommonData.Amount += assetData.Amount
+		case "AssetFlexible":
+			asset.FlexibleData = assetData
+			asset.CommonData.Amount += assetData.Amount
+		case "AssetStaking":
+			asset.StakingData = assetData
+			asset.CommonData.Amount += assetData.Amount
 		}
-		if typeData == "AssetStaking" {
-			acc.Assets[valueAsset].StakingData = assetData
-			acc.Assets[valueAsset].CommonData.Amount = acc.Assets[valueAsset].CommonData.Amount + acc.Assets[valueAsset].StakingData.Amount
-		}
-		acc.Assets[valueAsset].CommonData.FullPrice = acc.Assets[valueAsset].CommonData.Amount * acc.Assets[valueAsset].Price
+
+		asset.CommonData.FullPrice = asset.CommonData.Amount * asset.Price
 	}
-
 }

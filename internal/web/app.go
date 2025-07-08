@@ -17,6 +17,7 @@ import (
 )
 
 type Web struct {
+	mu     sync.Mutex
 	server *http.Server
 	App    *application.Application
 	Sockets
@@ -142,7 +143,9 @@ func (w *Web) serveTLS() error {
 		Handler:      w.routes(),
 		TLSConfig:    certManager.TLSConfig(),
 	}
+	w.mu.Lock()
 	w.server = srv
+	w.mu.Unlock()
 
 	return srv.ListenAndServeTLS("", "")
 }
@@ -154,13 +157,24 @@ func (w *Web) serve() error {
 		Addr:    ":" + w.listenPort,
 		Handler: w.routes(),
 	}
+	w.mu.Lock()
 	w.server = srv
+	w.mu.Unlock()
 	return srv.ListenAndServe()
 }
 
 func (w *Web) stop() error {
 	ctxShutdown, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()
+
+	w.mu.Lock()
+	srv := w.server
+	w.mu.Unlock()
+
+	if srv == nil {
+		return nil
+	}
+
 	if err := w.server.Shutdown(ctxShutdown); err != nil {
 		appWebLogger.Errorf("ошибка при завершении работы HTTP-сервера: %v", err)
 		return err
