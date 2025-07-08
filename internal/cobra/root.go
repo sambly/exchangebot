@@ -8,11 +8,15 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
+
+	_ "net/http/pprof"
 
 	"github.com/joho/godotenv"
 	"github.com/sambly/exchangeService/pkg/exchange"
@@ -235,6 +239,34 @@ func run(cmd *cobra.Command, args []string) error {
 	g.Go(func() error {
 		return app.Run(gCtx)
 	})
+
+	if cfg.PprofEnable {
+		runtime.SetMutexProfileFraction(1)
+		runtime.SetBlockProfileRate(1)
+
+		pprofServer := &http.Server{
+			Addr: "localhost:6060",
+		}
+
+		go func() {
+			mainLogger.Info("pprof доступен по адресу http://localhost:6060/debug/pprof/")
+			if err := pprofServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				mainLogger.Warnf("ошибка при запуске pprof: %v", err)
+			}
+		}()
+
+		g.Go(func() error {
+			<-gCtx.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			mainLogger.Info("Завершение pprof-сервера...")
+			if err := pprofServer.Shutdown(ctx); err != nil {
+				mainLogger.Warnf("ошибка при завершении pprof-сервера: %v", err)
+			}
+			return nil
+		})
+	}
+
 	mainLogger.Info("Приложение exchangebot запущено")
 	fmt.Println("Приложение exchangebot запущено")
 	err = g.Wait()

@@ -2,7 +2,8 @@ app:
     server-name: exchange-bot
     # exchange or grpc    
     exchange-type: exchange
-    pairs-from-file: true 
+    pairs-from-file: true
+    pprof-enable: false
 web:
     use-tls: false
     listen-port: "80"

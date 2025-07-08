@@ -12,7 +12,9 @@
 При запуске `yarn dev` CONTENT_EMBED=false
 
 ## Backend
-Для embed.go нужна директория frontend/dist  которая создается при yarn build 
+- Для embed.go нужна директория frontend/dist  которая создается при yarn build 
+- Запуск приложения  `go run ./cmd/cobra`
+- Запуск приложения с отлеживанием data race `go run --race ./cmd/cobra` 
 
 ## Docker 
 - В первый раз может потребоваться вход  
@@ -52,9 +54,23 @@ windows (если запусккать просто через run) `go run ./cm
 docker  `/app # ./exchangebot update --debug-log=true`
 - Записать пары в файл pairs.txt   `go run ./cmd/cobra pairs-to-file`
 
+## Pprof 
 
+### Основные команды
+- Веб-интерфейс: `http://localhost:6060/debug/pprof/` 
+- Профиль в браузере:
+  ```
+  go tool pprof -http=:8081 http://localhost:6060/debug/pprof/profile?seconds=30
+  ```
+- Интерактивный режим:
+  ```
+  go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30
+  ```
 
-
-
-
-
+### Интерактивные команды
+- `top`: Показать топ функций по времени выполнения.
+- `list <FuncName>`: Показать исходный код конкретной функции с аннотациями производительности.
+- `web`: Открыть SVG-график в браузере для визуального представления графа вызовов.
+- `svg`: Сохранить граф вызовов в формате SVG.
+- `png` / `pdf`: Сохранить граф вызовов в формате PNG или PDF.
+- `quit`: Выйти из интерактивного режима.

@@ -12,6 +12,7 @@ type App struct {
 	ServerName    string `mapstructure:"server-name" yaml:"server-name"`
 	ExchangeType  string `mapstructure:"exchange-type" yaml:"exchange-type"`
 	PairsFromFile bool   `mapstructure:"pairs-from-file" yaml:"pairs-from-file"`
+	PprofEnable   bool   `mapstructure:"pprof-enable" yaml:"pprof-enable"`
 }
 
 type Web struct {
