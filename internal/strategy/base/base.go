@@ -17,7 +17,7 @@ type StrategyBase struct {
 	TelegramMenu *StrategyBaseMenu
 
 	Periods      map[string]time.Duration
-	AssetsPrices *prices.AsetsPrices
+	AssetsPrices *prices.AssetsPrices
 
 	subscribers []chan StrategyBaseResult
 }
@@ -34,7 +34,7 @@ type BaseResult struct {
 	ChangePercent float64
 }
 
-func NewStrategy(assetsPrices *prices.AsetsPrices, periods map[string]time.Duration, pairs []string, notify *notification.Notification) (*StrategyBase, error) {
+func NewStrategy(assetsPrices *prices.AssetsPrices, periods map[string]time.Duration, pairs []string, notify *notification.Notification) (*StrategyBase, error) {
 	cfg, err := NewConfig()
 	if err != nil {
 		return nil, err

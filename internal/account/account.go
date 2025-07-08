@@ -14,20 +14,20 @@ type Account struct {
 	sync.Mutex
 	exchange     exchange.Exchange
 	Notification *notification.Notification
-	AssetPrices  *prices.AsetsPrices
+	AssetPrices  *prices.AssetsPrices
 	AssetsKey    []string                  // пары к USDT которые есть на на Spot, Flexible, Staking
 	Assets       map[string]*exModel.Asset // Сруктура пары к USDT
 
 	BaseLimitAsset float64
 }
 
-func NewAccount(exchange exchange.Exchange, assetPrices *prices.AsetsPrices, baseLimitAsset float64) (*Account, error) {
+func NewAccount(exchange exchange.Exchange, assetPrices *prices.AssetsPrices) (*Account, error) {
 	acc := Account{
 		exchange:       exchange,
 		AssetsKey:      make([]string, 0),
 		Assets:         make(map[string]*exModel.Asset),
 		AssetPrices:    assetPrices,
-		BaseLimitAsset: baseLimitAsset,
+		BaseLimitAsset: 1.0,
 	}
 	return &acc, nil
 }

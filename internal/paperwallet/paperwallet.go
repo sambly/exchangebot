@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/order"
+	"github.com/sambly/exchangebot/internal/prices"
 )
 
 var (
@@ -17,7 +17,7 @@ type PaperWallet struct {
 	sync.Mutex
 	ordersActive  map[string][]*order.Order
 	ordersHistory map[string][]*order.Order
-	MarketsStat   map[string]*model.MarketsStat
+	assetsPrices  *prices.AssetsPrices
 	pnl           *pnl
 }
 
@@ -26,14 +26,15 @@ type pnl struct {
 	profit            float64
 }
 
-func NewPaperWallet() *PaperWallet {
+func NewPaperWallet(
+	assetsPrices *prices.AssetsPrices,
+) *PaperWallet {
 
 	return &PaperWallet{
 		ordersActive:  make(map[string][]*order.Order),
 		ordersHistory: make(map[string][]*order.Order),
-		// TODO как то по другому передевать либо еще что то придумать
-		MarketsStat: make(map[string]*model.MarketsStat),
-		pnl:         &pnl{},
+		assetsPrices:  assetsPrices,
+		pnl:           &pnl{},
 	}
 }
 
@@ -72,8 +73,6 @@ func (p *PaperWallet) addOrderHistory(o *order.Order) {
 }
 
 func (p *PaperWallet) removeOrderActive(pair string, id int64) {
-	p.Lock()
-	defer p.Unlock()
 	if orders, ok := p.ordersActive[pair]; ok {
 		for i, order := range orders {
 			if id == order.ID {
@@ -140,24 +139,22 @@ func (p *PaperWallet) CreateOrderMarket(deal order.Deal) (*order.Order, error) {
 	}
 	// TODO здесь мне не очень нравится что данные берем с marketStat, актуальные они точно? или может другой способ сделать
 	// плюс не совсем корректно брать и время от туда , короче надо изучить
-	marketStat, ok := p.MarketsStat[pair]
-	if !ok {
-		return nil, fmt.Errorf("market data not available for pair: %s", pair)
-	}
-	if marketStat == nil {
-		return nil, fmt.Errorf("nil market data for pair: %s", pair)
+	marketStat, err := p.assetsPrices.GetMarketsStatForPair(pair)
+	if err != nil {
+		return &order.Order{}, err
 	}
 
 	// TODO Ну и вообще брать данные с MarketsStat потокобезопасно?
+	// ну время точно поменять надо
 	order := order.Order{
-		TimeCreated:  p.MarketsStat[pair].Time,
-		Time:         p.MarketsStat[pair].Time,
+		TimeCreated:  marketStat.Time,
+		Time:         marketStat.Time,
 		Pair:         pair,
 		Side:         side,
 		Type:         order.OrderTypeMarket,
 		Status:       order.OrderStatusTypeActive,
-		PriceCreated: p.MarketsStat[pair].Price,
-		Price:        p.MarketsStat[pair].Price,
+		PriceCreated: marketStat.Price,
+		Price:        marketStat.Price,
 		Quantity:     size,
 		Profit:       0,
 		StrategyBuy:  strategy,
@@ -174,12 +171,18 @@ func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, er
 	for pair, orders := range p.ordersActive {
 		for _, o := range orders {
 			if o.ID == id {
-				if p.MarketsStat[pair].Price == 0 || o.PriceCreated == 0 {
+
+				marketStat, err := p.assetsPrices.GetMarketsStatForPair(pair)
+				if err != nil {
+					return &order.Order{}, err
+				}
+
+				if marketStat.Price == 0 || o.PriceCreated == 0 {
 					return nil, fmt.Errorf("error цена пары равна 0")
 				}
-				o.Time = p.MarketsStat[pair].Time
+				o.Time = marketStat.Time
 				o.Status = order.OrderStatusTypeClose
-				o.Price = p.MarketsStat[pair].Price
+				o.Price = marketStat.Price
 				if o.Side == order.SideTypeBuy {
 					o.Profit = (o.Price / o.PriceCreated * 100) - 100
 				}

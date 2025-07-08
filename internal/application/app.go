@@ -31,7 +31,7 @@ type Application struct {
 	dataFeed *exchange.DataFeed
 
 	Account      *account.Account
-	AssetsPrices *prices.AsetsPrices
+	AssetsPrices *prices.AssetsPrices
 
 	OrderController    *order.OrderService
 	PaperWallet        *paperwallet.PaperWallet
@@ -52,15 +52,15 @@ func NewApp(
 	orderDB := database.NewOrderDb(db)
 	pricesDB := database.NewPricesDb(db)
 
-	assetsPrices := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, pricesDB)
-
-	baseLimitAsset := 1.0
-
-	account, err := account.NewAccount(exch, assetsPrices, baseLimitAsset)
+	assetsPrices, err := prices.NewAssetsPrices(settings.Pairs, settings.ChangePeriods, settings.DeltaPeriods, pricesDB)
 	if err != nil {
 		return nil, err
 	}
-	paperWallet := paperwallet.NewPaperWallet()
+	account, err := account.NewAccount(exch, assetsPrices)
+	if err != nil {
+		return nil, err
+	}
+	paperWallet := paperwallet.NewPaperWallet(assetsPrices)
 	orderController, err := order.NewOrderService(orderDB, paperWallet, socketsMessage, assetsPrices)
 	if err != nil {
 		return nil, err
@@ -84,8 +84,6 @@ func NewApp(
 		ControllerStrategy: controllerStrategy,
 	}
 
-	app.PaperWallet.MarketsStat = assetsPrices.MarketsStat
-
 	return app, nil
 }
 
@@ -94,8 +92,8 @@ func (app *Application) Run(ctx context.Context) error {
 	appLogger.Info("Ожидание предварительной загрузки данных")
 
 	timeStart := time.Now()
-
 	shouldBreak := false
+
 	// Ожидание, пока текущее время не попадет в интервал от 10 до 50 секунд
 	for {
 		select {
@@ -108,18 +106,12 @@ func (app *Application) Run(ctx context.Context) error {
 				shouldBreak = true
 				break
 			}
-			time.Sleep(1 * time.Second) // Ждем одну секунду перед повторной проверкой
+			time.Sleep(1 * time.Second)
 		}
 		if shouldBreak {
 			break
 		}
 	}
-
-	timeRounding := time.Now().Truncate(time.Minute)
-
-	app.AssetsPrices.UpdateTime = timeRounding
-	app.AssetsPrices.InitChangePrices()
-	app.AssetsPrices.InitChangeDelta()
 
 	observers := []func(market exModel.MarketsStat){
 		func(market exModel.MarketsStat) {

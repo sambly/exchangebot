@@ -99,7 +99,10 @@ func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
 		appWebLogger.Errorf("error readfile: %v", err)
 	}
 	pair := string(bodyByte)
-	top := web.App.AssetsPrices.GetMarketsStatForPair(pair)
+	top, err := web.App.AssetsPrices.GetMarketsStatForPair(pair)
+	if err != nil {
+		appWebLogger.Errorf("error GetMarketsStatForPair: %v", err)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(top); err != nil {

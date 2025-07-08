@@ -1,6 +1,7 @@
 package prices
 
 import (
+	"fmt"
 	"slices"
 	"sync"
 	"time"
@@ -48,7 +49,7 @@ type ChangeDeltaDataset struct {
 	fill    bool
 }
 
-type AsetsPrices struct {
+type AssetsPrices struct {
 	repo Repository
 
 	Pairs        []string
@@ -73,8 +74,8 @@ type AsetsPrices struct {
 
 var pricesLogger = logger.AddFieldsEmpty()
 
-func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time.Duration, repo Repository) *AsetsPrices {
-	asetsPrices := &AsetsPrices{
+func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time.Duration, repo Repository) (*AssetsPrices, error) {
+	assetsPrices := &AssetsPrices{
 		Pairs:        pairs,
 		Periods:      periodsChange,
 		PeriodsDelta: periodsDelta,
@@ -93,32 +94,37 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 	}
 
 	for _, pair := range pairs {
-		asetsPrices.MarketsStat[pair] = &exModel.MarketsStat{Pair: pair}
+		assetsPrices.MarketsStat[pair] = &exModel.MarketsStat{Pair: pair}
 
-		asetsPrices.ChangePrices[pair] = map[string]*ChangePrices{}
-		asetsPrices.ChangePricesDataset[pair] = map[string]*ChangePricesDataset{}
-		asetsPrices.ChangeDelta[pair] = map[string]*ChangeDelta{}
-		asetsPrices.ChangeDeltaDataset[pair] = map[string]*ChangeDeltaDataset{}
+		assetsPrices.ChangePrices[pair] = map[string]*ChangePrices{}
+		assetsPrices.ChangePricesDataset[pair] = map[string]*ChangePricesDataset{}
+		assetsPrices.ChangeDelta[pair] = map[string]*ChangeDelta{}
+		assetsPrices.ChangeDeltaDataset[pair] = map[string]*ChangeDeltaDataset{}
 
 		for period := range periodsChange {
-			asetsPrices.ChangePrices[pair][period] = &ChangePrices{}
-			asetsPrices.ChangePricesDataset[pair][period] = &ChangePricesDataset{}
+			assetsPrices.ChangePrices[pair][period] = &ChangePrices{}
+			assetsPrices.ChangePricesDataset[pair][period] = &ChangePricesDataset{}
 		}
 		for period := range periodsDelta {
-			asetsPrices.ChangeDelta[pair][period] = &ChangeDelta{}
-			asetsPrices.ChangeDeltaDataset[pair][period] = &ChangeDeltaDataset{}
+			assetsPrices.ChangeDelta[pair][period] = &ChangeDelta{}
+			assetsPrices.ChangeDeltaDataset[pair][period] = &ChangeDeltaDataset{}
 		}
 	}
-	return asetsPrices
+	timeRounding := time.Now().Truncate(time.Minute)
+	assetsPrices.UpdateTime = timeRounding
+	assetsPrices.initChangePrices()
+	assetsPrices.initChangeDelta()
+
+	return assetsPrices, nil
 }
 
-func (ap *AsetsPrices) OnMarket(ms exModel.MarketsStat) {
+func (ap *AssetsPrices) OnMarket(ms exModel.MarketsStat) {
 
 	ap.MarketsStatMu.Lock()
 	defer ap.MarketsStatMu.Unlock()
 
 	if _, ok := ap.MarketsStat[ms.Pair]; !ok {
-		ap.MarketsStat[ms.Pair] = &exModel.MarketsStat{}
+		return
 	}
 	ap.MarketsStat[ms.Pair].Pair = ms.Pair
 	ap.MarketsStat[ms.Pair].Price = ms.Price
@@ -132,7 +138,7 @@ func (ap *AsetsPrices) OnMarket(ms exModel.MarketsStat) {
 		go func() {
 			// За это время ждем пока остальные пары обновят цену, не точное решение...
 			time.Sleep(1 * time.Second)
-			ap.UpdateChangePrices()
+			ap.updateChangePrices()
 			select {
 			case ap.UpdateChanel <- struct{}{}:
 			default:
@@ -144,14 +150,14 @@ func (ap *AsetsPrices) OnMarket(ms exModel.MarketsStat) {
 			// Ожидание пока данные запишутся в базу данных,данные пишутся в базу данных с feederApp, потом мы считаем новые значения
 			// В принципе есть время на это учитывая что запись производим каждую минуту
 			time.Sleep(10 * time.Second)
-			if err := ap.UpdateChangeDelta(); err != nil {
+			if err := ap.updateChangeDelta(); err != nil {
 				pricesLogger.Errorf("error in updateDelta: %v", err)
 			}
 		}()
 	}
 }
 
-func (ap *AsetsPrices) InitChangePrices() {
+func (ap *AssetsPrices) initChangePrices() {
 
 	// Максимальный заданный период для запроса в бд
 	var max time.Duration
@@ -219,7 +225,7 @@ func (ap *AsetsPrices) InitChangePrices() {
 	}
 }
 
-func (ap *AsetsPrices) InitChangeDelta() {
+func (ap *AssetsPrices) initChangeDelta() {
 
 	// Максимальный заданный период для запроса в бд
 	var max time.Duration
@@ -282,7 +288,7 @@ func (ap *AsetsPrices) InitChangeDelta() {
 	}
 }
 
-func (ap *AsetsPrices) UpdateChangePrices() {
+func (ap *AssetsPrices) updateChangePrices() {
 	ap.MarketsStatMu.RLock()
 	defer ap.MarketsStatMu.RUnlock()
 	ap.ChangePricesMu.Lock()
@@ -328,7 +334,7 @@ func (ap *AsetsPrices) UpdateChangePrices() {
 	pricesLogger.Debugf("Время выполнения UpdateChanges: %v ", duration)
 }
 
-func (ap *AsetsPrices) UpdateChangeDelta() error {
+func (ap *AssetsPrices) updateChangeDelta() error {
 
 	timeStart := time.Now()
 
@@ -408,40 +414,122 @@ func (ap *AsetsPrices) UpdateChangeDelta() error {
 	}
 
 	duration := time.Since(timeStart)
-	pricesLogger.Debugf("Время выполнения UpdateChangeDelta: %v ", duration)
+	pricesLogger.Debugf("Время выполнения updateChangeDelta: %v ", duration)
 
 	return nil
 }
 
-func (ap *AsetsPrices) GetAllChPrice() map[string]map[string]*ChangePrices {
+func (ap *AssetsPrices) GetAllChPrice() map[string]map[string]ChangePrices {
 	ap.ChangePricesMu.RLock()
 	defer ap.ChangePricesMu.RUnlock()
 
-	return ap.ChangePrices
+	result := make(map[string]map[string]ChangePrices, len(ap.ChangePrices))
+
+	for k1, innerMap := range ap.ChangePrices {
+		innerCopy := make(map[string]ChangePrices, len(innerMap))
+		for k2, v := range innerMap {
+			if v != nil {
+				innerCopy[k2] = *v
+			} else {
+				innerCopy[k2] = ChangePrices{}
+			}
+		}
+		result[k1] = innerCopy
+	}
+
+	return result
 }
 
-func (ap *AsetsPrices) GetAllChDelta() map[string]map[string]*ChangeDelta {
+func (ap *AssetsPrices) GetAllChDelta() map[string]map[string]ChangeDelta {
 	ap.ChangeDeltaMu.RLock()
 	defer ap.ChangeDeltaMu.RUnlock()
 
-	return ap.ChangeDelta
+	result := make(map[string]map[string]ChangeDelta, len(ap.ChangeDelta))
+
+	for outerKey, innerMap := range ap.ChangeDelta {
+		innerCopy := make(map[string]ChangeDelta, len(innerMap))
+
+		for innerKey, deltaPtr := range innerMap {
+			if deltaPtr != nil {
+				innerCopy[innerKey] = *deltaPtr
+			} else {
+				innerCopy[innerKey] = ChangeDelta{}
+			}
+		}
+
+		result[outerKey] = innerCopy
+	}
+
+	return result
 }
 
-func (ap *AsetsPrices) GetAllMarketsStat() map[string]*exModel.MarketsStat {
+func (ap *AssetsPrices) GetAllMarketsStat() map[string]exModel.MarketsStat {
 	ap.MarketsStatMu.RLock()
 	defer ap.MarketsStatMu.RUnlock()
 
-	return ap.MarketsStat
+	result := make(map[string]exModel.MarketsStat, len(ap.MarketsStat))
+
+	for key, statPtr := range ap.MarketsStat {
+		if statPtr != nil {
+			result[key] = *statPtr
+		} else {
+			result[key] = exModel.MarketsStat{}
+		}
+	}
+
+	return result
 }
 
-func (ap *AsetsPrices) GetMarketsStatForPair(pair string) *exModel.MarketsStat {
+func (ap *AssetsPrices) GetMarketsStatForPair(pair string) (exModel.MarketsStat, error) {
 	ap.MarketsStatMu.RLock()
 	defer ap.MarketsStatMu.RUnlock()
 
-	return ap.MarketsStat[pair]
+	if statPtr := ap.MarketsStat[pair]; statPtr == nil {
+		return exModel.MarketsStat{}, fmt.Errorf("market stat for pair %s not found", pair)
+	} else {
+		return *statPtr, nil
+	}
 }
 
-func (ap *AsetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDeltaForCandle, error) {
+func (ap *AssetsPrices) GetChPriceForPair(pair string) (map[string]ChangePrices, error) {
+	ap.ChangePricesMu.RLock()
+	defer ap.ChangePricesMu.RUnlock()
+
+	if innerMap, exists := ap.ChangePrices[pair]; exists {
+		result := make(map[string]ChangePrices, len(innerMap))
+		for k, v := range innerMap {
+			if v != nil {
+				result[k] = *v
+			} else {
+				result[k] = ChangePrices{}
+			}
+		}
+		return result, nil
+	}
+
+	return nil, fmt.Errorf("pair %s not found", pair)
+}
+
+func (ap *AssetsPrices) GetChangeDeltaForPair(pair string) (map[string]ChangeDelta, error) {
+	ap.ChangeDeltaMu.RLock()
+	defer ap.ChangeDeltaMu.RUnlock()
+
+	if innerMap, exists := ap.ChangeDelta[pair]; exists {
+		result := make(map[string]ChangeDelta, len(innerMap))
+		for k, v := range innerMap {
+			if v != nil {
+				result[k] = *v
+			} else {
+				result[k] = ChangeDelta{}
+			}
+		}
+		return result, nil
+	}
+
+	return nil, fmt.Errorf("pair %s not found in ChangeDelta data", pair)
+}
+
+func (ap *AssetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDeltaForCandle, error) {
 
 	timeStart := time.Now()
 

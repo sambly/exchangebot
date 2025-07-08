@@ -30,7 +30,7 @@ type ControllerStrategy struct {
 	Notification    *notification.Notification
 	Periods         map[string]time.Duration
 	Pairs           []string
-	AssetsPrices    *prices.AsetsPrices
+	AssetsPrices    *prices.AssetsPrices
 	OrderController *order.OrderService
 }
 
@@ -39,7 +39,7 @@ var strategyLogger = logger.AddFields(map[string]interface{}{
 })
 
 func NewControllerStrategy(
-	assetsPrices *prices.AsetsPrices,
+	assetsPrices *prices.AssetsPrices,
 	periods map[string]time.Duration,
 	pairs []string,
 	notify *notification.Notification,

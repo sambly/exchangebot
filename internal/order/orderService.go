@@ -44,7 +44,7 @@ type OrderService struct {
 	Orders             []*Order
 	ordersDependencies []func(Order)
 
-	assetsPrices   *prices.AsetsPrices
+	assetsPrices   *prices.AssetsPrices
 	socketsMessage *notification.SocketsMessage
 }
 
@@ -52,7 +52,7 @@ func NewOrderService(
 	repo Repository,
 	state TradeState,
 	socketsMessage *notification.SocketsMessage,
-	assetsPrices *prices.AsetsPrices,
+	assetsPrices *prices.AssetsPrices,
 ) (*OrderService, error) {
 
 	os := &OrderService{
@@ -103,10 +103,18 @@ func (os *OrderService) CreateOrderMarket(deal Deal) (Order, error) {
 
 	orderLogger.Debugf("Creating market order for pair: %s, side: %s, size: %f", pair, deal.SideType, deal.Size)
 
-	// TODO Проверить потокобезопаность
-	mkStat := os.assetsPrices.MarketsStat[pair]
-	chData := os.assetsPrices.ChangePrices[pair]
-	dFast := os.assetsPrices.ChangeDelta[pair]
+	mkStat, err := os.assetsPrices.GetMarketsStatForPair(pair)
+	if err != nil {
+		orderLogger.Errorf("error GetMarketsStatForPair : %v", err)
+	}
+	chData, err := os.assetsPrices.GetChPriceForPair(pair)
+	if err != nil {
+		orderLogger.Errorf("error GetChPriceForPair : %v", err)
+	}
+	dFast, err := os.assetsPrices.GetChangeDeltaForPair(pair)
+	if err != nil {
+		orderLogger.Errorf("error GetChangeDeltaForPair : %v", err)
+	}
 
 	mkStatJSON, err := json.Marshal(mkStat)
 	if err != nil {

@@ -18,7 +18,7 @@ type StrategySimpleBuy struct {
 	Notification *notification.Notification
 	TelegramMenu *StrategySimpleBuyMenu
 
-	AssetsPrices    *prices.AsetsPrices
+	AssetsPrices    *prices.AssetsPrices
 	OrderController *order.OrderService
 
 	StrategyBaseResult chan base.StrategyBaseResult
@@ -29,7 +29,7 @@ type StrategySimpleBuy struct {
 
 func NewStrategy(
 	notify *notification.Notification,
-	assetsPrices *prices.AsetsPrices,
+	assetsPrices *prices.AssetsPrices,
 	orderController *order.OrderService,
 
 ) (*StrategySimpleBuy, error) {

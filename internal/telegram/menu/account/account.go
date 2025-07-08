@@ -35,14 +35,14 @@ var (
 type AccountMenu struct {
 	*base.BaseMenu
 	Account      *account.Account
-	AssetsPrices *prices.AsetsPrices
+	AssetsPrices *prices.AssetsPrices
 }
 
-func NewAccountMenu(name, id string, account *account.Account, asetsPrices *prices.AsetsPrices) *AccountMenu {
+func NewAccountMenu(name, id string, account *account.Account, assetsPrices *prices.AssetsPrices) *AccountMenu {
 	menu := &AccountMenu{
 		BaseMenu:     base.NewBaseMenu(name, id),
 		Account:      account,
-		AssetsPrices: asetsPrices,
+		AssetsPrices: assetsPrices,
 	}
 
 	menu.WithEntryButton(entryButton)
