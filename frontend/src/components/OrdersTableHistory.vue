@@ -1,40 +1,42 @@
 <template>
   <div>
     <!-- Верхняя панель с фильтрами -->
-    <div class="d-flex align-items-center mt-3 mb-2 gap-3">
-      <div class="d-flex gap-1 ms-3">
-        Сделок
-        <div class="text-primary" style="font-weight: bold;">{{ totalOrders.toLocaleString('ru') }}</div>
+    <div style="overflow-x: auto; white-space: nowrap; scrollbar-width: none; -ms-overflow-style: none;">
+      <div class="d-flex align-items-center mt-3 mb-2 gap-3">
+        <div class="d-flex gap-1 ms-3">
+          Сделок
+          <div class="text-primary" style="font-weight: bold;">{{ totalOrders.toLocaleString('ru') }}</div>
+        </div>
+        <div class="d-flex gap-1 ms-3">
+          PNL
+          <div :style="{ color: colorProfit(totalProfit), fontWeight: 'bold' }"> {{ formatProfit(totalProfit) }}</div>
+        </div>
+        <!-- Новый фильтр по паре -->
+        <label class="ms-3">Пара:</label>
+        <select v-model="selectedPair" class="form-select w-auto">
+          <option value="">Все</option>
+          <option v-for="p in pairOptions" :key="p" :value="p">{{ p }}</option>
+        </select>
+        <label class="ms-3">Интервал:</label>
+        <select v-model="selectedInterval" class="form-select w-auto">
+          <option value="all">За всё время</option>
+          <option value="1d">За 1 день</option>
+          <option value="7d">За 7 дней</option>
+          <option value="30d">За 30 дней</option>
+        </select>
+        <label class="ms-3">Стратегия покупки:</label>
+        <select v-model="selectedStrategyBuy" class="form-select w-auto">
+          <option value="">Все</option>
+          <option v-for="s in strategyBuyOptions" :key="s" :value="s">{{ s }}</option>
+        </select>
+        <label class="ms-3">Стратегия продажи:</label>
+        <select v-model="selectedStrategySell" class="form-select w-auto">
+          <option value="">Все</option>
+          <option v-for="s in strategySellOptions" :key="s" :value="s">{{ s }}</option>
+        </select>
+        <!-- Кнопка сброса фильтров -->
+        <button class="btn btn-outline-secondary ms-3" @click="resetFilters">Сбросить фильтры</button>
       </div>
-      <div class="d-flex gap-1 ms-3">
-        PNL
-        <div :style="{ color: colorProfit(totalProfit), fontWeight: 'bold' }"> {{ formatProfit(totalProfit) }}</div>
-      </div>
-      <!-- Новый фильтр по паре -->
-      <label class="ms-3">Пара:</label>
-      <select v-model="selectedPair" class="form-select w-auto">
-        <option value="">Все</option>
-        <option v-for="p in pairOptions" :key="p" :value="p">{{ p }}</option>
-      </select>
-      <label class="ms-3">Интервал:</label>
-      <select v-model="selectedInterval" class="form-select w-auto">
-        <option value="all">За всё время</option>
-        <option value="1d">За 1 день</option>
-        <option value="7d">За 7 дней</option>
-        <option value="30d">За 30 дней</option>
-      </select>
-      <label class="ms-3">Стратегия покупки:</label>
-      <select v-model="selectedStrategyBuy" class="form-select w-auto">
-        <option value="">Все</option>
-        <option v-for="s in strategyBuyOptions" :key="s" :value="s">{{ s }}</option>
-      </select>
-      <label class="ms-3">Стратегия продажи:</label>
-      <select v-model="selectedStrategySell" class="form-select w-auto">
-        <option value="">Все</option>
-        <option v-for="s in strategySellOptions" :key="s" :value="s">{{ s }}</option>
-      </select>
-      <!-- Кнопка сброса фильтров -->
-      <button class="btn btn-outline-secondary ms-3" @click="resetFilters">Сбросить фильтры</button>
     </div>
  
     <!-- Таблица -->
@@ -222,6 +224,10 @@ export default {
 
 
 <style scoped>
+
+.filters-container::-webkit-scrollbar {
+  display: none;
+}
 
 .table-trade-history {
   table-layout: fixed;
