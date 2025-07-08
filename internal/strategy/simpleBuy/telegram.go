@@ -59,7 +59,7 @@ func (m *StrategySimpleBuyMenu) Show(c tele.Context, handler model.MenuHandler) 
 	handler.DeleteUserMessages(c, userID)
 
 	text := fmt.Sprintf("Настройки стратегии: %s\n", m.Strategy.Config.Name)
-	if m.Strategy.Config.StrategyEnable {
+	if m.Strategy.IsStrategyEnabled() {
 		text += "Стратегия: включена"
 	} else {
 		text += "Стратегия: отключена"
@@ -157,12 +157,12 @@ func (m *StrategySimpleBuyMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 	})
 
 	b.Handle(&btnEnableStr, func(c tele.Context) error {
-		m.Strategy.Config.StrategyEnable = true
+		m.Strategy.SetStrategyEnabled(true)
 		return c.Respond(&tele.CallbackResponse{Text: "Стратегия включена ✅", ShowAlert: true})
 	})
 
 	b.Handle(&btnDisablStr, func(c tele.Context) error {
-		m.Strategy.Config.StrategyEnable = false
+		m.Strategy.SetStrategyEnabled(false)
 		return c.Respond(&tele.CallbackResponse{Text: "Стратегия отключена ❌", ShowAlert: true})
 	})
 }

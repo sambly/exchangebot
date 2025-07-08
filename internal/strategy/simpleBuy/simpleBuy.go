@@ -24,6 +24,7 @@ type StrategySimpleBuy struct {
 	StrategyBaseResult chan base.StrategyBaseResult
 	ordersMu           sync.RWMutex
 	Orders             map[string][]order.Order
+	configMu           sync.RWMutex
 	Sale               sales.Sales
 }
 
@@ -65,11 +66,25 @@ func (str *StrategySimpleBuy) GetTelegramMenu() model.WindowHandler {
 	return str.TelegramMenu
 }
 
+// IsStrategyEnabled безопасно читает состояние стратегии
+func (str *StrategySimpleBuy) IsStrategyEnabled() bool {
+	str.configMu.RLock()
+	defer str.configMu.RUnlock()
+	return str.Config.StrategyEnable
+}
+
+// SetStrategyEnabled безопасно устанавливает состояние стратегии
+func (str *StrategySimpleBuy) SetStrategyEnabled(enabled bool) {
+	str.configMu.Lock()
+	defer str.configMu.Unlock()
+	str.Config.StrategyEnable = enabled
+}
+
 func (str *StrategySimpleBuy) Start(ctx context.Context) error {
 	for {
 		select {
 		case baseResult := <-str.StrategyBaseResult:
-			if str.Config.StrategyEnable {
+			if str.IsStrategyEnabled() {
 				if err := str.execute(ctx, baseResult); err != nil {
 					return err
 				}
@@ -107,7 +122,7 @@ func (str *StrategySimpleBuy) OnMarket(ms exModel.MarketsStat) {
 		return
 	}
 
-	if !str.Config.StrategyEnable {
+	if !str.IsStrategyEnabled() {
 		return
 	}
 
