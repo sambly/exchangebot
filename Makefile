@@ -99,6 +99,15 @@ compare-all-envs:
 
 
 
+# Создание и отправка Git-тега
+.PHONY: tag
+tag:
+	@if [ -z "$(version)" ]; then echo "Error: version is not set. Usage: make tag version=v1.1.1"; exit 1; fi
+	@echo "Creating and pushing tag $(version)..."
+	git tag -a $(version) -m "$(version)"
+	git push origin $(version)
+
+
 # Запуск docker в одиночном режиме без docker-compose с простыми настройками и sqlite memory
 BUILD_ARGS_DOCKER = \
     --build-arg GITHUB_TOKEN=$(GITHUB_TOKEN) \
