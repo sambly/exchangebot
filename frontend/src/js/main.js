@@ -265,6 +265,10 @@ function forming_page() {
 
     size_conversion();
 
+    const params = new URLSearchParams(window.location.search);
+    const paramsPair = params.get("pair");
+    const paramsStrategy = params.get("strategy");
+
     $.ajax({
         url: 'formingPage',
         async: false,
@@ -292,19 +296,30 @@ function forming_page() {
                 change_pair(e.target.value);
             });
 
+            // выбор текущей пары
+            let currentPair = localStorage.getItem('currentPair') || 'BTCUSDT';
+            // Если в URL есть параметр pair и он есть в списке доступных пар
+            if (paramsPair && pairs.includes(paramsPair)) {
+                currentPair = paramsPair;
+            }
+            localStorage.setItem('currentPair', currentPair);
+
+
             // option Strategy
             let selectStrategy = document.querySelector('#panel-trade-strategy');
-
+            // Если в URL передана стратегия и её нет в списке - добавляем
+            if (paramsStrategy && !strategyDescription[paramsStrategy]) {
+                strategyDescription[paramsStrategy] = { description: "Custom strategy from URL" };
+            }
             for (let optionName in strategyDescription) {
                 let option = new Option(optionName, optionName);
                 option.setAttribute("title", strategyDescription[optionName].description);
                 selectStrategy.prepend(option);
             }
-
-            // выбор текущей пары
-            let currentPair = localStorage.getItem('currentPair') || 'BTCUSDT';
-            localStorage.setItem('currentPair', currentPair);
-
+            if (paramsStrategy && strategyDescription[paramsStrategy]) {
+                selectStrategy.value = paramsStrategy;
+            }
+            
             // Фильтры
             // Объем 
             document.querySelector('#minVolume').value = localStorage.getItem('minVolume');

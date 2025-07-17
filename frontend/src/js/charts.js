@@ -178,12 +178,30 @@ export function widget_charts(container_chart, pair) {
 
     localStorage.setItem('widgetPair', pair);
     let chartWidth = container_chart.clientWidth;
+    const params = new URLSearchParams(window.location.search);
+    const paramsPeriod = params.get("period");
+    const intervalMap = {
+        '1m': '1',
+        '3m': '3',
+        '15m': '15',
+        '1h': '60',
+        '4h': '240',
+        '1d': '1D'
+    };
+
+    const intervals = Object.keys(intervalMap); // ['1m', '3m', '15m', '1h', '4h', '1d']
+    let selectedInterval = '15'; // Значение по умолчанию (15 минут)
+
+    if (paramsPeriod && intervals.includes(paramsPeriod)) {
+        selectedInterval = intervalMap[paramsPeriod];
+    }
+
     new TradingView.widget(
         {
             "height": "532",
             width: chartWidth,
             "symbol": "BINANCE:" + pair,
-            "interval": "15",
+            "interval": selectedInterval,
             "timezone": "Europe/Moscow",
             "theme": "Light",
             "style": "1",
