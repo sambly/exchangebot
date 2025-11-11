@@ -1,0 +1,20 @@
+# Имя стратегии
+name: simpleIndicator стратегия
+# Id стратегии
+idName: simpleIndicator
+# Описание стратегии
+description:
+# Включение стратегии
+strategyEnable : true
+
+# Проверить все пары
+allPairs: true
+# Выбор определенных пар 
+pairs:
+  - BTCUSDT
+  - XRPUSDT
+  - SOLUSDT
+  - BNBUSDT
+  - GALAUSDT
+
+hostWeb: http://localhost/trade/

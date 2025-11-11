@@ -220,7 +220,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	notificationService.AddService(telegram)
 
-	web := web.NewWeb(app, socketsMessage, cfg.Web, exchangebot.Content)
+	web := web.NewWeb(app, socketsMessage, &cfg.Web, exchangebot.Content)
 
 	g, gCtx := errgroup.WithContext(ctx)
 

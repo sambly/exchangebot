@@ -5,9 +5,9 @@ idName: base
 # Описание стратегии
 description: Отслеживание цены за период для пар, формирование уведомлений и сигналов для других стратегий
 # Включение стратегии
-strategyEnable : true
+strategyEnable : false
 # Включение уведомлений 
-notificationEnable: true
+notificationEnable: false
 
 # Проверить все пары
 allPairs: true

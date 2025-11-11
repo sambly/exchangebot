@@ -18,16 +18,13 @@ import (
 
 type Web struct {
 	mu     sync.Mutex
+	cfg    *config.Web
 	server *http.Server
-	App    *application.Application
-	Sockets
+	app    *application.Application
+	sockets
 
-	listenPort   string
-	hostname     string
-	useTLS       bool
-	contentEmbed bool
-	content      embed.FS
-	auth         auth
+	content embed.FS
+	auth    auth
 }
 
 type auth struct {
@@ -35,7 +32,7 @@ type auth struct {
 	password string
 }
 
-type Sockets struct {
+type sockets struct {
 	clients        sync.Map
 	socketsMessage *notification.SocketsMessage
 }
@@ -44,7 +41,7 @@ var appWebLogger = logger.AddFields(map[string]interface{}{
 	"package": "web",
 })
 
-func (c *Sockets) SendDataRun(ctx context.Context) {
+func (c *sockets) SendDataRun(ctx context.Context) {
 	go func(message chan []byte) {
 		for {
 			select {
@@ -67,18 +64,13 @@ func (c *Sockets) SendDataRun(ctx context.Context) {
 	}(c.socketsMessage.Message)
 }
 
-func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, cfg config.Web, content embed.FS) *Web {
+func NewWeb(app *application.Application, socketsMessage *notification.SocketsMessage, cfg *config.Web, content embed.FS) *Web {
 	web := &Web{
-		App: app,
-
-		listenPort: cfg.ListenPort,
-		hostname:   cfg.Host,
-		useTLS:     cfg.UseTLC,
-
-		contentEmbed: cfg.ContentEmbed,
-		content:      content,
+		app:     app,
+		cfg:     cfg,
+		content: content,
 	}
-	web.Sockets = Sockets{
+	web.sockets = sockets{
 		socketsMessage: socketsMessage,
 	}
 
@@ -89,13 +81,13 @@ func NewWeb(app *application.Application, socketsMessage *notification.SocketsMe
 }
 
 func (w *Web) Run(ctx context.Context) error {
-	w.Sockets.SendDataRun(ctx)
+	w.sockets.SendDataRun(ctx)
 
 	serverErrChan := make(chan error, 1)
 
 	go func() {
 		var err error
-		if w.useTLS {
+		if w.cfg.UseTLC {
 			err = w.serveTLS()
 		} else {
 			err = w.serve()
@@ -132,7 +124,7 @@ func (w *Web) serveTLS() error {
 	certManager := &autocert.Manager{
 		Cache:      autocert.DirCache("certs"),
 		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(w.hostname),
+		HostPolicy: autocert.HostWhitelist(w.cfg.HostProduction),
 	}
 
 	srv := &http.Server{
@@ -152,9 +144,9 @@ func (w *Web) serveTLS() error {
 
 func (w *Web) serve() error {
 
-	appWebLogger.Infof("Запуск HTTP сервера port:%s ", w.listenPort)
+	appWebLogger.Infof("Запуск HTTP сервера port:%s ", w.cfg.ListenPort)
 	srv := &http.Server{
-		Addr:    ":" + w.listenPort,
+		Addr:    ":" + w.cfg.ListenPort,
 		Handler: w.routes(),
 	}
 	w.mu.Lock()

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/config"
+	rsitrendcross "github.com/sambly/exchangebot/internal/indicator/rsi_trend_cross"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
@@ -14,6 +16,7 @@ import (
 	"github.com/sambly/exchangebot/internal/strategy/base"
 	"github.com/sambly/exchangebot/internal/strategy/sales/simplesale"
 	simplebuy "github.com/sambly/exchangebot/internal/strategy/simpleBuy"
+	simpleindicator "github.com/sambly/exchangebot/internal/strategy/simpleIndicator"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
 
@@ -26,6 +29,7 @@ type Strategy interface {
 type Option func(*ControllerStrategy)
 
 type ControllerStrategy struct {
+	Config          *config.Config
 	Strategies      []Strategy
 	Notification    *notification.Notification
 	Periods         map[string]time.Duration
@@ -44,9 +48,11 @@ func NewControllerStrategy(
 	pairs []string,
 	notify *notification.Notification,
 	orderController *order.OrderService,
+	cfg *config.Config,
 	options ...Option) (*ControllerStrategy, error) {
 
 	ctrlStr := &ControllerStrategy{
+		Config:          cfg,
 		AssetsPrices:    assetsPrices,
 		Periods:         periods,
 		Pairs:           pairs,
@@ -87,6 +93,17 @@ func (cs *ControllerStrategy) build() error {
 	baseStrategy.Subscribe(simpleBuyStrategy.StrategyBaseResult)
 	simpleBuyStrategy.WithSaleStrategy(simpleSaleStrategy)
 	cs.AddStrategy(simpleBuyStrategy)
+
+	rsitrendcross, err := rsitrendcross.NewIndicator()
+	if err != nil {
+		return err
+	}
+
+	simpleIndicator, err := simpleindicator.NewStrategy(cs.AssetsPrices, cs.Notification, rsitrendcross, cs.Pairs)
+	if err != nil {
+		return err
+	}
+	cs.AddStrategy(simpleIndicator)
 
 	return nil
 }

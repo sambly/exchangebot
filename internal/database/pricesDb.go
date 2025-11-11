@@ -93,6 +93,57 @@ func (r *pricesDb) GetCandlesByPeriod(period string) ([]exModel.Candle, error) {
 	return candles, nil
 }
 
+func (r *pricesDb) GetCandlesBySymbol(symbol string, period string, quantity int) (model.Quote, error) {
+	start := time.Now()
+	var candles []exModel.Candle
+
+	tableName := fmt.Sprintf("%s%s", candlesTables, period)
+	result := r.db.
+		Table(tableName).
+		Where("pair = ?", symbol).
+		Order("time DESC").
+		Limit(int(quantity)).
+		Find(&candles)
+
+	duration := time.Since(start).Seconds()
+	status := "success"
+	if result.Error != nil {
+		status = "error"
+	}
+
+	pricesDbOperationDuration.WithLabelValues("get_candles_by_symbol_and_period", status).Observe(duration)
+	pricesDbOperationTotal.WithLabelValues("get_candles_by_symbol_and_period", status).Inc()
+
+	if result.Error != nil {
+		return model.Quote{}, result.Error
+	}
+
+	ohlcv := model.Quote{
+		Date:   make([]time.Time, len(candles)),
+		Open:   make([]float64, len(candles)),
+		High:   make([]float64, len(candles)),
+		Low:    make([]float64, len(candles)),
+		Close:  make([]float64, len(candles)),
+		Volume: make([]float64, len(candles)),
+	}
+
+	// Переворачиваем результат, чтобы вернуть в хронологическом порядке (от старого к новому)
+	for i, j := 0, len(candles)-1; i < j; i, j = i+1, j-1 {
+		candles[i], candles[j] = candles[j], candles[i]
+	}
+
+	for i, candle := range candles {
+		ohlcv.Date[i] = candle.Time
+		ohlcv.Open[i] = candle.Open
+		ohlcv.High[i] = candle.High
+		ohlcv.Low[i] = candle.Low
+		ohlcv.Close[i] = candle.Close
+		ohlcv.Volume[i] = candle.Volume
+	}
+
+	return ohlcv, nil
+}
+
 func (r *pricesDb) SelectMarketStateTimev2(timeRounding time.Time) ([]exModel.Candle, error) {
 	start := time.Now()
 	var candles []exModel.Candle

@@ -5,4 +5,4 @@ idName: simplebuy
 # Описание стратегии
 description: покупка через телеграм, по сигналам base стратегии
 # Включение стратегии
-strategyEnable : true
+strategyEnable : false

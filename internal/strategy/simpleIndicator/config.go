@@ -13,6 +13,10 @@ type Config struct {
 	Description        string `yaml:"description"`
 	StrategyEnable     bool   `yaml:"strategyEnable"`
 	NotificationEnable bool   `yaml:"notificationEnable"`
+
+	Pairs    []string `yaml:"pairs"`
+	AllPairs bool     `yaml:"allPairs"`
+	HostWeb  string   `yaml:"hostWeb"`
 }
 
 func NewConfig() (*Config, error) {

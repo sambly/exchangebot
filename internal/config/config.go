@@ -16,12 +16,12 @@ type App struct {
 }
 
 type Web struct {
-	ListenPort   string `mapstructure:"listen-port" yaml:"listen-port"`
-	Host         string `mapstructure:"host" yaml:"host"`
-	UseTLC       bool   `mapstructure:"use-tls" yaml:"use-tls"`
-	ContentEmbed bool   `mapstructure:"content-embed" yaml:"content-embed"`
-	UsernameAuth string `mapstructure:"username-auth" yaml:"username-auth"`
-	PasswordAuth string `mapstructure:"password-auth" yaml:"password-auth"`
+	ListenPort     string `mapstructure:"listen-port" yaml:"listen-port"`
+	HostProduction string `mapstructure:"host" yaml:"host"`
+	UseTLC         bool   `mapstructure:"use-tls" yaml:"use-tls"`
+	ContentEmbed   bool   `mapstructure:"content-embed" yaml:"content-embed"`
+	UsernameAuth   string `mapstructure:"username-auth" yaml:"username-auth"`
+	PasswordAuth   string `mapstructure:"password-auth" yaml:"password-auth"`
 }
 type Exchange struct {
 	APIKey    string `mapstructure:"api-key" yaml:"api-key"`

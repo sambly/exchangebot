@@ -29,4 +29,7 @@ configs/*
 !configs/example/*
 internal/strategy/**/config.yaml
 !internal/strategy/**/config.example.yaml
+internal/indicator/**/config.yaml
+!internal/indicator/**/config.default.yaml
+
 

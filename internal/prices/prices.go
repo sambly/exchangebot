@@ -18,6 +18,7 @@ type Repository interface {
 	GetCandlesByPeriod(period string) ([]exModel.Candle, error)
 	SelectMarketStateTimev2(timeRounding time.Time) ([]exModel.Candle, error)
 	SelectDeltaPeriod(pair string, period string) ([]model.ChangeDeltaForCandle, error)
+	GetCandlesBySymbol(symbol string, period string, quantity int) (model.Quote, error)
 }
 
 type ChangePrices struct {
@@ -49,15 +50,40 @@ type ChangeDeltaDataset struct {
 	fill    bool
 }
 
+type BroadcasterUpdateAssets struct {
+	mu          sync.Mutex
+	subscribers []chan struct{}
+}
+
+func (b *BroadcasterUpdateAssets) Subscribe() <-chan struct{} {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	ch := make(chan struct{}, 1)
+	b.subscribers = append(b.subscribers, ch)
+	return ch
+}
+
+func (b *BroadcasterUpdateAssets) Broadcast() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	for _, ch := range b.subscribers {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+}
+
 type AssetsPrices struct {
-	repo Repository
+	Repo Repository
 
 	Pairs        []string
 	Periods      map[string]time.Duration
 	PeriodsDelta map[string]time.Duration
 
-	UpdateTime   time.Time
-	UpdateChanel chan struct{}
+	UpdateTime              time.Time
+	BroadcasterUpdateAssets *BroadcasterUpdateAssets
 
 	// Актуальные данные для каждой пары. Price, 24ch, Volume
 	MarketsStatMu sync.RWMutex
@@ -80,7 +106,9 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 		Periods:      periodsChange,
 		PeriodsDelta: periodsDelta,
 
-		UpdateChanel: make(chan struct{}),
+		BroadcasterUpdateAssets: &BroadcasterUpdateAssets{
+			subscribers: []chan struct{}{},
+		},
 
 		MarketsStat: make(map[string]*exModel.MarketsStat),
 
@@ -90,7 +118,7 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 		ChangeDelta:        make(map[string]map[string]*ChangeDelta),
 		ChangeDeltaDataset: make(map[string]map[string]*ChangeDeltaDataset),
 
-		repo: repo,
+		Repo: repo,
 	}
 
 	for _, pair := range pairs {
@@ -139,11 +167,7 @@ func (ap *AssetsPrices) OnMarket(ms exModel.MarketsStat) {
 			// За это время ждем пока остальные пары обновят цену, не точное решение...
 			time.Sleep(1 * time.Second)
 			ap.updateChangePrices()
-			select {
-			case ap.UpdateChanel <- struct{}{}:
-			default:
-			}
-
+			ap.BroadcasterUpdateAssets.Broadcast()
 		}()
 
 		go func() {
@@ -170,7 +194,7 @@ func (ap *AssetsPrices) initChangePrices() {
 	// Интервал времени текущее время - время макс. периода
 	timeRoundingMax := ap.UpdateTime.Add(-max)
 
-	candles, err := ap.repo.SelectMarketStateTimev2(timeRoundingMax)
+	candles, err := ap.Repo.SelectMarketStateTimev2(timeRoundingMax)
 	if err != nil {
 		pricesLogger.Errorf("error SelectMarketStateTimev2: %v", err)
 		return
@@ -236,7 +260,7 @@ func (ap *AssetsPrices) initChangeDelta() {
 	}
 	// умножаем на два для сравнения двух периодов
 	timeRoundingMax := ap.UpdateTime.Add(-max * 2)
-	candles, err := ap.repo.SelectMarketStateTimev2(timeRoundingMax)
+	candles, err := ap.Repo.SelectMarketStateTimev2(timeRoundingMax)
 	if err != nil {
 		pricesLogger.Errorf("error SelectMarketStateTimev2: %v", err)
 		return
@@ -338,7 +362,7 @@ func (ap *AssetsPrices) updateChangeDelta() error {
 
 	timeStart := time.Now()
 
-	candles, err := ap.repo.SelectMarketStateTimev2(ap.UpdateTime.Add(-1 * time.Minute))
+	candles, err := ap.Repo.SelectMarketStateTimev2(ap.UpdateTime.Add(-1 * time.Minute))
 	if err != nil {
 		pricesLogger.Errorf("error SelectMarketStateTimev2: %v", err)
 		return err
@@ -533,7 +557,7 @@ func (ap *AssetsPrices) GetDeltaPeriod(pair, period string) ([]model.ChangeDelta
 
 	timeStart := time.Now()
 
-	changeDelta, err := ap.repo.SelectDeltaPeriod(pair, period)
+	changeDelta, err := ap.Repo.SelectDeltaPeriod(pair, period)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,8 @@
 module github.com/sambly/exchangebot
 
-go 1.22.5
+go 1.23.2
+
+toolchain go1.23.11
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
@@ -8,6 +10,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/joho/godotenv v1.5.1
+	github.com/markcheno/go-quote v0.0.0-20251007225555-e8466a237665
+	github.com/markcheno/go-talib v0.0.0-20250114000313-ec55a20c902f
 	github.com/prometheus/client_golang v1.22.0
 	github.com/sambly/exchangeService v1.4.15
 	github.com/sirupsen/logrus v1.9.3

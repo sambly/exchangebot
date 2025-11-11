@@ -59,10 +59,10 @@ func (s *StrategyBase) WithTelegramMenu() *StrategyBase {
 }
 
 func (str *StrategyBase) Start(ctx context.Context) error {
-
+	updateAsset := str.AssetsPrices.BroadcasterUpdateAssets.Subscribe()
 	for {
 		select {
-		case <-str.AssetsPrices.UpdateChanel:
+		case <-updateAsset:
 			str.changePrices()
 		case <-ctx.Done():
 			return ctx.Err()
@@ -78,6 +78,7 @@ func (str *StrategyBase) changePrices() {
 
 	for _, pair := range str.Config.Pairs {
 		for period := range str.Periods {
+			// TODO не правильно запроса, потокобезопасно надо
 			assets := str.AssetsPrices
 
 			if _, ok := assets.ChangePricesDataset[pair]; !ok {

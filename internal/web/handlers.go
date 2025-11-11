@@ -24,7 +24,7 @@ var upgrader = websocket.Upgrader{
 func (web *Web) updateFull(w http.ResponseWriter, _ *http.Request) {
 
 	maps := map[string]interface{}{
-		"MarketsStat": web.App.AssetsPrices.GetAllMarketsStat(),
+		"MarketsStat": web.app.AssetsPrices.GetAllMarketsStat(),
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(maps); err != nil {
@@ -59,10 +59,10 @@ func (web *Web) formingPage(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	maps := map[string]interface{}{
-		"Pairs":          web.App.AssetsPrices.Pairs,
-		"MarketsStat":    web.App.AssetsPrices.GetAllMarketsStat(),
-		"OrdersActive":   web.App.OrderController.State.GetOrdersActiveCopy(),
-		"OrdersHistory":  web.App.OrderController.State.GetOrdersHistoryCopy(),
+		"Pairs":          web.app.AssetsPrices.Pairs,
+		"MarketsStat":    web.app.AssetsPrices.GetAllMarketsStat(),
+		"OrdersActive":   web.app.OrderController.State.GetOrdersActiveCopy(),
+		"OrdersHistory":  web.app.OrderController.State.GetOrdersHistoryCopy(),
 		"OptionStrategy": option,
 	}
 
@@ -82,7 +82,7 @@ func (web *Web) getDeltaFast(w http.ResponseWriter, r *http.Request) {
 		appWebLogger.Errorf("error json unmarshal: %v", err)
 	}
 
-	candles, err := web.App.AssetsPrices.GetDeltaPeriod(data["Pair"], data["Frame"])
+	candles, err := web.app.AssetsPrices.GetDeltaPeriod(data["Pair"], data["Frame"])
 	if err != nil {
 		appWebLogger.Errorf("error GetDeltaPeriod: %v", err)
 	}
@@ -99,7 +99,7 @@ func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
 		appWebLogger.Errorf("error readfile: %v", err)
 	}
 	pair := string(bodyByte)
-	top, err := web.App.AssetsPrices.GetMarketsStatForPair(pair)
+	top, err := web.app.AssetsPrices.GetMarketsStatForPair(pair)
 	if err != nil {
 		appWebLogger.Errorf("error GetMarketsStatForPair: %v", err)
 	}
@@ -122,12 +122,12 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deal.Size = 1.0
-	_, err := web.App.OrderController.CreateOrderMarket(deal)
+	_, err := web.app.OrderController.CreateOrderMarket(deal)
 	if err != nil {
 		appWebLogger.Errorf("error CreateOrderMarket: %v", err)
 	}
 
-	orderActives := web.App.OrderController.State.GetOrdersActiveCopy()
+	orderActives := web.app.OrderController.State.GetOrdersActiveCopy()
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(orderActives); err != nil {
@@ -144,13 +144,13 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(string(bodyByte), 10, 64)
 	deal := order.Deal{Strategy: "manual"}
 
-	if err := web.App.OrderController.ClosePosition(id, deal); err != nil {
+	if err := web.app.OrderController.ClosePosition(id, deal); err != nil {
 		appWebLogger.Errorf("error ClosePosition: %v", err)
 	}
 
 	orders := map[string]interface{}{
-		"OrdersActive":  web.App.OrderController.State.GetOrdersActiveCopy(),
-		"OrdersHistory": web.App.OrderController.State.GetOrdersHistoryCopy()}
+		"OrdersActive":  web.app.OrderController.State.GetOrdersActiveCopy(),
+		"OrdersHistory": web.app.OrderController.State.GetOrdersHistoryCopy()}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(orders); err != nil {
@@ -161,17 +161,17 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 func (web *Web) closeAllDeal(w http.ResponseWriter, _ *http.Request) {
 
 	deal := order.Deal{Strategy: "manual"}
-	for _, orders := range web.App.OrderController.State.GetOrdersActiveCopy() {
+	for _, orders := range web.app.OrderController.State.GetOrdersActiveCopy() {
 		for _, order := range orders {
-			if err := web.App.OrderController.ClosePosition(order.ID, deal); err != nil {
+			if err := web.app.OrderController.ClosePosition(order.ID, deal); err != nil {
 				appWebLogger.Errorf("error ClosePosition: %v", err)
 			}
 		}
 	}
 
 	orders := map[string]interface{}{
-		"OrdersActive":  web.App.OrderController.State.GetOrdersActiveCopy(),
-		"OrdersHistory": web.App.OrderController.State.GetOrdersHistoryCopy()}
+		"OrdersActive":  web.app.OrderController.State.GetOrdersActiveCopy(),
+		"OrdersHistory": web.app.OrderController.State.GetOrdersHistoryCopy()}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(orders); err != nil {
@@ -183,15 +183,15 @@ func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 	conn, _ := upgrader.Upgrade(w, r, nil) // error ignored for sake of simplicity
 	defer conn.Close()
 
-	web.Sockets.clients.Store(conn, true)
-	defer web.Sockets.clients.Delete(conn)
+	web.sockets.clients.Store(conn, true)
+	defer web.sockets.clients.Delete(conn)
 	for {
 		mt, _, err := conn.ReadMessage()
 		if err != nil || mt == websocket.CloseMessage {
 			break // Выходим из цикла, если клиент пытается закрыть соединение или связь с клиентом прервана
 		}
 
-		web.Sockets.clients.Range(func(key, value interface{}) bool {
+		web.sockets.clients.Range(func(key, value interface{}) bool {
 			c := key.(*websocket.Conn)
 			if err := c.WriteMessage(websocket.TextMessage, []byte("Hello")); err != nil {
 				appWebLogger.Errorf("error Sockets: %v", err)
@@ -204,8 +204,8 @@ func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 func (web *Web) getChPrice(w http.ResponseWriter, _ *http.Request) {
 
 	maps := map[string]interface{}{
-		"MarketsStat":  web.App.AssetsPrices.GetAllMarketsStat(),
-		"ChangePrices": web.App.AssetsPrices.GetAllChPrice(),
+		"MarketsStat":  web.app.AssetsPrices.GetAllMarketsStat(),
+		"ChangePrices": web.app.AssetsPrices.GetAllChPrice(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -217,7 +217,7 @@ func (web *Web) getChPrice(w http.ResponseWriter, _ *http.Request) {
 func (web *Web) getChDelta(w http.ResponseWriter, _ *http.Request) {
 
 	maps := map[string]interface{}{
-		"DeltaFast": web.App.AssetsPrices.GetAllChDelta(),
+		"DeltaFast": web.app.AssetsPrices.GetAllChDelta(),
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(maps); err != nil {

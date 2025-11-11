@@ -90,7 +90,7 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/trade/jaeger/", app.basicAuth(app.jaeger))
 
 	// Сервер статических файлов
-	fileServer := http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content)))
+	fileServer := http.FileServer(http.FS(getFrontendAssets(app.cfg.ContentEmbed, app.content)))
 	mux.HandleFunc("/trade/", app.basicAuth(func(w http.ResponseWriter, r *http.Request) {
 		http.StripPrefix("/trade", instrumentedHandler("/trade", fileServer.ServeHTTP)).ServeHTTP(w, r)
 	}))
