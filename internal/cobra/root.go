@@ -196,6 +196,7 @@ func run(cmd *cobra.Command, args []string) error {
 		exflow,
 		exchange.WithDataFeedLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
 		exchange.WithDataFeedTracer(telemetry.Tracer),
+		exchange.WithMarketsFeed(),
 	)
 	if err != nil {
 		mainLogger.Fatalf("failed to initialize data feed: %v", err)
