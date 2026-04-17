@@ -7,6 +7,7 @@ import (
 	"time"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
@@ -26,6 +27,7 @@ type Strategy interface {
 type Option func(*ControllerStrategy)
 
 type ControllerStrategy struct {
+	TelegramEnable  bool
 	Strategies      []Strategy
 	Notification    *notification.Notification
 	Periods         map[string]time.Duration
@@ -39,6 +41,7 @@ var strategyLogger = logger.AddFields(map[string]interface{}{
 })
 
 func NewControllerStrategy(
+	cfg *config.Config,
 	assetsPrices *prices.AssetsPrices,
 	periods map[string]time.Duration,
 	pairs []string,
@@ -47,6 +50,7 @@ func NewControllerStrategy(
 	options ...Option) (*ControllerStrategy, error) {
 
 	ctrlStr := &ControllerStrategy{
+		TelegramEnable:  cfg.Telegram.Enable,
 		AssetsPrices:    assetsPrices,
 		Periods:         periods,
 		Pairs:           pairs,
@@ -66,11 +70,14 @@ func NewControllerStrategy(
 }
 
 func (cs *ControllerStrategy) build() error {
+
 	baseStrategy, err := base.NewStrategy(cs.AssetsPrices, cs.Periods, cs.Pairs, cs.Notification)
 	if err != nil {
 		return err
 	}
-	baseStrategy.WithTelegramMenu()
+	if cs.TelegramEnable {
+		baseStrategy.WithTelegramMenu()
+	}
 	cs.AddStrategy(baseStrategy)
 
 	simpleBuyStrategy, err := simplebuy.NewStrategy(cs.Notification, cs.AssetsPrices, cs.OrderController)
@@ -83,7 +90,9 @@ func (cs *ControllerStrategy) build() error {
 		return err
 	}
 
-	simpleBuyStrategy.WithTelegramMenu()
+	if cs.TelegramEnable {
+		simpleBuyStrategy.WithTelegramMenu()
+	}
 	baseStrategy.Subscribe(simpleBuyStrategy.StrategyBaseResult)
 	simpleBuyStrategy.WithSaleStrategy(simpleSaleStrategy)
 	cs.AddStrategy(simpleBuyStrategy)

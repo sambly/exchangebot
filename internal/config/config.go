@@ -31,6 +31,7 @@ type Telegram struct {
 	Token              string `mapstructure:"token" yaml:"token"`
 	User               string `mapstructure:"user" yaml:"user"`
 	NotificationEnable bool   `mapstructure:"notification-enable" yaml:"notification-enable"`
+	Enable             bool   `mapstructure:"enable" yaml:"enable"`
 }
 type Database struct {
 	Type       string `mapstructure:"type" yaml:"type"`

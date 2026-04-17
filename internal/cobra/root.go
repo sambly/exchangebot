@@ -215,19 +215,27 @@ func run(cmd *cobra.Command, args []string) error {
 		mainLogger.Fatal(err)
 	}
 
-	telegram, err := telegram.NewTelegram(app, cfg.Telegram)
-	if err != nil {
-		mainLogger.Fatal(err)
+	var telega *telegram.Telegram
+	if cfg.Telegram.Enable {
+		telega, err = telegram.NewTelegram(app, cfg.Telegram)
+		if err != nil {
+			mainLogger.Fatal(err)
+		}
+		notificationService.AddService(telega)
+		mainLogger.Info("Telegram инициализирован и запущен")
+	} else {
+		mainLogger.Info("Telegram не запущен: отключен в конфигурации")
 	}
-	notificationService.AddService(telegram)
 
 	web := web.NewWeb(app, socketsMessage, cfg.Web, exchangebot.Content)
 
 	g, gCtx := errgroup.WithContext(ctx)
 
-	g.Go(func() error {
-		return telegram.Start(gCtx)
-	})
+	if telega != nil {
+		g.Go(func() error {
+			return telega.Start(gCtx)
+		})
+	}
 
 	g.Go(func() error {
 		return notificationService.Start(gCtx)

@@ -18,6 +18,7 @@ tlg:
     token: ""
     user: ""
     notification-enable: false
+    enable: false
 db:
     type: mysql
     name: datafeeder

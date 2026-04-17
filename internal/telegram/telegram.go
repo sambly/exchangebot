@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -21,8 +22,8 @@ type Telegram struct {
 	bot             *tele.Bot
 	menu            *manager.MenuManager
 	callbakRegistry *utils.CallbackRegistry
-	*config.Telegram
-	user int64
+	config          *config.Telegram
+	user            int64
 
 	app *application.Application
 }
@@ -32,8 +33,7 @@ var tlgLogger = logger.AddFieldsEmpty()
 func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, error) {
 
 	if cfg.User == "" || cfg.Token == "" {
-		tlgLogger.Info("Telegram = nil, no cfg available")
-		return nil, nil
+		return nil, errors.New("telegram configuration is missing: user or token not provided")
 	}
 
 	user, _ := strconv.ParseInt(cfg.User, 10, 64)
@@ -67,7 +67,7 @@ func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, 
 		bot:             bot,
 		menu:            menu,
 		app:             app,
-		Telegram:        &cfg,
+		config:          &cfg,
 		user:            user,
 		callbakRegistry: callbakRegistry,
 	}
@@ -78,7 +78,7 @@ func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, 
 func (t *Telegram) Start(ctx context.Context) error {
 
 	if t == nil {
-		return nil
+		return errors.New("telegram not initialized")
 	}
 	menu := t.menu
 	// Запускаем обработчики всех кнопок
@@ -131,7 +131,7 @@ func (t *Telegram) Start(ctx context.Context) error {
 }
 
 func (t *Telegram) Send(message string) {
-	if t.NotificationEnable {
+	if t.config.NotificationEnable {
 		_, err := t.bot.Send(&tele.User{ID: t.user}, message)
 		if err != nil {
 			tlgLogger.Errorf("error sending message via Telegram: %v", err)
