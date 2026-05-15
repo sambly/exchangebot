@@ -35,7 +35,12 @@ COPY embed.go ./
 COPY ./configs ./configs
 COPY ./config.yaml ./config.yaml
 
-RUN go build -o ./exchangebot ./cmd/cobra
+# Версионирование
+ARG VERSION=unknown
+ARG COMMIT_HASH=unknown
+ARG BUILD_DATE=unknown
+
+RUN go build -ldflags="-X main.version=${VERSION}" -o ./exchangebot ./cmd/cobra
 
 # конфиги стратегий 
 RUN mkdir -p /app/only_strategies && \
@@ -49,7 +54,6 @@ RUN apk add --no-cache ca-certificates tzdata \
     && ln -sf /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
     && echo "Europe/Moscow" > /etc/timezone
 
-
 WORKDIR /app
 
 COPY --from=builder /app/exchangebot .
@@ -59,5 +63,15 @@ COPY --from=builder /app/only_strategies /app
 
 VOLUME /app/log
 EXPOSE 80
+
+# Docker метаданные
+ARG VERSION=unknown
+ARG COMMIT_HASH=unknown
+ARG BUILD_DATE=unknown
+LABEL org.opencontainers.image.created=${BUILD_DATE}
+LABEL org.opencontainers.image.revision=${COMMIT_HASH}
+LABEL org.opencontainers.image.version=${VERSION}
+LABEL org.opencontainers.image.title="exchangebot"
+LABEL org.opencontainers.image.description="Trading bot exchange"
 
 CMD ["./exchangebot"]
