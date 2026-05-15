@@ -50,10 +50,7 @@ window.forming_orders_history = function(orders) {
 
 $(function () {
     
-
-    const grafanaUrl = import.meta.env.VITE_GRAFANA_URL;
-    document.getElementById('grafana-link').href = grafanaUrl;
-
+    document.getElementById('grafana-link').href = "grafana";
     document.getElementById('jaeger-link').href = "jaeger";
 
     forming_page();
@@ -152,7 +149,7 @@ $(function () {
         e.preventDefault();
         e.target.disabled = true;
         $.ajax({
-            url: 'updatefull',
+            url: '/trade/api/updatefull',
             type: 'POST',
             method: 'POST',
             cache: false,
@@ -211,7 +208,7 @@ $(function () {
 
 
         $.ajax({
-            url: 'openDeal',
+            url: '/trade/api/openDeal',
             type: 'POST',
             method: 'POST',
             cache: false,
@@ -270,7 +267,7 @@ function forming_page() {
     const paramsStrategy = params.get("strategy");
 
     $.ajax({
-        url: 'formingPage',
+        url: '/trade/api/formingPage',
         async: false,
         type: 'POST',
         method: 'POST',
@@ -497,7 +494,7 @@ export  function change_pair(pair) {
 
 function update_top_data(pair) {
     $.ajax({
-        url: 'updateTop',
+        url: '/trade/api/updateTop',
         type: 'POST',
         method: 'POST',
         data: pair,
@@ -568,7 +565,7 @@ async function chart_volume_update() {
             let request = { Pair: pair, Frame: frame };
             let chartData = {};
             $.ajax({
-                url: 'getChangeDelta',
+                url: '/trade/api/getChangeDelta',
                 type: 'POST',
                 method: 'POST',
                 data: JSON.stringify(request),
@@ -645,7 +642,7 @@ export async function chart_frome_orders_update(orders) {
                 let request = { Pair: pair, Frame: frame };
                 let candles = [];
                 $.ajax({
-                    url: 'getChangeDelta',
+                    url: '/trade/api/getChangeDelta',
                     type: 'POST',
                     method: 'POST',
                     data: JSON.stringify(request),
@@ -818,7 +815,7 @@ function forming_tickers_list_volume() {
 
     var deltaFast;
     $.ajax({
-        url: 'getChDelta',
+        url: '/trade/api/getChDelta',
         async: false,
         method: 'GET',
         cache: false,
@@ -1098,7 +1095,7 @@ function fetchChangePrices() {
     var changePrices;
 
     $.ajax({
-        url: 'getChPrice',
+        url: '/trade/api/getChPrice',
         async: false,
         method: 'GET',
         cache: false,

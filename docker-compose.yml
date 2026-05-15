@@ -7,7 +7,6 @@ services:
       context: .
       args:
         GITHUB_TOKEN: ${GITHUB_TOKEN}
-        VITE_GRAFANA_URL: ${VITE_GRAFANA_URL:-grafana}
     image: sambly/exchangebot:${EXCHANGE_BOT_TAG:-latest}  
     ports:
       - "${EXCHANGEBOT_HOST_PORT:-8080}:${EXCHANGEBOT_WEB_LISTEN_PORT:-80}"

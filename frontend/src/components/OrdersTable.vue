@@ -112,7 +112,7 @@ export default {
     async function handleClose(orderId) {
       try {
         const response = await $.ajax({
-          url: 'closeDeal',
+          url: '/trade/api/closeDeal',
           type: 'POST',
           method: 'POST',
           cache: false,
@@ -134,7 +134,7 @@ export default {
       
       try {
         const response = await $.ajax({
-          url: 'closeAllDeal',
+          url: '/trade/api/closeAllDeal',
           type: 'POST',
           method: 'POST',
           cache: false,

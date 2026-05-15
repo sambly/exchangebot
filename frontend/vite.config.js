@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => ({
   base: "/trade/",
 
   plugins: [
-    vue(), // Подключаем плагин Vue
+    vue(),
   ],
 
   build: {
@@ -15,27 +15,43 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       input: path.resolve(__dirname, 'index.html'),
     },
-    sourcemap: mode === 'development', // Используем mode для включения sourcemap
+    sourcemap: mode === 'development',
   },
-  resolve: {
-    alias: {
-      '~bootstrap': path.resolve(__dirname, 'node_modules/bootstrap'),
-      '@': path.resolve(__dirname, 'src'), // Алиас для каталога src
-    },
-    extensions: ['.js', '.vue', '.json'], // Поддержка расширений файлов
-  },
+
   server: {
     port: 8080,
     hot: true,
+    proxy: {
+      // API-запросы проксируются на Go backend (порт 80)
+      '/trade/api': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
+      // WebSocket проксируется на Go backend
+      '/trade/ws': {
+        target: 'ws://localhost:80',
+        ws: true,
+      },
+    },
   },
+
+  resolve: {
+    alias: {
+      '~bootstrap': path.resolve(__dirname, 'node_modules/bootstrap'),
+      '@': path.resolve(__dirname, 'src'),
+    },
+    extensions: ['.js', '.vue', '.json'],
+  },
+
   css: {
     preprocessorOptions: {
       scss: {
-        additionalData: `@import "~bootstrap/scss/bootstrap";` // Поддержка SCSS
+        additionalData: `@import "~bootstrap/scss/bootstrap";`
       }
     }
   },
+
   optimizeDeps: {
-    include: ['bootstrap'], // Оптимизация зависимостей
-  }  
+    include: ['bootstrap'],
+  },
 }));

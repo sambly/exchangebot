@@ -57,6 +57,11 @@ func (app *Web) routes() *http.ServeMux {
 
 	mux := http.NewServeMux()
 
+	// Редирект с /trade на /trade/
+	mux.HandleFunc("/trade", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/trade/", http.StatusMovedPermanently)
+	})
+
 	// Промежуточный обработчик для измерения метрик
 	instrumentedHandler := func(path string, next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -70,24 +75,17 @@ func (app *Web) routes() *http.ServeMux {
 		}
 	}
 
-	mux.HandleFunc("/trade/formingPage", app.basicAuth(instrumentedHandler("/trade/formingPage", app.formingPage)))
-	mux.HandleFunc("/trade/updatefull", app.basicAuth(instrumentedHandler("/trade/updatefull", app.updateFull)))
-	mux.HandleFunc("/trade/getChangeDelta", app.basicAuth(instrumentedHandler("/trade/getChangeDelta", app.getDeltaFast)))
-	mux.HandleFunc("/trade/updateTop", app.basicAuth(instrumentedHandler("/trade/updateTop", app.updateTop)))
-	mux.HandleFunc("/trade/openDeal", app.basicAuth(instrumentedHandler("/trade/openDeal", app.openDeal)))
-	mux.HandleFunc("/trade/closeDeal", app.basicAuth(instrumentedHandler("/trade/closeDeal", app.closeDeal)))
-	// TODO пока закоментил, выдывало ошибку
-	// mux.HandleFunc("/trade/ws", app.basicAuth(instrumentedHandler("/trade/ws", app.echo)))
+	mux.HandleFunc("/trade/api/formingPage", app.basicAuth(instrumentedHandler("/trade/api/formingPage", app.formingPage)))
+	mux.HandleFunc("/trade/api/updatefull", app.basicAuth(instrumentedHandler("/trade/api/updatefull", app.updateFull)))
+	mux.HandleFunc("/trade/api/getChangeDelta", app.basicAuth(instrumentedHandler("/trade/api/getChangeDelta", app.getDeltaFast)))
+	mux.HandleFunc("/trade/api/getChPrice", app.basicAuth(instrumentedHandler("/trade/api/getChPrice", app.getChPrice)))
+	mux.HandleFunc("/trade/api/getChDelta", app.basicAuth(instrumentedHandler("/trade/api/getChDelta", app.getChDelta)))
+	mux.HandleFunc("/trade/api/updateTop", app.basicAuth(instrumentedHandler("/trade/api/updateTop", app.updateTop)))
+	mux.HandleFunc("/trade/api/openDeal", app.basicAuth(instrumentedHandler("/trade/api/openDeal", app.openDeal)))
+	mux.HandleFunc("/trade/api/closeDeal", app.basicAuth(instrumentedHandler("/trade/api/closeDeal", app.closeDeal)))
+	mux.HandleFunc("/trade/api/closeAllDeal", app.basicAuth(instrumentedHandler("/trade/api/closeAllDeal", app.closeAllDeal)))
+
 	mux.HandleFunc("/trade/ws", app.basicAuth(app.echo))
-
-	mux.HandleFunc("/trade/getChPrice", app.basicAuth(instrumentedHandler("/trade/getChPrice", app.getChPrice)))
-	mux.HandleFunc("/trade/getChDelta", app.basicAuth(instrumentedHandler("/trade/getChDelta", app.getChDelta)))
-
-	mux.HandleFunc("/trade/closeAllDeal", app.basicAuth(instrumentedHandler("/trade/closeAllDeal", app.closeAllDeal)))
-
-	//mux.HandleFunc("/trade/grafana", app.basicAuth(instrumentedHandler("/trade/grafana", app.grafana)))
-	mux.HandleFunc("/trade/grafana/", app.basicAuth(app.grafana))
-	mux.HandleFunc("/trade/jaeger/", app.basicAuth(app.jaeger))
 
 	// Сервер статических файлов
 	fileServer := http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content)))

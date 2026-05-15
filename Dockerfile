@@ -6,10 +6,6 @@ WORKDIR /app/frontend
 # Копируем только файлы, необходимые для установки зависимостей
 COPY ./frontend/package.json ./frontend/yarn.lock ./frontend/vite.config.js ./
 
-# Установка переменных окружения
-ARG VITE_GRAFANA_URL="grafana"
-ENV VITE_GRAFANA_URL=${VITE_GRAFANA_URL}
-
 # Установка зависимостей и сборка
 RUN yarn install
 COPY ./frontend ./
