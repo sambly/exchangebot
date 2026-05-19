@@ -13,9 +13,11 @@ import { createApp, h } from 'vue'
 import { change_pair, show_chart_orders, chart_frome_orders_update, chart_volume_update } from './tradeUtils.js';
 import OrdersTable from '../components/OrdersTable.vue'
 import OrdersTableHistory from '../components/OrdersTableHistory.vue'
+import FilterPanel from '../components/FilterPanel.vue'
 
 import { createPinia } from 'pinia';
 import { useOrdersStore } from '../stores/orders.js';
+import { useFiltersStore } from '../stores/filters.js';
 
 
 import emitter from './eventBus';
@@ -36,6 +38,13 @@ const historyApp = createApp({
 });
 historyApp.use(pinia);
 historyApp.mount('#panel-trade-history');
+
+// Приложение для панели фильтров
+const filterApp = createApp({
+  render: () => h(FilterPanel)
+});
+filterApp.use(pinia);
+filterApp.mount('#filter-panel');
 
 // Глобальные функции обновления ордеров
 window.forming_orders_active = function(orders) {
@@ -223,35 +232,10 @@ $(function () {
         });
     });
       
-    // Применить фильтры
-    $('#btn-apply-filter').click(function () {
-        // Объем 
-        let minVolume = document.querySelector('#minVolume').value.trim() || null;
-        let maxVolume = document.querySelector('#maxVolume').value.trim() || null;;
-        localStorage.setItem('minVolume', minVolume);
-        localStorage.setItem('maxVolume', maxVolume);
-        // ch1d
-        let minCh1d = document.querySelector('#minCh1d').value.trim() || null;
-        let maxCh1d = document.querySelector('#maxCh1d').value.trim() || null;;
-        localStorage.setItem('minCh1d', minCh1d);
-        localStorage.setItem('maxCh1d', maxCh1d);
-
+    // Слушатель события применения фильтров
+    window.addEventListener('filters:applied', function() {
+        forming_tickers_list_All();
     });
-
-    // Сбросить фильтры
-    $('#btn-reset-filter').click(function () {
-        // Объем 
-        document.querySelector('#minVolume').value = null;
-        document.querySelector('#maxVolume').value = null;
-        localStorage.setItem('minVolume', null);
-        localStorage.setItem('maxVolume', null);
-        // ch1d
-        document.querySelector('#minCh1d').value = null;
-        document.querySelector('#maxCh1d').value = null;
-        localStorage.setItem('minCh1d', null);
-        localStorage.setItem('maxCh1d', null);
-    });
-
 
 });
 
@@ -315,14 +299,6 @@ function forming_page() {
                 selectStrategy.value = paramsStrategy;
             }
             
-            // Фильтры
-            // Объем 
-            document.querySelector('#minVolume').value = localStorage.getItem('minVolume');
-            document.querySelector('#maxVolume').value = localStorage.getItem('maxVolume');
-            // Ch1d
-            document.querySelector('#minCh1d').value = localStorage.getItem('minCh1d');
-            document.querySelector('#maxCh1d').value = localStorage.getItem('maxCh1d');
-
             // Выбор определенного типа графика
             let checkboxes = document.querySelectorAll('[name="change-delta-check"]');
             checkboxes.forEach((checkbox, index) => {
@@ -873,31 +849,7 @@ function fetchChangePrices() {
 }
 
 
-function filters_get_pairs(marketsStat,changePrices){
-
-    const heads = ['1m', '3m', '15m', '1h', '4h', '1d'];
-    let pairs = [];
-
-   // Фильтры 
-   let minVolume = localStorage.getItem('minVolume');
-   let maxVolume = localStorage.getItem('maxVolume');
-   let minCh1d = localStorage.getItem('minCh1d');
-   let maxCh1d = localStorage.getItem('maxCh1d'); 
-
-   for (let pair in changePrices) {
-    
-        let volume = marketsStat[pair].Volume;
-        let ch1d = changePrices[pair][heads[5]]['СhangePercent'];
-
-        if ((minVolume != null && volume <= Number(minVolume)) || (maxVolume != null && volume >= Number(maxVolume))) {
-            continue;
-        }
-        // Ch1d
-        if ((minCh1d != null && ch1d <= Number(minCh1d)) || (maxCh1d != null && ch1d >= Number(maxCh1d))) {   
-            continue;
-        }
-
-        pairs.push(pair)
-   }
-   localStorage.setItem('filterPairs', JSON.stringify(pairs));
+function filters_get_pairs(marketsStat, changePrices) {
+    const filtersStore = useFiltersStore();
+    return filtersStore.filterPairs(marketsStat, changePrices);
 }
