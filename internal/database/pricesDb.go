@@ -33,66 +33,6 @@ func NewPricesDb(db *gorm.DB) *pricesDb {
 	return &pricesDb{db: db}
 }
 
-func (r *pricesDb) InsertCandle(candle exModel.Candle, period string) error {
-	start := time.Now()
-	result := r.db.Table(fmt.Sprintf("%s%s", candlesTables, period)).Create(&candle)
-	duration := time.Since(start).Seconds()
-
-	status := "success"
-	if result.Error != nil {
-		status = "error"
-	}
-
-	pricesDbOperationDuration.WithLabelValues("insert_candle", status).Observe(duration)
-	pricesDbOperationTotal.WithLabelValues("insert_candle", status).Inc()
-
-	return result.Error
-}
-
-func (r *pricesDb) InsertCandles(candles []exModel.Candle, period string) error {
-	if len(candles) == 0 {
-		return nil
-	}
-	start := time.Now()
-	result := r.db.Table(fmt.Sprintf("%s%s", candlesTables, period)).Create(&candles)
-	duration := time.Since(start).Seconds()
-
-	status := "success"
-	if result.Error != nil {
-		status = "error"
-	}
-
-	pricesDbOperationDuration.WithLabelValues("insert_candles", status).Observe(duration)
-	pricesDbOperationTotal.WithLabelValues("insert_candles", status).Inc()
-
-	return result.Error
-}
-
-func (r *pricesDb) GetCandlesByPeriod(period string) ([]exModel.Candle, error) {
-	start := time.Now()
-	var candles []exModel.Candle
-	result := r.db.Table(fmt.Sprintf("%s%s", candlesTables, period)).Find(&candles)
-	duration := time.Since(start).Seconds()
-
-	status := "success"
-	if result.Error != nil {
-		status = "error"
-	}
-
-	pricesDbOperationDuration.WithLabelValues("get_candles_by_period", status).Observe(duration)
-	pricesDbOperationTotal.WithLabelValues("get_candles_by_period", status).Inc()
-
-	if result.Error != nil {
-		return nil, result.Error
-	}
-
-	for i := range candles {
-		candles[i].AmountTradeAsk = candles[i].AmountTrade - candles[i].AmountTradeBuy
-		candles[i].ActiveAskVolume = candles[i].Volume - candles[i].ActiveBuyVolume
-	}
-	return candles, nil
-}
-
 func (r *pricesDb) SelectMarketStateTimev2(timeRounding time.Time) ([]exModel.Candle, error) {
 	start := time.Now()
 	var candles []exModel.Candle

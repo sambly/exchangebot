@@ -12,17 +12,15 @@ type Settings struct {
 	DeltaPeriods  map[string]time.Duration
 }
 type ChangeDeltaForCandle struct {
-	Time      time.Time
-	Volume    float64
-	VolumeBuy float64
-	VolumeAsk float64
-	Trades    int64
-	TradesBuy int64
-	TradesAsk int64
-
-	// For Candles
-	Open  float64
-	High  float64
-	Low   float64
-	Close float64
+	Time      time.Time `gorm:"column:time"`
+	Volume    float64   `gorm:"column:volume"`
+	VolumeBuy float64   `gorm:"column:active_buy_volume"`
+	VolumeAsk float64   `gorm:"-"`
+	Trades    int64     `gorm:"column:amount_trade"`
+	TradesBuy int64     `gorm:"column:amount_trade_buy"`
+	TradesAsk int64     `gorm:"-"`
+	Open      float64   `gorm:"column:open"`
+	High      float64   `gorm:"column:high"`
+	Low       float64   `gorm:"column:low"`
+	Close     float64   `gorm:"column:close"`
 }

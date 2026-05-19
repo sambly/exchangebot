@@ -13,9 +13,6 @@ import (
 )
 
 type Repository interface {
-	InsertCandle(candle exModel.Candle, period string) error
-	InsertCandles(candles []exModel.Candle, period string) error
-	GetCandlesByPeriod(period string) ([]exModel.Candle, error)
 	SelectMarketStateTimev2(timeRounding time.Time) ([]exModel.Candle, error)
 	SelectDeltaPeriod(pair string, period string) ([]model.ChangeDeltaForCandle, error)
 }
