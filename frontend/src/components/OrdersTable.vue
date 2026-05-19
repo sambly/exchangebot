@@ -62,7 +62,7 @@ import {
   change_pair,
   show_chart_orders,
   chart_frome_orders_update,
-} from '@/js/main.js';
+} from '@/js/tradeUtils.js';
 
 export default {
 
