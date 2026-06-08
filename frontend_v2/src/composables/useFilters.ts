@@ -1,5 +1,5 @@
 // composables/useFilters.ts
-import { ref, computed, inject, type Ref } from 'vue'
+import { ref } from 'vue'
 import type { MarketsStat, ChangePrices } from '../types'
 
 const periods = ['1m', '3m', '15m', '1h', '4h', '1d'] as const

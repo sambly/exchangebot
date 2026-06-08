@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, provide } from 'vue'
+import Toast from 'primevue/toast'
 
 import MainContainer from './components/MainView.vue'
 import Sidebar from './components/Layout/Sidebar.vue'
@@ -15,6 +16,7 @@ function toggleDarkMode() {
 
 <template>
   <div class="app-layout">
+    <Toast position="top-right" />
     <Sidebar :dark-mode="darkMode" @toggle-dark-mode="toggleDarkMode" />
     <main class="main-container-wrapper">
       <MainContainer />

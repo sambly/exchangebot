@@ -1,18 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, inject, type Ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useOrdersStore } from '../../stores/orders.ts'
+import { useUIStore } from '../../stores/ui'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
 import OrdersTabSwitcher from './OrdersTabSwitcher.vue'
 
-
 const store = useOrdersStore()
-
-const selectPair = inject<(pair: string) => void>('selectPair')!
-const activeOrdersTab = inject<Ref<'active' | 'history'>>('activeOrdersTab')!
-const activeChart = inject<Ref<'price' | 'volume' | 'trade-smart' | 'orders'>>('activeChart')!
+const ui = useUIStore()
 
 const selectedPair = ref('')
 const selectedInterval = ref('all')
@@ -62,8 +59,8 @@ function resetFilters() {
 }
 
 function onRowClick(event: any) {
-  selectPair(event.data.Pair)
-  activeChart.value = 'orders'
+  ui.selectPair(event.data.Pair)
+  ui.activeChart = 'orders'
 }
 
 function colorSide(side: string) {
@@ -89,7 +86,7 @@ function formatTime(timestamp?: string) {
   <div class="orders-wrapper">
 
     <div class="orders-header">
-      <OrdersTabSwitcher v-model="activeOrdersTab" />
+      <OrdersTabSwitcher v-model="ui.activeOrdersTab" />
 
       <div class="divider" />
 

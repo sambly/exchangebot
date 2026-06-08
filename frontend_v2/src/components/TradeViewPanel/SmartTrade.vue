@@ -3,7 +3,7 @@
 
     <!-- Header: пара + таймфреймы -->
     <div class="trade-header">
-      <span class="current-pair">{{ currentPair }}</span>
+      <span class="current-pair">{{ ui.currentPair }}</span>
       <div class="btn-group">
         <Button
           v-for="tf in timeframes"
@@ -31,6 +31,9 @@
         fluid
         size="small"
       />
+      <span v-if="selectedStrategyDescription" class="strategy-description">
+        {{ selectedStrategyDescription }}
+      </span>
     </div>
 
     <!-- Comment -->
@@ -69,14 +72,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, inject, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
 import Divider from 'primevue/divider'
+import { useToast } from 'primevue/usetoast'
 import { useOrdersStore, type Order } from '../../stores/orders.ts'
+import { useUIStore } from '../../stores/ui'
 
-const currentPair = inject<Ref<string>>('currentPair')!
+const ui = useUIStore()
+const toast = useToast()
 
 const timeframes = ['1m', '15m', '1h', '4h', '1d']
 const activeFrame = ref('15m')
@@ -84,9 +90,14 @@ const activeFrame = ref('15m')
 interface StrategyOption {
   label: string
   value: string
+  description: string
 }
 
 const strategyOptions = ref<StrategyOption[]>([])
+
+const selectedStrategyDescription = computed(() =>
+  strategyOptions.value.find(s => s.value === selectedStrategy.value)?.description || ''
+)
 const selectedStrategy = ref<string | null>(null)
 
 const loadStrategies = async () => {
@@ -125,7 +136,7 @@ const openDeal = async (sideType: 'BUY' | 'SELL') => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        pair: currentPair.value,
+        pair: ui.currentPair,
         sideType,
         frame: activeFrame.value,
         strategy: selectedStrategy.value,
@@ -140,8 +151,10 @@ const openDeal = async (sideType: 'BUY' | 'SELL') => {
     for (const order of orders) {
       ordersStore.addOrder(order)
     }
+    toast.add({ severity: 'success', summary: 'Сделка открыта', detail: `${ui.currentPair} ${sideType}`, life: 3000 })
   } catch (err) {
     console.error('openDeal error:', err)
+    toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Не удалось открыть сделку', life: 4000 })
   } finally {
     loading.value = false
   }
@@ -194,6 +207,12 @@ onMounted(() => {
   color: var(--p-text-muted-color);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.strategy-description {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  line-height: 1.4;
 }
 
 .deal-buttons {

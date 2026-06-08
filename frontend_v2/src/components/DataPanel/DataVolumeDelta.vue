@@ -1,19 +1,11 @@
 <script setup lang="ts">
-import {
-  ref,
-  computed,
-  inject,
-  watch,
-  onMounted,
-  nextTick,
-  type Ref
-} from 'vue'
-
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import type { DeltaFast, DeltaEntry } from '../../types'
-
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
+import { useUIStore } from '../../stores/ui'
+import { useFiltersStore } from '../../stores/filters'
 
 interface VolumeData {
   pair: string
@@ -26,24 +18,14 @@ interface VolumeData {
   isFavorite: boolean
 }
 
-
-const filteredPairs = inject<Ref<string[]>>('filteredPairs')!
-const currentPair = inject<Ref<string>>('currentPair')!
-const selectPair = inject<(pair: string) => void>('selectPair')!
-const activeComponent = inject<Ref<string>>('activeComponent')!
-const filterMode = inject<Ref<'all' | 'favorites'>>('filterMode')!
+const ui = useUIStore()
+const filters = useFiltersStore()
 
 const frames = ['1m', '3m', '15m', '1h', '4h', '1d'] as const
-
 const activeFrame = ref<string>('15m')
-
 const deltaFast = ref<DeltaFast>({})
-
 const isLoading = ref(false)
 const error = ref<string | null>(null)
-
-const favoritePairs = ref<Set<string>>(new Set())
-
 const tableContainerRef = ref<HTMLElement | null>(null)
 
 async function fetchDelta() {
@@ -79,21 +61,17 @@ async function fetchDelta() {
 
 const displayData = computed(() => {
   const df = deltaFast.value
-  const filterList = filteredPairs.value
+  const filterList = filters.filteredPairs
   const frame = activeFrame.value
 
   const result: VolumeData[] = []
 
   for (const pair of filterList) {
-    const entry: DeltaEntry | undefined =
-      df[pair]?.[frame]
+    const entry: DeltaEntry | undefined = df[pair]?.[frame]
 
     if (!entry) continue
 
-    if (
-      filterMode.value === 'favorites' &&
-      !favoritePairs.value.has(pair)
-    ) {
+    if (ui.filterMode === 'favorites' && !ui.favoritePairs.has(pair)) {
       continue
     }
 
@@ -105,7 +83,7 @@ const displayData = computed(() => {
       trades: entry.Trades,
       tradesBuy: entry.TradesBuy,
       tradesAsk: entry.TradesAsk,
-      isFavorite: favoritePairs.value.has(pair)
+      isFavorite: ui.favoritePairs.has(pair)
     })
   }
 
@@ -114,107 +92,48 @@ const displayData = computed(() => {
   return result
 })
 
-function loadFavorites() {
-  const stored = localStorage.getItem('favoritePairs')
-
-  if (!stored) return
-
-  try {
-    favoritePairs.value = new Set(JSON.parse(stored))
-  } catch {
-    favoritePairs.value = new Set()
-  }
-}
-
-function saveFavorites() {
-  localStorage.setItem(
-    'favoritePairs',
-    JSON.stringify(Array.from(favoritePairs.value))
-  )
-}
-
 function toggleFavorite(pairShort: string) {
-  const pairFull = pairShort + 'USDT'
-
-  if (favoritePairs.value.has(pairFull)) {
-    favoritePairs.value.delete(pairFull)
-  } else {
-    favoritePairs.value.add(pairFull)
-  }
-
-  saveFavorites()
+  ui.toggleFavorite(pairShort + 'USDT')
 }
 
 const onRowClick = (event: any) => {
-  selectPair(event.data.pair + 'USDT')
+  ui.selectPair(event.data.pair + 'USDT')
 }
 
 const fmt = (val: number) => val.toFixed(2)
 
-const getRowClass = (data: VolumeData) => {
-  return {
-    'table-row-active':
-      currentPair.value === data.pair + 'USDT'
-  }
-}
+const getRowClass = (data: VolumeData) => ({
+  'table-row-active': ui.currentPair === data.pair + 'USDT'
+})
+
+const ROW_HEIGHT = 41
 
 async function scrollToPair() {
   await nextTick()
-
-  const container = tableContainerRef.value?.querySelector(
-    '.p-datatable-table-container'
+  const idx = displayData.value.findIndex(d => d.pair + 'USDT' === ui.currentPair)
+  if (idx < 0) return
+  const container = (
+    tableContainerRef.value?.querySelector('.p-virtualscroller') ||
+    tableContainerRef.value?.querySelector('.p-datatable-table-container')
   ) as HTMLElement | null
-
   if (!container) return
-
-  const activeRow = container.querySelector(
-    '.table-row-active'
-  ) as HTMLElement | null
-
-  if (!activeRow) return
-
-  const containerRect =
-    container.getBoundingClientRect()
-
-  const rowRect =
-    activeRow.getBoundingClientRect()
-
-  const scrollOffset =
-    rowRect.top -
-    containerRect.top +
-    container.scrollTop -
-    container.clientHeight / 2 +
-    rowRect.height / 2
-
-  container.scrollTo({
-    top: scrollOffset,
-    behavior: 'auto'
-  })
+  const firstRow = container.querySelector('tbody tr') as HTMLElement | null
+  const rowH = firstRow?.offsetHeight || ROW_HEIGHT
+  const offset = idx * rowH - container.clientHeight / 2 + rowH / 2
+  container.scrollTo({ top: Math.max(0, offset), behavior: 'auto' })
 }
 
-watch(
-  [currentPair, displayData],
-  () => {
-    scrollToPair()
-  },
-  { deep: true }
-)
+watch(() => ui.currentPair, () => scrollToPair())
+watch(displayData, () => scrollToPair())
 
-watch(activeComponent, async (val) => {
+watch(() => ui.activeDataPanel, async (val) => {
   if (val !== 'volume') return
-
   await nextTick()
-
-  requestAnimationFrame(() => {
-    scrollToPair()
-  })
+  requestAnimationFrame(() => scrollToPair())
 })
 
 onMounted(async () => {
-  loadFavorites()
-
   await fetchDelta()
-
   scrollToPair()
 })
 </script>
@@ -230,23 +149,23 @@ onMounted(async () => {
           icon="pi pi-heart"
           size="small"
           severity="secondary"
-          :outlined="filterMode !== 'favorites'"
-          @click="filterMode = filterMode === 'favorites' ? 'all' : 'favorites'"
+          :outlined="ui.filterMode !== 'favorites'"
+          @click="ui.filterMode = ui.filterMode === 'favorites' ? 'all' : 'favorites'"
         />
         <div class="divider" />
         <Button
           label="Цена"
           severity="secondary"
           size="small"
-          :outlined="activeComponent !== 'price'"
-          @click="activeComponent = 'price'"
+          :outlined="ui.activeDataPanel !== 'price'"
+          @click="ui.activeDataPanel = 'price'"
         />
         <Button
           label="Объем"
           severity="secondary"
           size="small"
-          :outlined="activeComponent !== 'volume'"
-          @click="activeComponent = 'volume'"
+          :outlined="ui.activeDataPanel !== 'volume'"
+          @click="ui.activeDataPanel = 'volume'"
         />
       </div>
 
@@ -283,6 +202,7 @@ onMounted(async () => {
         :loading="isLoading"
         :scrollable="true"
         scrollHeight="flex"
+        :virtualScrollerOptions="{ itemSize: ROW_HEIGHT }"
         class="volume-table"
         dataKey="pair"
         :rowClass="getRowClass"
@@ -484,8 +404,6 @@ onMounted(async () => {
 
 :deep(.p-datatable-tbody > tr) {
   cursor: pointer;
-
-  transition: background-color 0.2s;
 }
 
 :deep(.p-datatable-tbody > tr > td) {

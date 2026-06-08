@@ -189,13 +189,6 @@ func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 			break // Выходим из цикла, если клиент пытается закрыть соединение или связь с клиентом прервана
 		}
 
-		web.Sockets.clients.Range(func(key, value interface{}) bool {
-			c := key.(*websocket.Conn)
-			if err := c.WriteMessage(websocket.TextMessage, []byte("Hello")); err != nil {
-				appWebLogger.Errorf("error Sockets: %v", err)
-			}
-			return true
-		})
 	}
 }
 

@@ -89,13 +89,13 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/trade/ws", app.basicAuth(app.echo))
 
 	// Сервер статических файлов (старый фронтенд)
-	v1FS := http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content, "frontend/dist")))
+	v1FS := gzipMiddleware(http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content, "frontend/dist"))))
 	mux.HandleFunc("/trade/", app.basicAuth(func(w http.ResponseWriter, r *http.Request) {
 		http.StripPrefix("/trade", instrumentedHandler("/trade", v1FS.ServeHTTP)).ServeHTTP(w, r)
 	}))
 
 	// Новый фронтенд (v2) на /trade/v2/
-	v2FS := http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content, "frontend_v2/dist")))
+	v2FS := gzipMiddleware(http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content, "frontend_v2/dist"))))
 	mux.HandleFunc("/trade/v2/", app.basicAuth(func(w http.ResponseWriter, r *http.Request) {
 		http.StripPrefix("/trade/v2", instrumentedHandler("/trade/v2", v2FS.ServeHTTP)).ServeHTTP(w, r)
 	}))

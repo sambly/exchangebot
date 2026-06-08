@@ -1,85 +1,66 @@
 <script setup lang="ts">
-import { ref, provide, onMounted, computed, inject, type Ref } from 'vue'
+import { ref, inject, onMounted, type Ref } from 'vue'
 import Button from 'primevue/button'
+import { useToast } from 'primevue/usetoast'
 
-import type { MarketsStat, ChangePrices } from '../types.ts'
-import { useFilters } from '../composables/useFilters.ts'
+import { useMarketStore } from '../stores/market'
+import { useFiltersStore } from '../stores/filters'
+import { useUIStore } from '../stores/ui'
+import { useOrders } from '../composables/useOrders.ts'
+
 import DataPanel from './DataPanel/DataPanel.vue'
 import HeaderInfo from './Layout/HeaderInfo.vue'
 import FilterPanel from './Layout/FilterPanel.vue'
 import TradingView  from './TradeViewPanel/TradingViewChart.vue'
 import ChartVolume  from './TradeViewPanel/ChartVolume.vue'
 import SmartTrade from './TradeViewPanel/SmartTrade.vue'
-import { useOrders } from '../composables/useOrders.ts'
 import OrdersChart from './TradeViewPanel/OrdersChart.vue'
 import OrdersActive from './OrdersPanel/OrdersActive.vue'
 import OrdersHistory from './OrdersPanel/OrdersHistory.vue'
-
 
 const PRICE_TABLE_WIDTH = '30%'
 
 const darkMode = inject<Ref<boolean>>('darkMode')!
 
-const marketsStat = ref<MarketsStat>({})
-const changePrices = ref<ChangePrices>({})
-const currentPair = ref<string>(localStorage.getItem('currentPair') || 'BTCUSDT')
-const filters = useFilters()
-const filteredPairs = computed(() => 
-  filters.getFilteredPairs(marketsStat.value, changePrices.value)
-)
+const market = useMarketStore()
+const filters = useFiltersStore()
+const ui = useUIStore()
 const { refreshOrders } = useOrders()
+const toast = useToast()
 
-
-// Управление видимостью компонентов
-const activeChart = ref<'price' | 'volume' | 'trade-smart' | 'orders'>('price')
-const activeOrdersTab = ref<'active' | 'history'>('active')
-
-
-provide('marketsStat', marketsStat)
-provide('changePrices', changePrices)
-provide('currentPair', currentPair)
-provide('selectPair', (pair: string) => {
-  currentPair.value = pair
-  localStorage.setItem('currentPair', pair)
-})
-provide('activeChart', activeChart)
-provide('activeOrdersTab', activeOrdersTab)
-// Фильтры
-provide('volumeFilter', filters.volumeFilter)
-provide('periodFilters', filters.periodFilters)
-provide('periods', filters.periods)
-provide('resetFilters', filters.resetFilters)
-provide('filteredPairs', filteredPairs)
-provide('saveFilters', filters.saveFilters)
+const isRefreshing = ref(false)
 
 const fetchData = async () => {
   try {
-    const response = await fetch('/trade/api/getChPrice', {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    })
+    const response = await fetch('/trade/api/getChPrice')
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
     const data = await response.json()
-    
-    console.log('Data fetched:', data)
 
-    marketsStat.value = data.MarketsStat || {}
-    changePrices.value = data.ChangePrices || {}
+    market.setMarketData({
+      MarketsStat: data.MarketsStat,
+      ChangePrices: data.ChangePrices,
+    })
 
-    const pairs = Object.keys(changePrices.value)
-    if (pairs.length > 0 && !pairs.includes(currentPair.value)) {
-      currentPair.value = pairs[0]
-      localStorage.setItem('currentPair', currentPair.value)
+    const pairs = Object.keys(data.ChangePrices || {})
+    if (pairs.length > 0 && !pairs.includes(ui.currentPair)) {
+      ui.selectPair(pairs[0])
     }
   } catch (err) {
     console.error('Error loading data:', err)
+    toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Не удалось загрузить данные', life: 4000 })
   }
 }
 
-const refreshData = () => {
-  filters.loadFilters()
-  fetchData()
-  refreshOrders()
+const refreshData = async () => {
+  if (isRefreshing.value) return
+  isRefreshing.value = true
+  try {
+    filters.loadFilters()
+    await Promise.all([fetchData(), refreshOrders()])
+    toast.add({ severity: 'success', summary: 'Готово', detail: 'Данные обновлены', life: 2000 })
+  } finally {
+    isRefreshing.value = false
+  }
 }
 
 onMounted(() => {
@@ -90,7 +71,7 @@ onMounted(() => {
 
 <template>
   <div class="main-container">
-    
+
     <div class="top-bar">
       <HeaderInfo />
       <div class="top-bar-controls">
@@ -101,15 +82,16 @@ onMounted(() => {
           size="small"
           severity="secondary"
           outlined
+          :loading="isRefreshing"
           @click="refreshData"
         />
       </div>
     </div>
 
     <div class="workspace">
-      
+
       <div class="workspace-body">
-        
+
         <div class="pairs-panel">
           <DataPanel />
         </div>
@@ -121,41 +103,41 @@ onMounted(() => {
               label="Price Chart"
               size="small"
               severity="secondary"
-              :outlined="activeChart !== 'price'"
-              @click="activeChart = 'price'"
+              :outlined="ui.activeChart !== 'price'"
+              @click="ui.activeChart = 'price'"
             />
             <Button
               label="Volume Chart"
               size="small"
               severity="secondary"
-              :outlined="activeChart !== 'volume'"
-              @click="activeChart = 'volume'"
+              :outlined="ui.activeChart !== 'volume'"
+              @click="ui.activeChart = 'volume'"
             />
             <Button
               label="Trade Console"
               size="small"
               severity="secondary"
-              :outlined="activeChart !== 'trade-smart'"
-              @click="activeChart = 'trade-smart'"
+              :outlined="ui.activeChart !== 'trade-smart'"
+              @click="ui.activeChart = 'trade-smart'"
             />
           </div>
 
           <div class="trading-workspace-content">
-            
-            <div v-show="activeChart === 'price'" class="trading-workspace-slot">
-              <TradingView :pair="currentPair" :dark-mode="darkMode" />
+
+            <div v-show="ui.activeChart === 'price'" class="trading-workspace-slot">
+              <TradingView :pair="ui.currentPair" :dark-mode="darkMode" />
             </div>
 
-            <div v-show="activeChart === 'volume'" class="trading-workspace-slot">
-              <ChartVolume :pair="currentPair" :dark-mode="darkMode" />
+            <div v-if="ui.activeChart === 'volume'" class="trading-workspace-slot">
+              <ChartVolume :pair="ui.currentPair" :dark-mode="darkMode" />
             </div>
 
-            <div v-show="activeChart === 'trade-smart'" class="trading-workspace-slot">
+            <div v-if="ui.activeChart === 'trade-smart'" class="trading-workspace-slot">
               <SmartTrade />
             </div>
 
-            <div v-show="activeChart === 'orders'" class="trading-workspace-slot">
-              <OrdersChart :pair="currentPair" :dark-mode="darkMode" :visible="activeChart === 'orders'" />
+            <div v-if="ui.activeChart === 'orders'" class="trading-workspace-slot">
+              <OrdersChart :pair="ui.currentPair" :dark-mode="darkMode" :visible="true" />
             </div>
 
           </div>
@@ -167,10 +149,10 @@ onMounted(() => {
 
     <div class="orders-bar">
       <div class="orders-bar-content">
-        <div v-show="activeOrdersTab === 'active'" class="orders-bar-slot">
+        <div v-show="ui.activeOrdersTab === 'active'" class="orders-bar-slot">
           <OrdersActive />
         </div>
-        <div v-show="activeOrdersTab === 'history'" class="orders-bar-slot">
+        <div v-show="ui.activeOrdersTab === 'history'" class="orders-bar-slot">
           <OrdersHistory />
         </div>
       </div>

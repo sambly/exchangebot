@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, inject, type Ref } from 'vue'
+import { computed } from 'vue'
 import { useOrdersStore, type Order } from '../../stores/orders.ts'
+import { useUIStore } from '../../stores/ui'
+import { useToast } from 'primevue/usetoast'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import OrdersTabSwitcher from './OrdersTabSwitcher.vue'
 
 const store = useOrdersStore()
-
-const selectPair = inject<(pair: string) => void>('selectPair')!
-const activeOrdersTab = inject<Ref<'active' | 'history'>>('activeOrdersTab')!
-const activeChart = inject<Ref<'price' | 'volume' | 'trade-smart' | 'orders'>>('activeChart')!
+const ui = useUIStore()
+const toast = useToast()
 
 const orderList = computed(() => store.sortedActive)
 const pnl = computed(() => orderList.value.reduce((sum, o) => sum + (o.Profit || 0), 0))
@@ -37,8 +37,8 @@ function formatTime(timestamp?: string) {
 }
 
 function onRowClick(event: any) {
-  selectPair(event.data.Pair)
-  activeChart.value = 'orders'
+  ui.selectPair(event.data.Pair)
+  ui.activeChart = 'orders'
 }
 
 async function handleClose(orderId: number) {
@@ -52,20 +52,20 @@ async function handleClose(orderId: number) {
     // Убираем из активных точечно
     store.removeOrder(orderId)
 
-    // Добавляем в историю если сервер вернул
     if (data.OrdersHistory) {
       const historyOrders = Array.isArray(data.OrdersHistory)
         ? data.OrdersHistory
         : (Object.values(data.OrdersHistory).flat() as Order[])
-      // Merge истории тоже без полного сброса
       for (const order of historyOrders) {
         if (!store.history.some(o => o.ID === order.ID)) {
           store.history.push(order)
         }
       }
     }
+    toast.add({ severity: 'success', summary: 'Сделка закрыта', detail: `#${orderId}`, life: 3000 })
   } catch (err) {
     console.error('Error closing order:', err)
+    toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Не удалось закрыть сделку', life: 4000 })
   }
 }
 
@@ -89,7 +89,7 @@ async function handleCloseAll() {
   <div class="orders-wrapper">
 
     <div class="orders-header">
-      <OrdersTabSwitcher v-model="activeOrdersTab" />
+      <OrdersTabSwitcher v-model="ui.activeOrdersTab" />
 
       <div class="divider" />
 

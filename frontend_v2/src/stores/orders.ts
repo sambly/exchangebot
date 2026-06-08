@@ -44,7 +44,7 @@ export const useOrdersStore = defineStore('orders', () => {
     active.value = active.value.filter(o => o.ID !== orderId)
   }
 
-  const sortedActive = computed(() =>
+const sortedActive = computed(() =>
     [...active.value].sort((a, b) => new Date(b.TimeCreated || 0).getTime() - new Date(a.TimeCreated || 0).getTime())
   )
 

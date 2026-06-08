@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { ref, inject, computed, type Ref } from 'vue'
+import { ref, computed } from 'vue'
 import InputNumber from 'primevue/inputnumber'
 import Button from 'primevue/button'
 import Divider from 'primevue/divider'
 import Card from 'primevue/card'
 import Popover from 'primevue/popover'
+import { storeToRefs } from 'pinia'
+import { useFiltersStore } from '../../stores/filters'
 
-const volumeFilter = inject<Ref<{ min: number | null; max: number | null }>>('volumeFilter')!
-const periodFilters = inject<Ref<Record<string, { min: number | null; max: number | null }>>>('periodFilters')!
-const periods = inject<readonly string[]>('periods')!
-const resetFilters = inject<() => void>('resetFilters')!
-const saveFilters = inject<() => void>('saveFilters')!
+const filtersStore = useFiltersStore()
+const { volumeFilter, periodFilters } = storeToRefs(filtersStore)
+const { periods, resetFilters, saveFilters } = filtersStore
 
 const popover = ref<InstanceType<typeof Popover>>()
 

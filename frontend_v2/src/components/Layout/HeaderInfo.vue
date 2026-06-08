@@ -1,42 +1,38 @@
 <script setup lang="ts">
-import { inject, computed, type Ref } from 'vue'
-import type { MarketsStat, ChangePrices } from '../types'
+import { computed } from 'vue'
 import Select from 'primevue/select'
+import { useMarketStore } from '../../stores/market'
+import { useUIStore } from '../../stores/ui'
 
-const marketsStat = inject<Ref<MarketsStat>>('marketsStat')!
-const changePrices = inject<Ref<ChangePrices>>('changePrices')!
-const currentPair = inject<Ref<string>>('currentPair')!
-const selectPair = inject<(pair: string) => void>('selectPair')!
+const market = useMarketStore()
+const ui = useUIStore()
 
-const pairOptions = computed(() => {
-  const pairs = Object.keys(changePrices.value || {})
-  return pairs.map(p => p.replace('USDT', ''))
-})
+const pairOptions = computed(() =>
+  Object.keys(market.changePrices).map(p => p.replace('USDT', ''))
+)
 
-const selectedOption = computed(() => {
-  return (currentPair.value || '').replace('USDT', '')
-})
+const selectedOption = computed(() => ui.currentPair.replace('USDT', ''))
 
 function onPairChange(displayName: string) {
-  selectPair(displayName + 'USDT')
+  ui.selectPair(displayName + 'USDT')
 }
 
 const ch24Top = computed(() => {
-  const stat = marketsStat.value?.[currentPair.value]
+  const stat = market.marketsStat[ui.currentPair]
   return stat?.Ch24 != null
     ? stat.Ch24.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' }) + '%'
     : ''
 })
 
 const volumeTop = computed(() => {
-  const stat = marketsStat.value?.[currentPair.value]
+  const stat = market.marketsStat[ui.currentPair]
   return stat?.Volume != null
     ? stat.Volume.toLocaleString('ru', { maximumFractionDigits: 2, notation: 'compact' })
     : ''
 })
 
 const ch24Color = computed(() => {
-  const val = marketsStat.value?.[currentPair.value]?.Ch24
+  const val = market.marketsStat[ui.currentPair]?.Ch24
   if (val == null) return 'inherit'
   return val > 0 ? 'var(--p-green-500)' : val < 0 ? 'var(--p-red-500)' : 'inherit'
 })

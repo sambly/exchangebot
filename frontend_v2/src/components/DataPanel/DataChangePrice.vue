@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, inject, watch, nextTick, type Ref } from 'vue'
-import type { MarketsStat, ChangePrices } from '../../types'
-
+import { ref, computed, watch, nextTick } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
+import { useMarketStore } from '../../stores/market'
+import { useUIStore } from '../../stores/ui'
+import { useFiltersStore } from '../../stores/filters'
 
 interface PriceData {
   pair: string
@@ -19,26 +20,18 @@ interface PriceData {
   isFavorite: boolean
 }
 
-// Inject
-const marketsStat = inject<Ref<MarketsStat>>('marketsStat')!
-const changePrices = inject<Ref<ChangePrices>>('changePrices')!
-const filteredPairs = inject<Ref<string[]>>('filteredPairs')!
-const currentPair = inject<Ref<string>>('currentPair')!
-const selectPair = inject<(pair: string) => void>('selectPair')!
-const activeComponent = inject<Ref<string>>('activeComponent')!
-const filterMode = inject<Ref<'all' | 'favorites'>>('filterMode')!
-
-const favoritePairs = ref<Set<string>>(new Set())
+const market = useMarketStore()
+const ui = useUIStore()
+const filters = useFiltersStore()
 
 const tableContainerRef = ref<HTMLElement | null>(null)
 
 const TIME_PERIODS = ['1m', '3m', '15m', '1h', '4h', '1d'] as const
 
-// Построение списка пар
 const pairs = computed(() => {
-  const ms = marketsStat.value || {}
-  const cp = changePrices.value || {}
-  const filterList = filteredPairs.value
+  const ms = market.marketsStat
+  const cp = market.changePrices
+  const filterList = filters.filteredPairs
 
   const result: PriceData[] = []
 
@@ -53,56 +46,22 @@ const pairs = computed(() => {
       '1h': cp[pair]?.['1h']?.ChangePercent || 0,
       '4h': cp[pair]?.['4h']?.ChangePercent || 0,
       '1d': cp[pair]?.['1d']?.ChangePercent || 0,
-      isFavorite: favoritePairs.value.has(pair)
+      isFavorite: ui.favoritePairs.has(pair)
     })
   }
 
   return result
 })
 
-// Отображаемый список
 const displayedPairs = computed(() => {
-  if (filterMode.value === 'favorites') {
-    return pairs.value.filter(p =>
-      favoritePairs.value.has(p.pair + 'USDT')
-    )
+  if (ui.filterMode === 'favorites') {
+    return pairs.value.filter(p => ui.favoritePairs.has(p.pair + 'USDT'))
   }
-
   return pairs.value
 })
 
-// Загрузка избранного
-function loadFavorites() {
-  const stored = localStorage.getItem('favoritePairs')
-
-  if (!stored) return
-
-  try {
-    favoritePairs.value = new Set(JSON.parse(stored))
-  } catch {
-    favoritePairs.value = new Set()
-  }
-}
-
-// Сохранение избранного
-function saveFavorites() {
-  localStorage.setItem(
-    'favoritePairs',
-    JSON.stringify(Array.from(favoritePairs.value))
-  )
-}
-
-// Toggle favorite
 function toggleFavorite(pairShort: string) {
-  const pairFull = pairShort + 'USDT'
-
-  if (favoritePairs.value.has(pairFull)) {
-    favoritePairs.value.delete(pairFull)
-  } else {
-    favoritePairs.value.add(pairFull)
-  }
-
-  saveFavorites()
+  ui.toggleFavorite(pairShort + 'USDT')
 }
 
 // Форматирование объема
@@ -131,70 +90,38 @@ const getChangeClass = (value: number) => {
 
 // Клик по строке
 const onRowClick = (event: any) => {
-  selectPair(event.data.pair + 'USDT')
+  ui.selectPair(event.data.pair + 'USDT')
 }
 
-// Active row class
-const getRowClass = (data: PriceData) => {
-  return {
-    'table-row-active':
-      currentPair.value === data.pair + 'USDT'
-  }
-}
-
-// Скролл к активной строке
-async function scrollToPair() {
-  await nextTick()
-
-  const container = tableContainerRef.value?.querySelector(
-    '.p-datatable-table-container'
-  ) as HTMLElement | null
-
-  if (!container) return
-
-  const activeRow = container.querySelector(
-    '.table-row-active'
-  ) as HTMLElement | null
-
-  if (!activeRow) return
-
-  const containerRect = container.getBoundingClientRect()
-  const rowRect = activeRow.getBoundingClientRect()
-
-  const scrollOffset =
-    rowRect.top -
-    containerRect.top +
-    container.scrollTop -
-    container.clientHeight / 2 +
-    rowRect.height / 2
-
-  container.scrollTo({
-    top: scrollOffset,
-    behavior: 'auto'
-  })
-}
-
-// Watch active pair
-watch(
-  [currentPair, displayedPairs],
-  () => {
-    scrollToPair()
-  },
-  { deep: true }
-)
-
-watch(activeComponent, async (val) => {
-  if (val !== 'price') return
-
-  await nextTick()
-
-  requestAnimationFrame(() => {
-    scrollToPair()
-  })
+const getRowClass = (data: PriceData) => ({
+  'table-row-active': ui.currentPair === data.pair + 'USDT'
 })
 
-// Init
-loadFavorites()
+const ROW_HEIGHT = 41
+
+async function scrollToPair() {
+  await nextTick()
+  const idx = displayedPairs.value.findIndex(p => p.pair + 'USDT' === ui.currentPair)
+  if (idx < 0) return
+  const container = (
+    tableContainerRef.value?.querySelector('.p-virtualscroller') ||
+    tableContainerRef.value?.querySelector('.p-datatable-table-container')
+  ) as HTMLElement | null
+  if (!container) return
+  const firstRow = container.querySelector('tbody tr') as HTMLElement | null
+  const rowH = firstRow?.offsetHeight || ROW_HEIGHT
+  const offset = idx * rowH - container.clientHeight / 2 + rowH / 2
+  container.scrollTo({ top: Math.max(0, offset), behavior: 'auto' })
+}
+
+watch(() => ui.currentPair, () => scrollToPair())
+watch(displayedPairs, () => scrollToPair())
+
+watch(() => ui.activeDataPanel, async (val) => {
+  if (val !== 'price') return
+  await nextTick()
+  requestAnimationFrame(() => scrollToPair())
+})
 </script>
 
 <template>
@@ -207,29 +134,29 @@ loadFavorites()
           icon="pi pi-heart"
           size="small"
           severity="secondary"
-          :outlined="filterMode !== 'favorites'"
-          @click="filterMode = filterMode === 'favorites' ? 'all' : 'favorites'"
+          :outlined="ui.filterMode !== 'favorites'"
+          @click="ui.filterMode = ui.filterMode === 'favorites' ? 'all' : 'favorites'"
         />
         <div class="divider" />
         <Button
           label="Цена"
           severity="secondary"
           size="small"
-          :outlined="activeComponent !== 'price'"
-          @click="activeComponent = 'price'"
+          :outlined="ui.activeDataPanel !== 'price'"
+          @click="ui.activeDataPanel = 'price'"
         />
         <Button
           label="Объем"
           severity="secondary"
           size="small"
-          :outlined="activeComponent !== 'volume'"
-          @click="activeComponent = 'volume'"
+          :outlined="ui.activeDataPanel !== 'volume'"
+          @click="ui.activeDataPanel = 'volume'"
         />
       </div>
     </div>
 
     <div
-      v-if="!changePrices || Object.keys(changePrices).length === 0"
+      v-if="!market.changePrices || Object.keys(market.changePrices).length === 0"
       class="loading-msg"
     >
       Загрузка данных...
@@ -244,6 +171,7 @@ loadFavorites()
         :value="displayedPairs"
         :scrollable="true"
         scrollHeight="flex"
+        :virtualScrollerOptions="{ itemSize: ROW_HEIGHT }"
         class="price-table"
         dataKey="pair"
         :rowClass="getRowClass"
@@ -419,7 +347,6 @@ loadFavorites()
 
 :deep(.p-datatable-tbody > tr) {
   cursor: pointer;
-  transition: background-color 0.2s;
 }
 
 :deep(.p-datatable-tbody > tr > td) {
