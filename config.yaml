@@ -19,6 +19,8 @@ tlg:
     user: ""
     notification-enable: false
     enable: false
+    use-proxy: false
+    proxy-url: ""
 db:
     type: mysql
     name: datafeeder

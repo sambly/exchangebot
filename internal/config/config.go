@@ -32,6 +32,8 @@ type Telegram struct {
 	User               string `mapstructure:"user" yaml:"user"`
 	NotificationEnable bool   `mapstructure:"notification-enable" yaml:"notification-enable"`
 	Enable             bool   `mapstructure:"enable" yaml:"enable"`
+	UseProxy           bool   `mapstructure:"use-proxy" yaml:"use-proxy"`
+	ProxyURL           string `mapstructure:"proxy-url" yaml:"proxy-url"`
 }
 type Database struct {
 	Type       string `mapstructure:"type" yaml:"type"`

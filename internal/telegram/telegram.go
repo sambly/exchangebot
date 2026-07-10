@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -46,6 +48,18 @@ func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, 
 		Poller: poller,
 	}
 
+	if cfg.UseProxy {
+		if cfg.ProxyURL == "" {
+			return nil, errors.New("use_proxy is enabled but proxy_url is not provided")
+		}
+
+		client, err := newHTTPClientWithProxy(cfg.ProxyURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure proxy: %w", err)
+		}
+		pref.Client = client
+	}
+
 	bot, err := tele.NewBot(pref)
 	if err != nil {
 		return nil, err
@@ -73,6 +87,22 @@ func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, 
 	}
 
 	return tlg, nil
+}
+
+func newHTTPClientWithProxy(rawProxyURL string) (*http.Client, error) {
+	proxyURL, err := url.Parse(rawProxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid proxy url: %w", err)
+	}
+
+	transport := &http.Transport{
+		Proxy: http.ProxyURL(proxyURL),
+	}
+
+	return &http.Client{
+		Transport: transport,
+		Timeout:   30 * time.Second,
+	}, nil
 }
 
 func (t *Telegram) Start(ctx context.Context) error {
