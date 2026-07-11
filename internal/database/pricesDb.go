@@ -62,6 +62,39 @@ func (r *pricesDb) SelectMarketStateTimev2(timeRounding time.Time) ([]exModel.Ca
 	return candles, nil
 }
 
+// SelectCandlesFromPeriod возвращает агрегированные свечи периода (таблица
+// candles_{period}) начиная с указанного времени, по всем парам сразу.
+// Используется для сидирования истории стратегий из БД при старте.
+func (r *pricesDb) SelectCandlesFromPeriod(period string, from time.Time) ([]exModel.Candle, error) {
+	start := time.Now()
+	var candles []exModel.Candle
+
+	err := r.db.Table(fmt.Sprintf("%s%s", candlesTables, period)).
+		Where("time >= ?", from).
+		Order("time DESC").
+		Find(&candles).Error
+	duration := time.Since(start).Seconds()
+
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+
+	pricesDbOperationDuration.WithLabelValues("select_candles_from_period", status).Observe(duration)
+	pricesDbOperationTotal.WithLabelValues("select_candles_from_period", status).Inc()
+
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range candles {
+		candles[i].AmountTradeAsk = candles[i].AmountTrade - candles[i].AmountTradeBuy
+		candles[i].ActiveAskVolume = candles[i].Volume - candles[i].ActiveBuyVolume
+	}
+
+	return candles, nil
+}
+
 func (r *pricesDb) SelectDeltaPeriod(pair string, period string) ([]model.ChangeDeltaForCandle, error) {
 	start := time.Now()
 	var candles []model.ChangeDeltaForCandle

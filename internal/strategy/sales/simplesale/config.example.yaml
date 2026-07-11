@@ -5,6 +5,6 @@ idName: salesimple
 # Описание стратегии
 description: Продажа при достижении изменения цены на определенный процент
 # Включение стратегии
-strategyEnable : true
+strategyEnable : false
 
 procent: 1.0

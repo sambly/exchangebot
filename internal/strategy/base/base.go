@@ -60,9 +60,11 @@ func (s *StrategyBase) WithTelegramMenu() *StrategyBase {
 
 func (str *StrategyBase) Start(ctx context.Context) error {
 
+	updates := str.AssetsPrices.Subscribe()
+
 	for {
 		select {
-		case <-str.AssetsPrices.UpdateChanel:
+		case <-updates:
 			str.changePrices()
 		case <-ctx.Done():
 			return ctx.Err()

@@ -12,6 +12,7 @@ import (
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/prices"
+	"github.com/sambly/exchangebot/internal/strategy/anomaly"
 	"github.com/sambly/exchangebot/internal/strategy/base"
 	"github.com/sambly/exchangebot/internal/strategy/sales/simplesale"
 	simplebuy "github.com/sambly/exchangebot/internal/strategy/simpleBuy"
@@ -84,6 +85,12 @@ func (cs *ControllerStrategy) build() error {
 	if err != nil {
 		return err
 	}
+
+	anomalyStrategy, err := anomaly.NewStrategy(cs.AssetsPrices, cs.Periods, cs.Pairs, cs.Notification)
+	if err != nil {
+		return err
+	}
+	cs.AddStrategy(anomalyStrategy)
 
 	simpleSaleStrategy, err := simplesale.NewStrategy(cs.OrderController)
 	if err != nil {

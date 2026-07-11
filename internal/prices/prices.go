@@ -15,6 +15,7 @@ import (
 type Repository interface {
 	SelectMarketStateTimev2(timeRounding time.Time) ([]exModel.Candle, error)
 	SelectDeltaPeriod(pair string, period string) ([]model.ChangeDeltaForCandle, error)
+	SelectCandlesFromPeriod(period string, from time.Time) ([]exModel.Candle, error)
 }
 
 type ChangePrices struct {
@@ -53,8 +54,12 @@ type AssetsPrices struct {
 	Periods      map[string]time.Duration
 	PeriodsDelta map[string]time.Duration
 
-	UpdateTime   time.Time
-	UpdateChanel chan struct{}
+	UpdateTime time.Time
+
+	// Каждый потребитель обновлений получает собственный канал через Subscribe().
+	// Общий канал на всех не подходит: тик достался бы только одной стратегии.
+	subscribersMu sync.Mutex
+	subscribers   []chan struct{}
 
 	// Актуальные данные для каждой пары. Price, 24ch, Volume
 	MarketsStatMu sync.RWMutex
@@ -76,8 +81,6 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 		Pairs:        pairs,
 		Periods:      periodsChange,
 		PeriodsDelta: periodsDelta,
-
-		UpdateChanel: make(chan struct{}),
 
 		MarketsStat: make(map[string]*exModel.MarketsStat),
 
@@ -136,11 +139,7 @@ func (ap *AssetsPrices) OnMarket(ms exModel.MarketsStat) {
 			// За это время ждем пока остальные пары обновят цену, не точное решение...
 			time.Sleep(1 * time.Second)
 			ap.updateChangePrices()
-			select {
-			case ap.UpdateChanel <- struct{}{}:
-			default:
-			}
-
+			ap.broadcastUpdate()
 		}()
 
 		go func() {
@@ -152,6 +151,73 @@ func (ap *AssetsPrices) OnMarket(ms exModel.MarketsStat) {
 			}
 		}()
 	}
+}
+
+// Subscribe возвращает отдельный канал обновлений для одного потребителя.
+// Канал буферизован на 1: если потребитель ещё обрабатывает предыдущий тик,
+// новый тик не теряется, но и не копится.
+func (ap *AssetsPrices) Subscribe() <-chan struct{} {
+	ap.subscribersMu.Lock()
+	defer ap.subscribersMu.Unlock()
+
+	ch := make(chan struct{}, 1)
+	ap.subscribers = append(ap.subscribers, ch)
+	return ch
+}
+
+// broadcastUpdate рассылает тик всем подписчикам. Отправка неблокирующая:
+// медленный потребитель не должен тормозить остальных.
+func (ap *AssetsPrices) broadcastUpdate() {
+	ap.subscribersMu.Lock()
+	defer ap.subscribersMu.Unlock()
+
+	for _, ch := range ap.subscribers {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+}
+
+// GetPeriodCandles отдаёт агрегированные свечи периода из БД начиная с from.
+// Одна такая свеча = одна выборка истории для стратегий: их метрики (change
+// цены, дельта объёма/трейдов) считаются как отношение соседних свечей периода.
+func (ap *AssetsPrices) GetPeriodCandles(period string, from time.Time) ([]exModel.Candle, error) {
+	return ap.repo.SelectCandlesFromPeriod(period, from)
+}
+
+// GetChangePrices возвращает копию ChangePrices для пары+периода и признак
+// того, что датасет уже заполнен (иначе ChangePercent не имеет смысла).
+func (ap *AssetsPrices) GetChangePrices(pair, period string) (ChangePrices, bool) {
+	ap.ChangePricesMu.RLock()
+	defer ap.ChangePricesMu.RUnlock()
+
+	ds, ok := ap.ChangePricesDataset[pair][period]
+	if !ok || ds == nil || !ds.Fill {
+		return ChangePrices{}, false
+	}
+	cp, ok := ap.ChangePrices[pair][period]
+	if !ok || cp == nil {
+		return ChangePrices{}, false
+	}
+	return *cp, true
+}
+
+// GetChangeDelta возвращает копию ChangeDelta для пары+периода и признак
+// того, что дельта-датасет уже заполнен.
+func (ap *AssetsPrices) GetChangeDelta(pair, period string) (ChangeDelta, bool) {
+	ap.ChangeDeltaMu.RLock()
+	defer ap.ChangeDeltaMu.RUnlock()
+
+	ds, ok := ap.ChangeDeltaDataset[pair][period]
+	if !ok || ds == nil || !ds.fill {
+		return ChangeDelta{}, false
+	}
+	cd, ok := ap.ChangeDelta[pair][period]
+	if !ok || cd == nil {
+		return ChangeDelta{}, false
+	}
+	return *cd, true
 }
 
 func (ap *AssetsPrices) initChangePrices() {
