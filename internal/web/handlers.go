@@ -189,13 +189,6 @@ func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 			break // Выходим из цикла, если клиент пытается закрыть соединение или связь с клиентом прервана
 		}
 
-		web.Sockets.clients.Range(func(key, value interface{}) bool {
-			c := key.(*websocket.Conn)
-			if err := c.WriteMessage(websocket.TextMessage, []byte("Hello")); err != nil {
-				appWebLogger.Errorf("error Sockets: %v", err)
-			}
-			return true
-		})
 	}
 }
 
@@ -217,6 +210,54 @@ func (web *Web) getChDelta(w http.ResponseWriter, _ *http.Request) {
 	maps := map[string]interface{}{
 		"DeltaFast": web.App.AssetsPrices.GetAllChDelta(),
 	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(maps); err != nil {
+		appWebLogger.Errorf("error json encoder: %v", err)
+	}
+}
+
+func (web *Web) getOrders(w http.ResponseWriter, _ *http.Request) {
+
+	maps := map[string]interface{}{
+		"OrdersActive":  web.App.OrderController.State.GetOrdersActiveCopy(),
+		"OrdersHistory": web.App.OrderController.State.GetOrdersHistoryCopy(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(maps); err != nil {
+		appWebLogger.Errorf("error json encoder: %v", err)
+	}
+}
+
+func (web *Web) getStrategies(w http.ResponseWriter, _ *http.Request) {
+
+	configPath := filepath.Join("configs", "strategy.yaml")
+	var optionByte []byte
+
+	// Список стратегий
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		if err := os.WriteFile(configPath, []byte{}, 0644); err != nil {
+			appWebLogger.Errorf("failed to create strategy file: %v", err)
+			return
+		}
+		optionByte = []byte{}
+	} else {
+		optionByte, err = os.ReadFile(configPath)
+		if err != nil {
+			appWebLogger.Errorf("failed to read strategy file: %v", err)
+			return
+		}
+	}
+
+	var option map[string]any
+	if err := yaml.Unmarshal(optionByte, &option); err != nil {
+		appWebLogger.Errorf("error yaml unmarshal: %v", err)
+	}
+
+	maps := map[string]any{
+		"OptionStrategy": option,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(maps); err != nil {
 		appWebLogger.Errorf("error json encoder: %v", err)

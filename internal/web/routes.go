@@ -38,19 +38,16 @@ func init() {
 	prometheus.MustRegister(httpRequestDuration)
 }
 
-func getFrontendAssets(production bool, content embed.FS) fs.FS {
-
-	path := "frontend/dist"
-
+func getFrontendAssets(production bool, content embed.FS, p string) fs.FS {
 	if production {
 		fsys := fs.FS(content)
-		f, err := fs.Sub(fsys, path)
+		f, err := fs.Sub(fsys, p)
 		if err != nil {
 			fmt.Println(err)
 		}
 		return f
 	}
-	return os.DirFS(path)
+	return os.DirFS(p)
 }
 
 func (app *Web) routes() *http.ServeMux {
@@ -85,12 +82,22 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/trade/api/closeDeal", app.basicAuth(instrumentedHandler("/trade/api/closeDeal", app.closeDeal)))
 	mux.HandleFunc("/trade/api/closeAllDeal", app.basicAuth(instrumentedHandler("/trade/api/closeAllDeal", app.closeAllDeal)))
 
+	// TODO : new API
+	mux.HandleFunc("/trade/api/getOrders", app.basicAuth(instrumentedHandler("/trade/api/getOrders", app.getOrders)))
+	mux.HandleFunc("/trade/api/getStrategies", app.basicAuth(instrumentedHandler("/trade/api/getStrategies", app.getStrategies)))
+
 	mux.HandleFunc("/trade/ws", app.basicAuth(app.echo))
 
-	// Сервер статических файлов
-	fileServer := http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content)))
+	// Сервер статических файлов (старый фронтенд)
+	v1FS := gzipMiddleware(http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content, "frontend/dist"))))
 	mux.HandleFunc("/trade/", app.basicAuth(func(w http.ResponseWriter, r *http.Request) {
-		http.StripPrefix("/trade", instrumentedHandler("/trade", fileServer.ServeHTTP)).ServeHTTP(w, r)
+		http.StripPrefix("/trade", instrumentedHandler("/trade", v1FS.ServeHTTP)).ServeHTTP(w, r)
+	}))
+
+	// Новый фронтенд (v2) на /trade/v2/
+	v2FS := gzipMiddleware(http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content, "frontend_v2/dist"))))
+	mux.HandleFunc("/trade/v2/", app.basicAuth(func(w http.ResponseWriter, r *http.Request) {
+		http.StripPrefix("/trade/v2", instrumentedHandler("/trade/v2", v2FS.ServeHTTP)).ServeHTTP(w, r)
 	}))
 
 	// Экспонируем метрики на маршруте /metrics
