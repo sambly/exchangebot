@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/prices"
@@ -11,6 +12,9 @@ import (
 
 var (
 	ErrInvalidQuantity = errors.New("invalid quantity")
+	// ErrNoMarketData - по паре ещё не приходило ни одного тика, открывать
+	// сделку не по чему: цена и время неизвестны.
+	ErrNoMarketData = errors.New("нет рыночных данных по паре")
 )
 
 type PaperWallet struct {
@@ -135,20 +139,30 @@ func (p *PaperWallet) CreateOrderMarket(deal order.Deal) (*order.Order, error) {
 	strategy := deal.Strategy
 
 	if size == 0 {
-		return &order.Order{}, ErrInvalidQuantity
-	}
-	// TODO здесь мне не очень нравится что данные берем с marketStat, актуальные они точно? или может другой способ сделать
-	// плюс не совсем корректно брать и время от туда , короче надо изучить
-	marketStat, err := p.assetsPrices.GetMarketsStatForPair(pair)
-	if err != nil {
-		return &order.Order{}, err
+		return nil, ErrInvalidQuantity
 	}
 
-	// TODO Ну и вообще брать данные с MarketsStat потокобезопасно?
-	// ну время точно поменять надо
+	marketStat, err := p.assetsPrices.GetMarketsStatForPair(pair)
+	if err != nil {
+		return nil, err
+	}
+
+	// По паре ещё не приходило ни одного тика: цена и время нулевые.
+	//
+	// Раньше такой ордер молча создавался с ценой 0 и датой 0000-00-00, а падал
+	// уже в MySQL ("Incorrect datetime value") - причём ошибка не доходила до
+	// интерфейса, и сделка просто "не появлялась".
+	if marketStat.Price == 0 || marketStat.Time.IsZero() {
+		return nil, fmt.Errorf("%w: %s", ErrNoMarketData, pair)
+	}
+
+	now := time.Now()
+
 	order := order.Order{
-		TimeCreated:  marketStat.Time,
-		Time:         marketStat.Time,
+		// Время СОЗДАНИЯ - это момент сделки по нашим часам, а не время события
+		// на бирже: последнее относится к цене, а не к ордеру.
+		TimeCreated:  now,
+		Time:         now,
 		Pair:         pair,
 		Side:         side,
 		Type:         order.OrderTypeMarket,
@@ -190,6 +204,7 @@ func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, er
 					o.Profit = (o.PriceCreated / o.Price * 100) - 100
 				}
 				o.StrategySell = deal.Strategy
+				o.ExitReason = deal.ExitReason
 				p.addOrderHistory(o)
 				p.removeOrderActive(o.Pair, o.ID)
 
@@ -198,7 +213,42 @@ func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, er
 		}
 	}
 
-	return nil, nil
+	// Раньше здесь возвращалось (nil, nil) - "ошибки нет, но и ордера нет".
+	// Вызывающий код это принимал за успех и разыменовывал nil.
+	return nil, fmt.Errorf("активный ордер id=%d не найден", id)
+}
+
+// UpdateOrdersPrice проставляет активным ордерам пары текущую цену и профит,
+// возвращая КОПИИ обновлённых ордеров.
+//
+// Раньше это делал OrderService: он брал у кошелька указатели на ордера и писал
+// в них, не держа его мьютекс, - то есть гонка с GetOrdersActiveCopy. Мутация
+// должна происходить там же, где живёт блокировка, а наружу уходить копии.
+func (p *PaperWallet) UpdateOrdersPrice(pair string, price float64) []order.Order {
+	p.Lock()
+	defer p.Unlock()
+
+	orders := p.ordersActive[pair]
+	if len(orders) == 0 {
+		return nil
+	}
+
+	updated := make([]order.Order, 0, len(orders))
+	for _, o := range orders {
+		o.Price = price
+
+		if o.PriceCreated != 0 && price != 0 {
+			switch o.Side {
+			case order.SideTypeBuy:
+				o.Profit = (price / o.PriceCreated * 100) - 100
+			case order.SideTypeSell:
+				o.Profit = (o.PriceCreated / price * 100) - 100
+			}
+		}
+
+		updated = append(updated, *o)
+	}
+	return updated
 }
 
 func (p *PaperWallet) CalculatePNL() (count int, profit float64) {

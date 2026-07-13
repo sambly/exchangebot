@@ -89,14 +89,44 @@ z = (текущее_значение - медиана_истории) / (1.4826 
 
 🚨 ADAUSDT
    1h z=8.4 | price +2.96%, volume +482.94%
+https://www.tradingview.com/chart/?symbol=BINANCE:ADAUSDT
+
 🚨 SXTUSDT
    15m z=7.5 | price +6.08%
    1h z=8.2 | price +5.94%
+https://www.tradingview.com/chart/?symbol=BINANCE:SXTUSDT
+
 🔴 TUSDT
    15m z=-6.2 | price -4.64%
+https://www.tradingview.com/chart/?symbol=BINANCE:TUSDT
 ```
 
+Ссылка на график идёт последней строкой блока: она нужна, чтобы по ней кликнуть, а не чтобы читать её глазами. Разметку (Markdown/HTML) не используем намеренно — Telegram и так делает такие ссылки кликабельными, а разметка ломала бы отправку на любом неэкранированном символе в тексте.
+
 Сколько пар показывать — `digestMaxItems`, остальные схлопываются в «… и ещё N пар».
+
+### 6.1. Лог аномалий
+
+При `logAnomalies: true` каждая аномалия дополнительно пишется в лог — по строке на пару+период:
+
+```
+anomaly pair=SXTUSDT period=15m level=2 z=7.50 notified=true  metrics=[price +6.08%]
+anomaly pair=BANDUSDT period=1h level=1 z=4.10 notified=false metrics=[price -1.55%]
+market-anomaly period=1h percent=12.5 anomalous=54 total=432
+```
+
+Два отличия от Telegram, и оба намеренные.
+
+**В лог идёт всё, что найдено** — включая аномалии, подавленные cooldown'ом и не дотянувшие до `minNotifyLevel`. Именно они и объясняют потом, почему в чате было пусто, а движение — было. Помечены как `notified=false`.
+
+**Формат плоский и грепаемый**, а не красивый: лог читают не глазами, а `grep`'ом.
+
+```bash
+grep 'anomaly ' log/app.log | grep 'level=3'          # только критические
+grep 'anomaly ' log/app.log | grep 'pair=SXTUSDT'     # история по паре
+grep 'anomaly ' log/app.log | grep 'notified=false'   # что не дошло до Telegram
+grep 'market-anomaly' log/app.log                     # рыночные срабатывания
+```
 
 ### 7. Рыночная метрика
 

@@ -51,7 +51,7 @@ func (m *StrategyBaseMenu) Show(c tele.Context, handler model.MenuHandler) error
 	handler.DeleteUserMessages(c, userID)
 
 	text := fmt.Sprintf("Настройки стратегии: %s\n", m.Strategy.Config.Name)
-	if m.Strategy.Config.NotificationEnable {
+	if m.Strategy.NotificationEnable.Get() {
 		text += "Уведомления: включены"
 	} else {
 		text += "Уведомления: отключены"
@@ -78,12 +78,12 @@ func (m *StrategyBaseMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 	})
 
 	b.Handle(&btnEnableNotifications, func(c tele.Context) error {
-		m.Strategy.Config.NotificationEnable = true
+		m.Strategy.NotificationEnable.Set(true)
 		return c.Respond(&tele.CallbackResponse{Text: "Уведомления включены ✅", ShowAlert: true})
 	})
 
 	b.Handle(&btnDisableNotifications, func(c tele.Context) error {
-		m.Strategy.Config.NotificationEnable = false
+		m.Strategy.NotificationEnable.Set(false)
 		return c.Respond(&tele.CallbackResponse{Text: "Уведомления отключены ❌", ShowAlert: true})
 	})
 

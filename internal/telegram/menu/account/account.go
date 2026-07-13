@@ -2,7 +2,6 @@ package account
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/sambly/exchangebot/internal/account"
@@ -91,7 +90,10 @@ func (m *AccountMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		handler.DeleteUserMessages(c, userID)
 
 		var out []string
-		for _, asset := range m.Account.Assets {
+		for _, asset := range m.Account.GetAssets() {
+			if asset.CommonData == nil {
+				continue
+			}
 			marketStat, _ := m.AssetsPrices.GetMarketsStatForPair(asset.Name)
 			s := fmt.Sprintf("%s: %.1f💲  24ch: %-5.1f", asset.Name[:len(asset.Name)-len("USDT")], asset.CommonData.FullPrice, marketStat.Ch24)
 			out = append(out, s)
@@ -117,7 +119,7 @@ func (m *AccountMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		handler.DeleteUserMessages(c, userID)
 
 		pairsText := "Выбери пару!!!!\n\nТекущие пары:\n"
-		for _, pair := range m.Account.AssetsKey {
+		for _, pair := range m.Account.GetAssetsKeys() {
 			pairsText += fmt.Sprintf("- %s\n", pair)
 		}
 		return c.Send(pairsText, m.Markup)
@@ -132,27 +134,29 @@ func (m *AccountMenu) HandleText(c tele.Context) error {
 	text := ""
 
 	// Выбор определенной пары
-	asset := strings.ToUpper(c.Text()) + "USDT"
-	assets := m.Account.Assets
-	assetsKey := m.Account.AssetsKey
+	assetName := strings.ToUpper(c.Text()) + "USDT"
+	assets := m.Account.GetAssets()
 	marketStat := m.AssetsPrices.GetAllMarketsStat()
 	change := m.AssetsPrices.GetAllChPrice()
-	if idx := slices.Index(assetsKey, asset); idx >= 0 {
-		fullPrice := assets[asset].CommonData.FullPrice
+
+	asset := assetName
+
+	if data, ok := assets[assetName]; ok && data.CommonData != nil {
+		fullPrice := data.CommonData.FullPrice
 		ch24 := marketStat[asset].Ch24
 
 		text = fmt.Sprintf("----%s----\nСтоимость	%.1f\nch24	%.1f\n", asset, fullPrice, ch24)
 
 		var fullPriceSpot, fullPriceFlexible, AssetStaking float64
 
-		if assets[asset].SpotData != nil {
-			fullPriceSpot = assets[asset].SpotData.FullPrice
+		if data.SpotData != nil {
+			fullPriceSpot = data.SpotData.FullPrice
 		}
-		if assets[asset].FlexibleData != nil {
-			fullPriceFlexible = assets[asset].FlexibleData.FullPrice
+		if data.FlexibleData != nil {
+			fullPriceFlexible = data.FlexibleData.FullPrice
 		}
-		if assets[asset].StakingData != nil {
-			AssetStaking = assets[asset].StakingData.FullPrice
+		if data.StakingData != nil {
+			AssetStaking = data.StakingData.FullPrice
 		}
 
 		if fullPriceFlexible != 0 || AssetStaking != 0 {

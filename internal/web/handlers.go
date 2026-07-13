@@ -140,7 +140,7 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, _ := strconv.ParseInt(string(bodyByte), 10, 64)
-	deal := order.Deal{Strategy: "manual"}
+	deal := order.Deal{Strategy: "manual", ExitReason: "manual"}
 
 	if err := web.App.OrderController.ClosePosition(id, deal); err != nil {
 		appWebLogger.Errorf("error ClosePosition: %v", err)
@@ -158,7 +158,7 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 
 func (web *Web) closeAllDeal(w http.ResponseWriter, _ *http.Request) {
 
-	deal := order.Deal{Strategy: "manual"}
+	deal := order.Deal{Strategy: "manual", ExitReason: "manual"}
 	for _, orders := range web.App.OrderController.State.GetOrdersActiveCopy() {
 		for _, order := range orders {
 			if err := web.App.OrderController.ClosePosition(order.ID, deal); err != nil {
@@ -177,8 +177,14 @@ func (web *Web) closeAllDeal(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+// echo регистрирует WebSocket-клиента для рассылки обновлений (SendDataRun).
+// Читающий цикл нужен только чтобы заметить закрытие соединения клиентом.
 func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
-	conn, _ := upgrader.Upgrade(w, r, nil) // error ignored for sake of simplicity
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		appWebLogger.Errorf("websocket upgrade: %v", err)
+		return
+	}
 	defer conn.Close()
 
 	web.Sockets.clients.Store(conn, true)
@@ -188,14 +194,9 @@ func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 		if err != nil || mt == websocket.CloseMessage {
 			break // Выходим из цикла, если клиент пытается закрыть соединение или связь с клиентом прервана
 		}
-
-		web.Sockets.clients.Range(func(key, value interface{}) bool {
-			c := key.(*websocket.Conn)
-			if err := c.WriteMessage(websocket.TextMessage, []byte("Hello")); err != nil {
-				appWebLogger.Errorf("error Sockets: %v", err)
-			}
-			return true
-		})
+		// Входящие сообщения игнорируем: канал односторонний, сервер -> клиент.
+		// Раньше здесь на ЛЮБОЕ входящее сообщение всем клиентам рассылалось
+		// "Hello" - забытая отладка.
 	}
 }
 

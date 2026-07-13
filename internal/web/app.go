@@ -44,6 +44,26 @@ var appWebLogger = logger.AddFields(map[string]interface{}{
 	"package": "web",
 })
 
+// writeTimeout - сколько ждём медленного WS-клиента, прежде чем отключить его.
+// Без дедлайна WriteMessage к залипшему клиенту блокирует рассылку всем
+// остальным, а очередь сокетов начинает переполняться и терять сообщения.
+const writeTimeout = 2 * time.Second
+
+// Таймауты HTTP-сервера.
+//
+// ReadTimeout и WriteTimeout здесь НЕ выставляются намеренно: они превращаются
+// в дедлайны на самом соединении, а после Upgrade (hijack) это соединение живёт
+// как веб-сокет - и дедлайн его убьёт. Раньше в TLS-режиме стоял
+// WriteTimeout: 5s, то есть каждый веб-сокет рвался через 5 секунд.
+//
+// От медленных клиентов защищаемся точечно: заголовки - ReadHeaderTimeout,
+// простаивающие keep-alive соединения - IdleTimeout, запись в веб-сокет -
+// SetWriteDeadline в SendDataRun.
+const (
+	readHeaderTimeout = 10 * time.Second
+	idleTimeout       = 120 * time.Second
+)
+
 func (c *Sockets) SendDataRun(ctx context.Context) {
 	go func(message chan []byte) {
 		for {
@@ -51,6 +71,14 @@ func (c *Sockets) SendDataRun(ctx context.Context) {
 			case mes := <-message:
 				c.clients.Range(func(key, value interface{}) bool {
 					conn := key.(*websocket.Conn)
+
+					if err := conn.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+						appWebLogger.Errorf("error set write deadline: %v", err)
+						conn.Close()
+						c.clients.Delete(conn)
+						return true
+					}
+
 					err := conn.WriteMessage(websocket.TextMessage, mes)
 					if err != nil {
 						appWebLogger.Errorf("error writing message to websocket: %v", err)
@@ -136,12 +164,11 @@ func (w *Web) serveTLS() error {
 	}
 
 	srv := &http.Server{
-		Addr:         ":443",
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
-		IdleTimeout:  120 * time.Second,
-		Handler:      w.routes(),
-		TLSConfig:    certManager.TLSConfig(),
+		Addr:              ":443",
+		ReadHeaderTimeout: readHeaderTimeout,
+		IdleTimeout:       idleTimeout,
+		Handler:           w.routes(),
+		TLSConfig:         certManager.TLSConfig(),
 	}
 	w.mu.Lock()
 	w.server = srv
@@ -154,8 +181,10 @@ func (w *Web) serve() error {
 
 	appWebLogger.Infof("Запуск HTTP сервера port:%s ", w.listenPort)
 	srv := &http.Server{
-		Addr:    ":" + w.listenPort,
-		Handler: w.routes(),
+		Addr:              ":" + w.listenPort,
+		ReadHeaderTimeout: readHeaderTimeout,
+		IdleTimeout:       idleTimeout,
+		Handler:           w.routes(),
 	}
 	w.mu.Lock()
 	w.server = srv

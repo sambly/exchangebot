@@ -6,32 +6,59 @@ import (
 	"time"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/prices"
+	"github.com/sambly/exchangebot/internal/strategy/signal"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
+	"github.com/sambly/exchangebot/internal/toggle"
 )
+
+var baseLogger = logger.AddFields(map[string]interface{}{
+	"package": "base",
+})
 
 type StrategyBase struct {
 	Config       *Config
 	Notification *notification.Notification
 	TelegramMenu *StrategyBaseMenu
 
+	// NotificationEnable переключается из телеграм-меню, а читается горутиной
+	// стратегии - поэтому живёт отдельно от Config, за мьютексом.
+	NotificationEnable *toggle.Bool
+
 	Periods      map[string]time.Duration
 	AssetsPrices *prices.AssetsPrices
 
-	subscribers []chan StrategyBaseResult
+	subscribers []chan signal.Signal
 }
 
-type StrategyBaseResult struct {
-	//TODO  Executed зачем ?
-	Executed bool
-	Data     BaseResult
+// Subscribe подписывает исполнителя на сигналы стратегии.
+// Тип сигнала общий для всех детекторов - см. пакет signal.
+func (str *StrategyBase) Subscribe(ch chan signal.Signal) {
+	str.subscribers = append(str.subscribers, ch)
 }
 
-type BaseResult struct {
-	Pair          string
-	Period        string
-	ChangePercent float64
+func (str *StrategyBase) signalFrom(pair, period string, changePercent float64) signal.Signal {
+	direction := signal.DirectionUp
+	if changePercent < 0 {
+		direction = signal.DirectionDown
+	}
+
+	return signal.Signal{
+		Source:        str.Config.IDName,
+		Pair:          pair,
+		Period:        period,
+		Time:          time.Now(),
+		Direction:     direction,
+		Level:         1,
+		Strength:      changePercent,
+		ChangePercent: changePercent,
+		// base не считает статистику по паре, поэтому волатильность неизвестна.
+		// Политика выхода в этом случае откатится на проценты из конфига.
+		Volatility: 0,
+		Reason:     fmt.Sprintf("%s %s изменение %.2f%%", str.Config.IDName, period, changePercent),
+	}
 }
 
 func NewStrategy(assetsPrices *prices.AssetsPrices, periods map[string]time.Duration, pairs []string, notify *notification.Notification) (*StrategyBase, error) {
@@ -44,10 +71,11 @@ func NewStrategy(assetsPrices *prices.AssetsPrices, periods map[string]time.Dura
 	}
 
 	str := &StrategyBase{
-		AssetsPrices: assetsPrices,
-		Periods:      periods,
-		Config:       cfg,
-		Notification: notify,
+		AssetsPrices:       assetsPrices,
+		Periods:            periods,
+		Config:             cfg,
+		Notification:       notify,
+		NotificationEnable: toggle.New(cfg.NotificationEnable),
 	}
 	return str, nil
 }
@@ -82,46 +110,35 @@ func (str *StrategyBase) changePrices() {
 		for period := range str.Periods {
 			assets := str.AssetsPrices
 
-			if _, ok := assets.ChangePricesDataset[pair]; !ok {
-				break
+			// Читаем под локом AssetsPrices: раньше здесь была гонка с
+			// горутиной, которая пересчитывает цены раз в минуту.
+			cp, ok := assets.GetChangePrices(pair, period)
+			if !ok {
+				continue
 			}
 
-			if assets.ChangePricesDataset[pair][period].Fill {
-				if assets.ChangePrices[pair][period].ChangePercent >= str.Config.WeightProcents[period] {
-					// Отправка сообщения об изменении цены
-					if str.Config.NotificationEnable {
-						str.NotificationWeightPercent(pair, period, assets.ChangePrices[pair][period].ChangePercent)
-					}
-					result := StrategyBaseResult{
-						Executed: true,
-						Data: BaseResult{
-							Pair:          pair,
-							Period:        period,
-							ChangePercent: assets.ChangePrices[pair][period].ChangePercent,
-						},
-					}
-					// Уведомляем подписчиков
-					str.notifySubscribers(result)
+			if cp.ChangePercent >= str.Config.WeightProcents[period] {
+				// Отправка сообщения об изменении цены
+				if str.NotificationEnable.Get() {
+					str.NotificationWeightPercent(pair, period, cp.ChangePercent)
 				}
+				// Уведомляем подписчиков-исполнителей
+				str.publish(str.signalFrom(pair, period, cp.ChangePercent))
 			}
 		}
 	}
 }
 
-func (str *StrategyBase) Subscribe(ch chan StrategyBaseResult) {
-	str.subscribers = append(str.subscribers, ch)
-}
-
-func (str *StrategyBase) notifySubscribers(result StrategyBaseResult) {
+// publish рассылает сигнал НЕблокирующе. Раньше на каждого подписчика
+// поднималась горутина с таймаутом в секунду - при залипшем потребителе это
+// плодило горутины пачками.
+func (str *StrategyBase) publish(sig signal.Signal) {
 	for _, sub := range str.subscribers {
-		go func(sub chan StrategyBaseResult) {
-			select {
-			case sub <- result:
-				// Успешно отправили
-			case <-time.After(1 * time.Second):
-				fmt.Println("Timeout sending result to subscriber, skipping...")
-			}
-		}(sub)
+		select {
+		case sub <- sig:
+		default:
+			baseLogger.Warnf("подписчик не успевает, сигнал %s %s отброшен", sig.Pair, sig.Period)
+		}
 	}
 }
 

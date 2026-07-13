@@ -16,6 +16,7 @@ import (
 	"github.com/sambly/exchangebot/internal/telegram/menu/manager"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 	"github.com/sambly/exchangebot/internal/telegram/utils"
+	"github.com/sambly/exchangebot/internal/toggle"
 
 	tele "gopkg.in/telebot.v3"
 )
@@ -26,6 +27,10 @@ type Telegram struct {
 	callbakRegistry *utils.CallbackRegistry
 	config          *config.Telegram
 	user            int64
+
+	// notificationEnable переключается из меню настроек (конкурентные
+	// обработчики telebot), а читается из горутины шины уведомлений.
+	notificationEnable *toggle.Bool
 
 	app *application.Application
 }
@@ -41,7 +46,8 @@ func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, 
 	user, _ := strconv.ParseInt(cfg.User, 10, 64)
 	poller := &tele.LongPoller{Timeout: 10 * time.Second}
 	callbakRegistry := utils.NewCallbackRegistry()
-	menu := manager.NewMenuManager(app, user, callbakRegistry)
+	notificationEnable := toggle.New(cfg.NotificationEnable)
+	menu := manager.NewMenuManager(app, user, callbakRegistry, notificationEnable)
 
 	pref := tele.Settings{
 		Token:  cfg.Token,
@@ -78,12 +84,13 @@ func NewTelegram(app *application.Application, cfg config.Telegram) (*Telegram, 
 	}
 
 	tlg := &Telegram{
-		bot:             bot,
-		menu:            menu,
-		app:             app,
-		config:          &cfg,
-		user:            user,
-		callbakRegistry: callbakRegistry,
+		bot:                bot,
+		menu:               menu,
+		app:                app,
+		config:             &cfg,
+		user:               user,
+		callbakRegistry:    callbakRegistry,
+		notificationEnable: notificationEnable,
 	}
 
 	return tlg, nil
@@ -161,7 +168,7 @@ func (t *Telegram) Start(ctx context.Context) error {
 }
 
 func (t *Telegram) Send(message string) {
-	if t.config.NotificationEnable {
+	if t.notificationEnable.Get() {
 		_, err := t.bot.Send(&tele.User{ID: t.user}, message)
 		if err != nil {
 			tlgLogger.Errorf("error sending message via Telegram: %v", err)

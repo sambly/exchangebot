@@ -109,7 +109,7 @@ func (m *ChangePeriodsMenu) handlePeriod(c tele.Context, handler model.MenuHandl
 func (m *ChangePeriodsMenu) getPeriods(period string) []string {
 	change := m.AssetsPrices.GetAllChPrice()
 	var out []string
-	for _, asset := range m.Account.Assets {
+	for _, asset := range m.Account.GetAssets() {
 		if _, ok := change[asset.Name][period]; ok {
 			s := fmt.Sprintf("%s:		%.2f", asset.Name[:len(asset.Name)-len("USDT")], change[asset.Name][period].ChangePercent)
 			out = append(out, s)

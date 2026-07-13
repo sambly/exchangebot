@@ -11,6 +11,7 @@ import (
 	"github.com/sambly/exchangebot/internal/telegram/menu/settings"
 	"github.com/sambly/exchangebot/internal/telegram/menu/strategies"
 	"github.com/sambly/exchangebot/internal/telegram/utils"
+	"github.com/sambly/exchangebot/internal/toggle"
 	tele "gopkg.in/telebot.v3"
 )
 
@@ -35,11 +36,11 @@ type MenuManager struct {
 }
 
 // NewMenuManager создаёт все меню.
-func NewMenuManager(app *application.Application, user int64, cbRegistry *utils.CallbackRegistry) *MenuManager {
+func NewMenuManager(app *application.Application, user int64, cbRegistry *utils.CallbackRegistry, notificationEnable *toggle.Bool) *MenuManager {
 	mainMenu := entry.NewMainMenu("Главное меню:", "main")
 	accountMenu := account.NewAccountMenu("Аккаунт:", "account", app.Account, app.AssetsPrices)
 	strategiesMenu := strategies.NewStrategyMenu("Стратегии:", "strategies", app.ControllerStrategy)
-	settingsMenu := settings.NewSettingsMenu("Настройки:", "settings", &app.Config.Telegram)
+	settingsMenu := settings.NewSettingsMenu("Настройки:", "settings", notificationEnable)
 
 	mainMenu.AddButtons(false, accountMenu.ButtonsHandler.EntryButton)
 	mainMenu.AddButtons(false, strategiesMenu.ButtonsHandler.EntryButton)

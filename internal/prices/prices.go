@@ -23,9 +23,10 @@ type ChangePrices struct {
 	ChangePercent float64
 }
 
+// ChangePricesDataset - окно цен за период (по одному значению в минуту)
 type ChangePricesDataset struct {
-	dataset []DatasetChangePrices
-	Fill    bool
+	window[DatasetChangePrices]
+	Fill bool
 }
 
 type DatasetChangePrices struct {
@@ -42,9 +43,11 @@ type ChangeDelta struct {
 	TradesAsk float64   `json:"TradesAsk"`
 }
 
+// ChangeDeltaDataset - окно объёмов и трейдов за 2 x период: свежая половина
+// сравнивается со старой.
 type ChangeDeltaDataset struct {
-	dataset []ChangeDelta
-	fill    bool
+	window[ChangeDelta]
+	fill bool
 }
 
 type AssetsPrices struct {
@@ -101,13 +104,19 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 		assetsPrices.ChangeDelta[pair] = map[string]*ChangeDelta{}
 		assetsPrices.ChangeDeltaDataset[pair] = map[string]*ChangeDeltaDataset{}
 
-		for period := range periodsChange {
+		// Размер окна цен - одно значение в минуту за период.
+		// Окно дельт вдвое больше: свежая половина сравнивается со старой.
+		for period, duration := range periodsChange {
 			assetsPrices.ChangePrices[pair][period] = &ChangePrices{}
-			assetsPrices.ChangePricesDataset[pair][period] = &ChangePricesDataset{}
+			assetsPrices.ChangePricesDataset[pair][period] = &ChangePricesDataset{
+				window: newWindow[DatasetChangePrices](int(duration.Minutes())),
+			}
 		}
-		for period := range periodsDelta {
+		for period, duration := range periodsDelta {
 			assetsPrices.ChangeDelta[pair][period] = &ChangeDelta{}
-			assetsPrices.ChangeDeltaDataset[pair][period] = &ChangeDeltaDataset{}
+			assetsPrices.ChangeDeltaDataset[pair][period] = &ChangeDeltaDataset{
+				window: newWindow[ChangeDelta](int(duration.Minutes()) * 2),
+			}
 		}
 	}
 	timeRounding := time.Now().Truncate(time.Minute)
@@ -220,7 +229,13 @@ func (ap *AssetsPrices) GetChangeDelta(pair, period string) (ChangeDelta, bool) 
 	return *cd, true
 }
 
-func (ap *AssetsPrices) initChangePrices() {
+// maxGap - разрыв между соседними свечами, после которого прогрев из БД
+// прекращается: собирать окно из кусков, между которыми дыра, бессмысленно.
+const maxGap = 10 * time.Minute
+
+// warmupCandles читает свечи из БД для прогрева окон при старте.
+// depth - на сколько назад брать историю (для дельт нужно вдвое больше).
+func (ap *AssetsPrices) warmupCandles(depth time.Duration) []exModel.Candle {
 
 	// Максимальный заданный период для запроса в бд
 	var max time.Duration
@@ -230,124 +245,99 @@ func (ap *AssetsPrices) initChangePrices() {
 		}
 	}
 
-	// Интервал времени текущее время - время макс. периода
-	timeRoundingMax := ap.UpdateTime.Add(-max)
-
-	candles, err := ap.repo.SelectMarketStateTimev2(timeRoundingMax)
+	candles, err := ap.repo.SelectMarketStateTimev2(ap.UpdateTime.Add(-max * depth))
 	if err != nil {
 		pricesLogger.Errorf("error SelectMarketStateTimev2: %v", err)
-		return
+		return nil
 	}
 
 	if len(candles) == 0 {
 		pricesLogger.Info("Нет свечей")
-		return
+		return nil
 	}
 
-	// candles[0] -самый актуальный candle
-	// сравнение времени candle с текущим временем
-	if candles[0].Time.Sub(ap.UpdateTime) > 10*time.Minute {
+	// candles[0] - самая свежая свеча. Если она сильно старше текущего времени,
+	// значит в БД нет данных за период и горячий перезапуск не удался.
+	if candles[0].Time.Sub(ap.UpdateTime) > maxGap {
 		pricesLogger.Info("В базе данных отсутствуют данные за период, горячий перезапуск не удался")
-		return
+		return nil
 	}
 
-	for _, candle := range candles {
+	return candles
+}
+
+// initChangePrices прогревает окна цен из БД. Свечи приходят от новых к старым -
+// ровно в том порядке, в котором окно их и хранит, поэтому каждая следующая
+// дописывается в хвост (pushOlder).
+func (ap *AssetsPrices) initChangePrices() {
+
+	for _, candle := range ap.warmupCandles(1) {
 
 		if !slices.Contains(ap.Pairs, candle.Pair) {
 			continue
 		}
 
-		for period, periodValue := range ap.Periods {
+		for period := range ap.Periods {
 
 			data := ap.ChangePricesDataset[candle.Pair][period]
+			if data.Fill {
+				continue
+			}
 
-			if !data.Fill {
+			// Дыра в данных - дальше окно не набираем
+			if tail, ok := data.oldest(); ok && tail.Time.Sub(candle.Time) > maxGap {
+				continue
+			}
 
-				item := DatasetChangePrices{
-					Price: candle.Close,
-					Time:  candle.Time,
-				}
+			data.pushOlder(DatasetChangePrices{Price: candle.Close, Time: candle.Time})
 
-				if len(data.dataset) == int(periodValue.Minutes()-1) {
-
-					data.dataset = append(data.dataset, item)
-					ap.ChangePrices[candle.Pair][period].LastPrice = data.dataset[len(data.dataset)-1].Price
-					ap.ChangePricesDataset[candle.Pair][period].Fill = true
-					ap.ChangePricesDataset[candle.Pair][period].dataset = data.dataset
-
-				} else {
-
-					// Большая погрешность дальше не заполняем  DatasetChangePrices
-					if len(data.dataset) > 0 && data.dataset[len(data.dataset)-1].Time.Sub(candle.Time) > 10*time.Minute {
-						continue
-					}
-					ap.ChangePricesDataset[candle.Pair][period].dataset = append(data.dataset, item)
+			if data.filled() {
+				data.Fill = true
+				if oldest, ok := data.oldest(); ok {
+					ap.ChangePrices[candle.Pair][period].LastPrice = oldest.Price
 				}
 			}
 		}
 	}
 }
 
+// initChangeDelta прогревает окна дельт. Глубина вдвое больше: окно сравнивает
+// два соседних периода.
 func (ap *AssetsPrices) initChangeDelta() {
 
-	// Максимальный заданный период для запроса в бд
-	var max time.Duration
-	for _, dur := range ap.Periods {
-		if dur > max {
-			max = dur
-		}
-	}
-	// умножаем на два для сравнения двух периодов
-	timeRoundingMax := ap.UpdateTime.Add(-max * 2)
-	candles, err := ap.repo.SelectMarketStateTimev2(timeRoundingMax)
-	if err != nil {
-		pricesLogger.Errorf("error SelectMarketStateTimev2: %v", err)
-		return
-	}
-
-	if len(candles) == 0 {
-		pricesLogger.Info("Нет свечей")
-		return
-	}
-
-	// candles[0] -самый актуальный candle
-	// сравнение времени candle с текущим временем
-	if candles[0].Time.Sub(ap.UpdateTime) > 10*time.Minute {
-		pricesLogger.Info("В базе данных отсутствуют данные за период, горячий перезапуск не удался")
-		return
-	}
-
-	for _, candle := range candles {
+	for _, candle := range ap.warmupCandles(2) {
 
 		if !slices.Contains(ap.Pairs, candle.Pair) {
 			continue
 		}
-		for period, periodValue := range ap.Periods {
+
+		for period := range ap.PeriodsDelta {
 
 			data := ap.ChangeDeltaDataset[candle.Pair][period]
-
-			if !data.fill {
-
-				// Большая погрешность дальше не заполняем  DatasetChangeDelta
-				if len(data.dataset) > 0 && data.dataset[len(data.dataset)-1].Time.Sub(candle.Time) > 10*time.Minute {
-					continue
-				}
-
-				item := ChangeDelta{
-					Time:      candle.Time,
-					Volume:    candle.Volume,
-					VolumeBuy: candle.ActiveBuyVolume,
-					VolumeAsk: candle.ActiveAskVolume,
-					Trades:    float64(candle.AmountTrade),
-					TradesBuy: float64(candle.AmountTradeBuy),
-					TradesAsk: float64(candle.AmountTradeAsk),
-				}
-
-				data.dataset = append(data.dataset, item)
-				ap.ChangeDeltaDataset[candle.Pair][period].dataset = data.dataset
-				ap.ChangeDeltaDataset[candle.Pair][period].fill = len(data.dataset) == int(periodValue.Minutes()*2)
+			if data.fill {
+				continue
 			}
+
+			// Дыра в данных - дальше окно не набираем
+			if tail, ok := data.oldest(); ok && tail.Time.Sub(candle.Time) > maxGap {
+				continue
+			}
+
+			data.pushOlder(deltaFromCandle(candle))
+			data.fill = data.filled()
 		}
+	}
+}
+
+func deltaFromCandle(candle exModel.Candle) ChangeDelta {
+	return ChangeDelta{
+		Time:      candle.Time,
+		Volume:    candle.Volume,
+		VolumeBuy: candle.ActiveBuyVolume,
+		VolumeAsk: candle.ActiveAskVolume,
+		Trades:    float64(candle.AmountTrade),
+		TradesBuy: float64(candle.AmountTradeBuy),
+		TradesAsk: float64(candle.AmountTradeAsk),
 	}
 }
 
@@ -360,35 +350,26 @@ func (ap *AssetsPrices) updateChangePrices() {
 	timeStart := time.Now()
 
 	for _, pair := range ap.Pairs {
-		for period, periodValue := range ap.Periods {
+		stat := ap.MarketsStat[pair]
+
+		for period := range ap.Periods {
 
 			data := ap.ChangePricesDataset[pair][period]
+			changePrices := ap.ChangePrices[pair][period]
 
-			item := DatasetChangePrices{
-				Price: ap.MarketsStat[pair].Price,
-				Time:  ap.MarketsStat[pair].Time,
+			// Изменение считаем ДО сдвига окна: LastPrice сейчас - это цена в
+			// начале окна, то есть period минут назад.
+			if data.Fill {
+				changePrices.ChangePercent = checkValuesDividing(stat.Price, changePrices.LastPrice)
 			}
 
-			if !data.Fill {
-				if len(data.dataset) == int(periodValue.Minutes()-1) {
-					data.dataset = append(data.dataset, item)
-					ap.ChangePrices[pair][period].LastPrice = data.dataset[len(data.dataset)-1].Price
-					ap.ChangePricesDataset[pair][period].Fill = true
-					ap.ChangePricesDataset[pair][period].dataset = data.dataset
-				} else {
-					ap.ChangePricesDataset[pair][period].dataset = append(data.dataset, item)
+			data.pushNewest(DatasetChangePrices{Price: stat.Price, Time: stat.Time})
+
+			if data.filled() {
+				data.Fill = true
+				if oldest, ok := data.oldest(); ok {
+					changePrices.LastPrice = oldest.Price
 				}
-			} else {
-
-				ap.ChangePrices[pair][period].ChangePercent = checkValuesDividing(ap.MarketsStat[pair].Price, ap.ChangePrices[pair][period].LastPrice)
-
-				// Помещаем dataset в самое начало
-				data.dataset = append([]DatasetChangePrices{item}, data.dataset...)
-
-				// Удаляем последний элемент
-				data.dataset = data.dataset[:len(data.dataset)-1]
-				ap.ChangePrices[pair][period].LastPrice = data.dataset[len(data.dataset)-1].Price
-				ap.ChangePricesDataset[pair][period].dataset = data.dataset
 			}
 		}
 	}
@@ -410,69 +391,35 @@ func (ap *AssetsPrices) updateChangeDelta() error {
 	ap.ChangeDeltaMu.Lock()
 	defer ap.ChangeDeltaMu.Unlock()
 
-	for _, candle := range candles {
+	// Свечи приходят от новых к старым, а вставлять их нужно в порядке
+	// возрастания времени: если по паре пришли сразу две новые (feederapp
+	// дописал предыдущую с опозданием), обе должны встать в датасет по порядку.
+	for i := len(candles) - 1; i >= 0; i-- {
+		candle := candles[i]
 
 		if !slices.Contains(ap.Pairs, candle.Pair) {
 			continue
 		}
 
-		for period, periodValue := range ap.PeriodsDelta {
+		for period := range ap.PeriodsDelta {
 
 			data := ap.ChangeDeltaDataset[candle.Pair][period]
 
-			item := ChangeDelta{
-				Time:      candle.Time,
-				Volume:    candle.Volume,
-				VolumeBuy: candle.ActiveBuyVolume,
-				VolumeAsk: candle.ActiveAskVolume,
-				Trades:    float64(candle.AmountTrade),
-				TradesBuy: float64(candle.AmountTradeBuy),
-				TradesAsk: float64(candle.AmountTradeAsk),
+			// Пока окно не заполнено, считать нечего: сравнивались бы половины
+			// разной длины. Дедупликацию берёт на себя pushNewest - запрос к БД
+			// идёт с запасом в минуту, и одна и та же свеча приходит дважды.
+			wasFilled := data.fill
+
+			if !data.pushNewest(deltaFromCandle(candle)) {
+				continue
 			}
 
-			if !data.fill {
-				data.dataset = append(data.dataset, item)
-				ap.ChangeDeltaDataset[candle.Pair][period].dataset = data.dataset
-				ap.ChangeDeltaDataset[candle.Pair][period].fill = len(data.dataset) == int(periodValue.Minutes()*2)
-			} else {
-				data.dataset = append([]ChangeDelta{item}, data.dataset...)
-				data.dataset = data.dataset[:len(data.dataset)-1]
-
-				ap.ChangeDeltaDataset[candle.Pair][period].dataset = data.dataset
-
-				itemFirst := ChangeDelta{}
-				itemLast := ChangeDelta{}
-
-				for index, item := range data.dataset {
-
-					if index < len(data.dataset)/2 {
-						itemFirst.Volume += item.Volume
-						itemFirst.VolumeBuy += item.VolumeBuy
-						itemFirst.VolumeAsk += item.VolumeAsk
-						itemFirst.Trades += item.Trades
-						itemFirst.TradesBuy += item.TradesBuy
-						itemFirst.TradesAsk += item.TradesAsk
-					}
-
-					if index >= len(data.dataset)/2 {
-						itemLast.Volume += item.Volume
-						itemLast.VolumeBuy += item.VolumeBuy
-						itemLast.VolumeAsk += item.VolumeAsk
-						itemLast.Trades += item.Trades
-						itemLast.TradesBuy += item.TradesBuy
-						itemLast.TradesAsk += item.TradesAsk
-					}
-				}
-
-				ap.ChangeDelta[candle.Pair][period].Volume = checkValuesDividing(itemFirst.Volume, itemLast.Volume)
-				ap.ChangeDelta[candle.Pair][period].VolumeBuy = checkValuesDividing(itemFirst.VolumeBuy, itemLast.VolumeBuy)
-				ap.ChangeDelta[candle.Pair][period].VolumeAsk = checkValuesDividing(itemFirst.VolumeAsk, itemLast.VolumeAsk)
-
-				ap.ChangeDelta[candle.Pair][period].Trades = checkValuesDividing(float64(itemFirst.Trades), float64(itemLast.Trades))
-				ap.ChangeDelta[candle.Pair][period].TradesBuy = checkValuesDividing(float64(itemFirst.TradesBuy), float64(itemLast.TradesBuy))
-				ap.ChangeDelta[candle.Pair][period].TradesAsk = checkValuesDividing(float64(itemFirst.TradesAsk), float64(itemLast.TradesAsk))
-
+			if !wasFilled {
+				data.fill = data.filled()
+				continue
 			}
+
+			ap.recalcDelta(candle.Pair, period, data)
 		}
 	}
 
@@ -480,6 +427,39 @@ func (ap *AssetsPrices) updateChangeDelta() error {
 	pricesLogger.Debugf("Время выполнения updateChangeDelta: %v ", duration)
 
 	return nil
+}
+
+// recalcDelta сравнивает свежую половину окна со старой: окно хранится от новых
+// к старым, поэтому первая половина по индексу - это последние period минут,
+// вторая - предыдущие period минут.
+func (ap *AssetsPrices) recalcDelta(pair, period string, data *ChangeDeltaDataset) {
+	items := data.values()
+	half := len(items) / 2
+
+	recent := ChangeDelta{}
+	previous := ChangeDelta{}
+
+	for index, item := range items {
+		target := &previous
+		if index < half {
+			target = &recent
+		}
+
+		target.Volume += item.Volume
+		target.VolumeBuy += item.VolumeBuy
+		target.VolumeAsk += item.VolumeAsk
+		target.Trades += item.Trades
+		target.TradesBuy += item.TradesBuy
+		target.TradesAsk += item.TradesAsk
+	}
+
+	delta := ap.ChangeDelta[pair][period]
+	delta.Volume = checkValuesDividing(recent.Volume, previous.Volume)
+	delta.VolumeBuy = checkValuesDividing(recent.VolumeBuy, previous.VolumeBuy)
+	delta.VolumeAsk = checkValuesDividing(recent.VolumeAsk, previous.VolumeAsk)
+	delta.Trades = checkValuesDividing(recent.Trades, previous.Trades)
+	delta.TradesBuy = checkValuesDividing(recent.TradesBuy, previous.TradesBuy)
+	delta.TradesAsk = checkValuesDividing(recent.TradesAsk, previous.TradesAsk)
 }
 
 func (ap *AssetsPrices) GetAllChPrice() map[string]map[string]ChangePrices {

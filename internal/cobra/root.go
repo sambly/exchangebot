@@ -173,7 +173,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	notificationService := notification.NewNotificationService(cfg.NotificationEnable)
-	socketsMessage := &notification.SocketsMessage{Message: make(chan []byte)}
+	socketsMessage := notification.NewSocketsMessage()
 
 	var exflow exchange.Exflow
 	var conn *grpc.ClientConn

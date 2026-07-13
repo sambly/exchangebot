@@ -2,6 +2,7 @@ package anomaly
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sort"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/prices"
+	"github.com/sambly/exchangebot/internal/strategy/signal"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
 
@@ -90,6 +92,21 @@ func median(values []float64) float64 {
 	return (sorted[n/2-1] + sorted[n/2]) / 2
 }
 
+// Scale - робастная оценка типичного разброса метрики (в тех же единицах, что
+// и сама метрика: для price это проценты). Это знаменатель z-score.
+//
+// Наружу нужна политике выхода: «типичное движение пары за период» - честная
+// мера того, что для этой пары много, а что шум.
+func (mr *MetricRecord) Scale() float64 {
+	mr.mu.RLock()
+	defer mr.mu.RUnlock()
+
+	if len(mr.values) < mr.minSamples {
+		return 0
+	}
+	return mr.scaleLocked()
+}
+
 // ZScore вычисляет робастный z-score для value ОТНОСИТЕЛЬНО ТЕКУЩЕЙ истории,
 // не включая само value. Вызывающий код обязан вызвать ZScore ДО Add, иначе
 // выброс попадает в собственную базу и занижает свой же z-score.
@@ -106,6 +123,16 @@ func (mr *MetricRecord) ZScore(value float64) float64 {
 		return 0
 	}
 
+	scale := mr.scaleLocked()
+	if scale == 0 {
+		return 0
+	}
+
+	return (value - median(mr.values)) / scale
+}
+
+// scaleLocked - робастная оценка разброса: MAD, приведённый к шкале сигмы.
+func (mr *MetricRecord) scaleLocked() float64 {
 	med := median(mr.values)
 
 	deviations := make([]float64, len(mr.values))
@@ -129,11 +156,7 @@ func (mr *MetricRecord) ZScore(value float64) float64 {
 	if scale < mr.scaleFloor {
 		scale = mr.scaleFloor
 	}
-	if scale == 0 {
-		return 0
-	}
-
-	return (value - med) / scale
+	return scale
 }
 
 // AnomalyResult результат проверки одной пары за один период
@@ -218,7 +241,69 @@ type AnomalyStrategy struct {
 	// уведомления по коротким (15m, 1h) на всю свою длительность.
 	marketStates map[string]*PeriodState
 
+	// Подписчики на сигналы - исполнители сделок. Стратегия не знает, кто это
+	// и что они с сигналом сделают.
+	subscribers []chan signal.Signal
+
 	mu sync.RWMutex
+}
+
+// Subscribe подписывает исполнителя на сигналы стратегии
+func (s *AnomalyStrategy) Subscribe(ch chan signal.Signal) {
+	s.subscribers = append(s.subscribers, ch)
+}
+
+// publish рассылает сигналы подписчикам НЕблокирующе: торговый модуль не должен
+// тормозить детектор, а протухший сигнал никому не нужен.
+func (s *AnomalyStrategy) publish(results []*AnomalyResult) {
+	if len(s.subscribers) == 0 {
+		return
+	}
+
+	for _, result := range results {
+		sig := s.signalFrom(result)
+
+		for _, sub := range s.subscribers {
+			select {
+			case sub <- sig:
+			default:
+				anomalyLogger.Warnf("подписчик не успевает, сигнал %s %s отброшен", sig.Pair, sig.Period)
+			}
+		}
+	}
+}
+
+func (s *AnomalyStrategy) signalFrom(result *AnomalyResult) signal.Signal {
+	direction := signal.DirectionUp
+	if result.CompositeZ < 0 {
+		direction = signal.DirectionDown
+	}
+
+	priceMetric := result.Metrics["price"]
+
+	return signal.Signal{
+		Source:        s.Config.IDName,
+		Pair:          result.Pair,
+		Period:        result.Period,
+		Time:          time.Now(),
+		Direction:     direction,
+		Level:         result.Level,
+		Strength:      result.CompositeZ,
+		ChangePercent: priceMetric.Value,
+		Volatility:    s.priceVolatility(result.Pair, result.Period),
+		Reason: fmt.Sprintf("%s %s z=%.1f level=%d",
+			s.Config.IDName, result.Period, result.CompositeZ, result.Level),
+	}
+}
+
+// priceVolatility - типичное движение цены пары за период (%), по той же
+// робастной оценке, из которой считается z-score.
+func (s *AnomalyStrategy) priceVolatility(pair, period string) float64 {
+	record, ok := s.history[pair][period]["price"]
+	if !ok || record == nil {
+		return 0
+	}
+	return record.Scale()
 }
 
 var anomalyLogger = logger.AddFields(map[string]interface{}{
@@ -310,22 +395,74 @@ func (s *AnomalyStrategy) seedHistory() {
 		}
 
 		seededPairs := 0
+		samplesPerPair := 0
+
 		for pair, pairCandles := range byPair {
 			sort.Slice(pairCandles, func(i, j int) bool {
 				return pairCandles[i].Time.Before(pairCandles[j].Time)
 			})
-			if s.seedPairPeriod(pair, period, duration, pairCandles) {
-				seededPairs++
+
+			added := s.seedPairPeriod(pair, period, duration, pairCandles)
+			if added == 0 {
+				continue
+			}
+			seededPairs++
+			// Пары набирают одинаковое число выборок (свечи пишутся всем разом),
+			// поэтому для отчёта достаточно минимума - он и определяет, заработает
+			// период или нет.
+			if samplesPerPair == 0 || added < samplesPerPair {
+				samplesPerPair = added
 			}
 		}
 
-		anomalyLogger.Infof("история %s засеяна из БД: %d пар", period, seededPairs)
+		s.reportSeeding(period, duration, seededPairs, samplesPerPair)
 	}
 }
 
-// seedPairPeriod засеивает историю одной пары за один период. Возвращает true,
-// если удалось добавить хотя бы одну выборку.
-func (s *AnomalyStrategy) seedPairPeriod(pair, period string, duration time.Duration, candles []exModel.Candle) bool {
+// reportSeeding честно сообщает, заработает период или нет.
+//
+// Раньше здесь было просто "засеяна: N пар" - и это вводило в заблуждение: пара
+// считалась засеянной, если в неё попала ХОТЬ ОДНА выборка. Периоды 4h и 1d так
+// и молчали сутками, а лог рапортовал об успехе.
+func (s *AnomalyStrategy) reportSeeding(period string, duration time.Duration, pairs, samples int) {
+	required := s.requiredSamples(period)
+
+	if pairs == 0 {
+		anomalyLogger.Warnf("история %s НЕ засеяна: в БД нет свечей этого периода — период не работает", period)
+		return
+	}
+
+	if samples < required {
+		// Сколько ещё ждать: не хватает (required - samples) свечей, каждая
+		// набирается за duration.
+		wait := time.Duration(required-samples) * duration
+		anomalyLogger.Warnf(
+			"история %s засеяна из БД: %d пар, но выборок только %d из %d — ПЕРИОД НЕ РАБОТАЕТ (z-score не считается), нужно ещё ~%s данных",
+			period, pairs, samples, required, wait.Round(time.Hour))
+		return
+	}
+
+	anomalyLogger.Infof("история %s засеяна из БД: %d пар, выборок %d (минимум %d) — период работает",
+		period, pairs, samples, required)
+}
+
+// requiredSamples - сколько значений должно быть в буфере, чтобы z-score
+// вообще начал считаться (см. MetricRecord.minSamples и его клампинг по окну).
+func (s *AnomalyStrategy) requiredSamples(period string) int {
+	required := s.Config.MinSamples
+	if window := s.windowSizeForPeriod(period); required > window {
+		required = window
+	}
+	if required < 2 {
+		required = 2
+	}
+	return required
+}
+
+// seedPairPeriod засеивает историю одной пары за один период.
+// Возвращает число добавленных выборок: по нему видно, наберётся ли minSamples,
+// то есть заработает ли период вообще.
+func (s *AnomalyStrategy) seedPairPeriod(pair, period string, duration time.Duration, candles []exModel.Candle) int {
 	metrics := s.getActiveMetricNames()
 	added := 0
 
@@ -354,7 +491,7 @@ func (s *AnomalyStrategy) seedPairPeriod(pair, period string, duration time.Dura
 	}
 
 	if added == 0 {
-		return false
+		return 0
 	}
 
 	// Последняя засеянная выборка - это последняя завершённая свеча, поэтому
@@ -364,7 +501,7 @@ func (s *AnomalyStrategy) seedPairPeriod(pair, period string, duration time.Dura
 		state.nextSampleAt = time.Now().Add(duration)
 	}
 
-	return true
+	return added
 }
 
 // candleMetricValue считает значение метрики как отношение соседних свечей
@@ -732,11 +869,23 @@ func (s *AnomalyStrategy) checkAndNotify() {
 
 	s.mu.Unlock()
 
+	// В лог пишем ВСЁ, что нашли, - включая подавленное cooldown'ом. Telegram и
+	// лог решают разные задачи: там читаемая сводка для человека, здесь полная
+	// картина, по которой потом можно разобраться, что происходило.
+	if s.Config.LogAnomalies {
+		s.logAnomalies(allAnomalousResults, notifyResults)
+	}
+
 	// Все аномалии одного тика уходят ОДНИМ дайджестом. Отдельным сообщением на
 	// пару это нечитаемо: на рыночном движении сотни пар аномальны одновременно.
 	if s.Config.NotificationEnable && len(notifyResults) > 0 {
 		s.NotificationDigest(notifyResults)
 	}
+
+	// Исполнителям отдаём ТЕ ЖЕ результаты, что и в Telegram: они уже прошли
+	// через cooldown, то есть это "новая или усилившаяся" аномалия, а не одно и
+	// то же событие каждую минуту.
+	s.publish(notifyResults)
 
 	// Рыночная метрика считается по ВСЕМ аномальным парам, а не только
 	// по тем, что прошли через cooldown-фильтр персональных уведомлений.

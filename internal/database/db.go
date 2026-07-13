@@ -4,15 +4,21 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/config"
+	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/order"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	loggerGorm "gorm.io/gorm/logger"
 )
+
+var dbLogger = logger.AddFields(map[string]interface{}{
+	"package": "database",
+})
 
 var (
 	ordersTable       string   = "orders"
@@ -80,5 +86,38 @@ func DbInit(cfg config.Database) (*gorm.DB, error) {
 		}
 	}
 
+	if err := createCandlesTimeIndexes(db); err != nil {
+		return db, err
+	}
+
 	return db, nil
+}
+
+// createCandlesTimeIndexes создаёт индекс по time на каждой таблице свечей.
+//
+// Модель Candle объявлена во внешнем модуле exchangeService, и тег `index` в неё
+// не добавить - там проиндексирован только pair. При этом ВСЕ горячие запросы
+// фильтруют именно по времени (`WHERE time >= ?`): прогрев цен читает свечи за
+// 12 часов, прогрев дельт - за сутки, и каждую минуту идёт дозапрос. Без индекса
+// это full scan таблицы, которая растёт бесконечно (ретеншена нет).
+//
+// Индекс создаётся один раз; на уже накопленной таблице это может занять минуты.
+func createCandlesTimeIndexes(db *gorm.DB) error {
+	for _, tableName := range candlesTablesList {
+		table := fmt.Sprintf("%s%s", candlesTables, tableName)
+		indexName := fmt.Sprintf("idx_%s_time", table)
+
+		migrator := db.Table(table).Migrator()
+		if migrator.HasIndex(&exModel.Candle{}, indexName) {
+			continue
+		}
+
+		start := time.Now()
+		if err := db.Exec(fmt.Sprintf("CREATE INDEX %s ON %s (time)", indexName, table)).Error; err != nil {
+			return fmt.Errorf("create index %s: %w", indexName, err)
+		}
+		dbLogger.Infof("создан индекс %s за %v", indexName, time.Since(start))
+	}
+
+	return nil
 }

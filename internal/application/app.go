@@ -17,6 +17,7 @@ import (
 	"github.com/sambly/exchangebot/internal/paperwallet"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy"
+	"github.com/sambly/exchangebot/internal/watchdog"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 )
@@ -36,6 +37,7 @@ type Application struct {
 	OrderController    *order.OrderService
 	PaperWallet        *paperwallet.PaperWallet
 	ControllerStrategy *strategy.ControllerStrategy
+	Watchdog           *watchdog.Watchdog
 }
 
 var appLogger = logger.AddFieldsEmpty()
@@ -77,11 +79,14 @@ func NewApp(
 		exchange: exch,
 		dataFeed: dataFeed,
 
+		Notification: notification,
+
 		AssetsPrices:       assetsPrices,
 		Account:            account,
 		OrderController:    orderController,
 		PaperWallet:        paperWallet,
 		ControllerStrategy: controllerStrategy,
+		Watchdog:           watchdog.New(assetsPrices, settings.Pairs),
 	}
 
 	return app, nil
@@ -142,6 +147,12 @@ func (app *Application) Run(ctx context.Context) error {
 
 	g.Go(func() error {
 		return app.ControllerStrategy.StartAll(gCtx)
+	})
+
+	// Сторож фида: подписка на пару может умереть в exchangeService, и
+	// приложение этого не заметит - оно продолжит работать на застывших данных.
+	g.Go(func() error {
+		return app.Watchdog.Start(gCtx)
 	})
 
 	duration := time.Since(timeStart)

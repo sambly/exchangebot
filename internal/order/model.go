@@ -42,6 +42,12 @@ type Order struct {
 	Profit       float64         `gorm:"column:profit"`
 	StrategyBuy  string          `gorm:"column:strategy_buy"`
 	StrategySell string          `gorm:"column:strategy_sell"`
+
+	// ExitReason - ПОЧЕМУ закрыли: take-profit, stop-loss, timeout, manual.
+	// Раньше причина терялась: при закрытии сохранялась только стратегия, и по
+	// БД нельзя было отличить "сработал план" от "выбило стопом" - то есть
+	// нельзя было оценить, работает ли стратегия вообще.
+	ExitReason string `gorm:"column:exit_reason"`
 }
 
 type OrderInfo struct {
@@ -53,6 +59,15 @@ type OrderInfo struct {
 	MarketsStat  datatypes.JSON `gorm:"column:markets_stat"`
 	ChangePrices datatypes.JSON `gorm:"column:change_prices"`
 	DeltaFast    datatypes.JSON `gorm:"column:delta_fast"`
+
+	// План сделки и сила сигнала на момент входа - в отдельных колонках, а не
+	// в тексте комментария: по ним потом можно группировать и считать статистику
+	// (винрейт по уровням, как часто выбивает стоп при таком-то плане).
+	Level      int     `gorm:"column:level"`
+	Strength   float64 `gorm:"column:strength"`
+	Volatility float64 `gorm:"column:volatility"`
+	TakeProfit float64 `gorm:"column:take_profit"`
+	StopLoss   float64 `gorm:"column:stop_loss"`
 }
 
 type Deal struct {
@@ -62,4 +77,14 @@ type Deal struct {
 	Frame    string
 	Strategy string
 	Comment  string
+
+	// Заполняется при входе (план сделки и сила сигнала) и при выходе
+	// (ExitReason). Пустые значения допустимы: ручная сделка из веба плана
+	// не имеет.
+	Level      int
+	Strength   float64
+	Volatility float64
+	TakeProfit float64
+	StopLoss   float64
+	ExitReason string
 }

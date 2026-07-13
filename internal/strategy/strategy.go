@@ -70,6 +70,12 @@ func NewControllerStrategy(
 	return ctrlStr, nil
 }
 
+// build собирает граф стратегий.
+//
+// Детекторы (base, anomaly) публикуют сигналы, исполнитель (simpleBuy) на них
+// подписан, политика выхода (simplesale) отвечает за закрытие. Кто на кого
+// подписан - решается ЗДЕСЬ, а не внутри стратегий: поэтому новый детектор не
+// тащит за собой торговую логику, а новая торговая логика не трогает детекторы.
 func (cs *ControllerStrategy) build() error {
 
 	baseStrategy, err := base.NewStrategy(cs.AssetsPrices, cs.Periods, cs.Pairs, cs.Notification)
@@ -81,27 +87,31 @@ func (cs *ControllerStrategy) build() error {
 	}
 	cs.AddStrategy(baseStrategy)
 
-	simpleBuyStrategy, err := simplebuy.NewStrategy(cs.Notification, cs.AssetsPrices, cs.OrderController)
-	if err != nil {
-		return err
-	}
-
 	anomalyStrategy, err := anomaly.NewStrategy(cs.AssetsPrices, cs.Periods, cs.Pairs, cs.Notification)
 	if err != nil {
 		return err
 	}
 	cs.AddStrategy(anomalyStrategy)
 
+	simpleBuyStrategy, err := simplebuy.NewStrategy(cs.Notification, cs.AssetsPrices, cs.OrderController)
+	if err != nil {
+		return err
+	}
+	if cs.TelegramEnable {
+		simpleBuyStrategy.WithTelegramMenu()
+	}
+
 	simpleSaleStrategy, err := simplesale.NewStrategy(cs.OrderController)
 	if err != nil {
 		return err
 	}
-
-	if cs.TelegramEnable {
-		simpleBuyStrategy.WithTelegramMenu()
-	}
-	baseStrategy.Subscribe(simpleBuyStrategy.StrategyBaseResult)
 	simpleBuyStrategy.WithSaleStrategy(simpleSaleStrategy)
+
+	// Исполнитель слушает оба детектора. Какие сигналы он реально берёт в
+	// работу - решают фильтры в его конфиге (sources, minLevel, direction).
+	baseStrategy.Subscribe(simpleBuyStrategy.Signals)
+	anomalyStrategy.Subscribe(simpleBuyStrategy.Signals)
+
 	cs.AddStrategy(simpleBuyStrategy)
 
 	return nil

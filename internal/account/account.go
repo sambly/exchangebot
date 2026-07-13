@@ -11,14 +11,18 @@ import (
 	"github.com/sambly/exchangebot/internal/prices"
 )
 
+// Account хранит балансы аккаунта. Обработчики telebot выполняются конкурентно
+// (каждый апдейт в своей горутине), поэтому доступ к assets/assetsKey обязан
+// быть под мьютексом: раньше "Обновить данные" параллельно с "BALANCE" давали
+// не просто гонку, а fatal error - конкурентные итерацию и запись map.
 type Account struct {
-	// TODO не реализован полноценно Mutex
-	sync.Mutex
+	mu           sync.RWMutex
 	exchange     exchange.Exchange
 	Notification *notification.Notification
 	AssetPrices  *prices.AssetsPrices
-	AssetsKey    []string                  // пары к USDT которые есть на Spot, Flexible, Staking
-	Assets       map[string]*exModel.Asset // Структура пары к USDT
+
+	assetsKey []string                  // пары к USDT которые есть на Spot, Flexible, Staking
+	assets    map[string]*exModel.Asset // Структура пары к USDT
 
 	BaseLimitAsset float64
 }
@@ -30,19 +34,62 @@ var accLogger = logger.AddFields(map[string]interface{}{
 func NewAccount(exchange exchange.Exchange, assetPrices *prices.AssetsPrices) (*Account, error) {
 	acc := Account{
 		exchange:       exchange,
-		AssetsKey:      make([]string, 0),
-		Assets:         make(map[string]*exModel.Asset),
+		assetsKey:      make([]string, 0),
+		assets:         make(map[string]*exModel.Asset),
 		AssetPrices:    assetPrices,
 		BaseLimitAsset: 1.0,
 	}
 	return &acc, nil
 }
 
+// GetAssets отдаёт копию балансов: наружу не должны утекать ссылки на map,
+// которую UpdateAssets перестраивает.
+func (acc *Account) GetAssets() map[string]exModel.Asset {
+	acc.mu.RLock()
+	defer acc.mu.RUnlock()
+
+	assets := make(map[string]exModel.Asset, len(acc.assets))
+	for name, asset := range acc.assets {
+		if asset != nil {
+			assets[name] = *asset
+		}
+	}
+	return assets
+}
+
+// GetAssetsKeys отдаёт копию списка пар
+func (acc *Account) GetAssetsKeys() []string {
+	acc.mu.RLock()
+	defer acc.mu.RUnlock()
+
+	keys := make([]string, len(acc.assetsKey))
+	copy(keys, acc.assetsKey)
+	return keys
+}
+
 func (acc *Account) UpdateAssets() error {
-	acc.AssetsKey = make([]string, 0)
+	// Запросы к бирже делаем ДО захвата мьютекса: держать его на время трёх
+	// HTTP-вызовов значило бы блокировать на секунды все чтения балансов.
+	assetsSpotRaw, err := acc.exchange.GetAssetsSpot(context.Background())
+	if err != nil {
+		return err
+	}
+	assetsFlexible, err := acc.exchange.GetAssetsFlexibleV2(context.Background())
+	if err != nil {
+		return err
+	}
+	assetsStaking, err := acc.exchange.GetAssetsStaking(context.Background())
+	if err != nil {
+		return err
+	}
+
+	acc.mu.Lock()
+	defer acc.mu.Unlock()
+
+	acc.assetsKey = make([]string, 0)
 
 	// Сброс старых данных
-	for _, item := range acc.Assets {
+	for _, item := range acc.assets {
 		item.On = false
 		item.CommonData = nil
 		item.SpotData = nil
@@ -50,46 +97,33 @@ func (acc *Account) UpdateAssets() error {
 		item.StakingData = nil
 	}
 
-	assetsSpotRaw, err := acc.exchange.GetAssetsSpot(context.Background())
-	if err != nil {
-		return err
-	}
 	acc.feederAssets(assetsSpotRaw, "AssetSpot")
-
-	assetsFlexible, err := acc.exchange.GetAssetsFlexibleV2(context.Background())
-	if err != nil {
-		return err
-	}
 	acc.feederAssets(assetsFlexible, "AssetFlexible")
-
-	assetsStaking, err := acc.exchange.GetAssetsStaking(context.Background())
-	if err != nil {
-		return err
-	}
 	acc.feederAssets(assetsStaking, "AssetStaking")
 
-	acc.AssetsKey = nil
+	acc.assetsKey = nil
 
-	for key := range acc.Assets {
-		asset := acc.Assets[key]
+	for key := range acc.assets {
+		asset := acc.assets[key]
 		if !asset.On || asset.CommonData == nil || asset.CommonData.FullPrice < acc.BaseLimitAsset {
-			delete(acc.Assets, key)
+			delete(acc.assets, key)
 		} else {
-			acc.AssetsKey = append(acc.AssetsKey, key)
+			acc.assetsKey = append(acc.assetsKey, key)
 		}
 	}
 
 	return nil
 }
 
+// feederAssets вызывается только из UpdateAssets, уже под acc.mu.Lock()
 func (acc *Account) feederAssets(data []exModel.AssetData, typeData string) {
 	for _, value := range data {
 		valueAsset := value.AssetBase + "USDT"
 
-		if _, ok := acc.Assets[valueAsset]; !ok {
-			acc.Assets[valueAsset] = &exModel.Asset{Name: valueAsset}
+		if _, ok := acc.assets[valueAsset]; !ok {
+			acc.assets[valueAsset] = &exModel.Asset{Name: valueAsset}
 		}
-		asset := acc.Assets[valueAsset]
+		asset := acc.assets[valueAsset]
 		asset.On = true
 
 		marketStat, err := acc.AssetPrices.GetMarketsStatForPair(valueAsset)

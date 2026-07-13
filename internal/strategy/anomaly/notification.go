@@ -8,6 +8,17 @@ import (
 	"time"
 )
 
+// tradingViewExchange - биржа в ссылке на график. Пары мы берём со спота
+// Binance, поэтому префикс фиксированный.
+const tradingViewExchange = "BINANCE"
+
+// tradingViewURL - ссылка на график пары. Telegram сам делает такие ссылки
+// кликабельными, поэтому разметка (и связанный с ней риск сломать отправку
+// на неэкранированном символе) не нужна.
+func tradingViewURL(pair string) string {
+	return fmt.Sprintf("https://www.tradingview.com/chart/?symbol=%s:%s", tradingViewExchange, pair)
+}
+
 // iconForLevel возвращает иконку для уровня аномалии
 func iconForLevel(level int) string {
 	switch level {
@@ -88,13 +99,17 @@ func (s *AnomalyStrategy) NotificationDigest(results []*AnomalyResult) {
 			out += fmt.Sprintf("   %s z=%.1f | %s\n",
 				result.Period, result.CompositeZ, anomalousMetrics(result))
 		}
+
+		// Ссылка - последней строкой блока: она нужна, чтобы открыть график,
+		// а не чтобы читать её глазами.
+		out += tradingViewURL(pair) + "\n\n"
 	}
 
 	if hidden := len(pairs) - len(shown); hidden > 0 {
 		out += fmt.Sprintf("… и ещё %d %s\n", hidden, pairsWord(hidden))
 	}
 
-	s.Notification.Message <- out
+	s.Notification.SendMessage(out)
 }
 
 // pairStrength - максимальный уровень пары и максимальный |z| среди её периодов
@@ -150,19 +165,58 @@ func anomalousMetrics(result *AnomalyResult) string {
 	return strings.Join(parts, ", ")
 }
 
+// logAnomalies пишет найденные аномалии в лог - по строке на пару+период.
+//
+// Формат намеренно плоский и грепаемый (pair=... period=... z=...), а не
+// красивый: лог читают не глазами, а grep'ом, когда надо понять, что было.
+//
+// Пишем ВСЁ, что нашли, и помечаем, ушло ли это в Telegram: notified=false
+// означает "аномалия была, но её съел cooldown или minNotifyLevel". Именно эти
+// строки и объясняют потом, почему в чате пусто, а движение было.
+func (s *AnomalyStrategy) logAnomalies(all, notified []*AnomalyResult) {
+	if len(all) == 0 {
+		return
+	}
+
+	sent := make(map[string]bool, len(notified))
+	for _, result := range notified {
+		sent[result.Pair+"|"+result.Period] = true
+	}
+
+	sorted := make([]*AnomalyResult, len(all))
+	copy(sorted, all)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].Level != sorted[j].Level {
+			return sorted[i].Level > sorted[j].Level
+		}
+		return math.Abs(sorted[i].CompositeZ) > math.Abs(sorted[j].CompositeZ)
+	})
+
+	for _, result := range sorted {
+		anomalyLogger.Infof("anomaly pair=%s period=%s level=%d z=%.2f notified=%t metrics=[%s]",
+			result.Pair, result.Period, result.Level, result.CompositeZ,
+			sent[result.Pair+"|"+result.Period], anomalousMetrics(result))
+	}
+}
+
 // NotificationMarketAnomaly отправляет уведомление о рыночной аномалии
 func (s *AnomalyStrategy) NotificationMarketAnomaly(period string, percent float64, anomalous, total int, topResults []AnomalyResult) {
+	if s.Config.LogAnomalies {
+		anomalyLogger.Infof("market-anomaly period=%s percent=%.1f anomalous=%d total=%d",
+			period, percent, anomalous, total)
+	}
+
 	out := fmt.Sprintf("🌍 Рыночная аномалия (%s)\n", period)
 	out += fmt.Sprintf("  %.1f%% пар аномальны (%d из %d)\n", percent, anomalous, total)
 
 	if len(topResults) > 0 {
-		out += "  Топ аномалий:\n"
+		out += "\nТоп аномалий:\n"
 		for _, r := range topResults {
-			icon := iconForLevel(r.Level)
-			out += fmt.Sprintf("    %s %s: z=%.2f [%s]\n", icon, r.Pair, r.CompositeZ, levelName(r.Level))
+			out += fmt.Sprintf("%s %s z=%.1f [%s]\n%s\n",
+				iconForLevel(r.Level), r.Pair, r.CompositeZ, levelName(r.Level), tradingViewURL(r.Pair))
 		}
 	}
 
-	s.Notification.Message <- out
+	s.Notification.SendMessage(out)
 }
 

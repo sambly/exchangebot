@@ -1,10 +1,10 @@
 package settings
 
 import (
-	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sambly/exchangebot/internal/telegram/menu/base"
 	"github.com/sambly/exchangebot/internal/telegram/menu/global"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
+	"github.com/sambly/exchangebot/internal/toggle"
 	tele "gopkg.in/telebot.v3"
 )
 
@@ -27,13 +27,16 @@ var (
 
 type SettingsMenu struct {
 	*base.BaseMenu
-	settings *config.Telegram
+	// notificationEnable читает горутина шины уведомлений, а переключают его
+	// конкурентные обработчики telebot - отсюда потокобезопасный флаг вместо
+	// поля конфига.
+	notificationEnable *toggle.Bool
 }
 
-func NewSettingsMenu(name, id string, cfg *config.Telegram) *SettingsMenu {
+func NewSettingsMenu(name, id string, notificationEnable *toggle.Bool) *SettingsMenu {
 	menu := &SettingsMenu{
-		BaseMenu: base.NewBaseMenu(name, id),
-		settings: cfg,
+		BaseMenu:           base.NewBaseMenu(name, id),
+		notificationEnable: notificationEnable,
 	}
 
 	menu.AddButtonRows(replyButtons...)
@@ -50,7 +53,7 @@ func (m *SettingsMenu) Show(c tele.Context, handler model.MenuHandler) error {
 	handler.DeleteUserMessages(c, userID)
 
 	text := "Настройки бота:\n"
-	if m.settings.NotificationEnable {
+	if m.notificationEnable.Get() {
 		text += "Уведомления: включены"
 	} else {
 		text += "Уведомления: отключены"
@@ -77,12 +80,12 @@ func (m *SettingsMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 	})
 
 	b.Handle(&btnEnableNotifications, func(c tele.Context) error {
-		m.settings.NotificationEnable = true
+		m.notificationEnable.Set(true)
 		return c.Respond(&tele.CallbackResponse{Text: "Уведомления включены ✅", ShowAlert: true})
 	})
 
 	b.Handle(&btnDisableNotifications, func(c tele.Context) error {
-		m.settings.NotificationEnable = false
+		m.notificationEnable.Set(false)
 		return c.Respond(&tele.CallbackResponse{Text: "Уведомления отключены ❌", ShowAlert: true})
 	})
 
