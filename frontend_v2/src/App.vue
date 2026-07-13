@@ -1,23 +1,24 @@
 <script setup lang="ts">
-import { ref, provide } from 'vue'
+import { watch } from 'vue'
 import Toast from 'primevue/toast'
 
 import MainContainer from './components/MainView.vue'
 import Sidebar from './components/Layout/Sidebar.vue'
+import { useUIStore } from './stores/ui'
 
-const darkMode = ref(false)
-provide('darkMode', darkMode)
+const ui = useUIStore()
 
-function toggleDarkMode() {
-  darkMode.value = !darkMode.value
-  document.documentElement.classList.toggle('app-dark', darkMode.value)
-}
+watch(
+  () => ui.darkMode,
+  (enabled) => document.documentElement.classList.toggle('app-dark', enabled),
+  { immediate: true },
+)
 </script>
 
 <template>
   <div class="app-layout">
     <Toast position="top-right" />
-    <Sidebar :dark-mode="darkMode" @toggle-dark-mode="toggleDarkMode" />
+    <Sidebar />
     <main class="main-container-wrapper">
       <MainContainer />
     </main>

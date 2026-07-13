@@ -44,7 +44,15 @@ export const useOrdersStore = defineStore('orders', () => {
     active.value = active.value.filter(o => o.ID !== orderId)
   }
 
-const sortedActive = computed(() =>
+  function addToHistory(orders: Order[]) {
+    for (const order of orders) {
+      if (!history.value.some(o => o.ID === order.ID)) {
+        history.value.push(order)
+      }
+    }
+  }
+
+  const sortedActive = computed(() =>
     [...active.value].sort((a, b) => new Date(b.TimeCreated || 0).getTime() - new Date(a.TimeCreated || 0).getTime())
   )
 
@@ -60,6 +68,7 @@ const sortedActive = computed(() =>
     updateOrder,
     addOrder,
     removeOrder,
+    addToHistory,
     sortedActive,
     sortedHistory,
   }

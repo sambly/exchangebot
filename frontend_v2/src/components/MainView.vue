@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, inject, onMounted, type Ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 
@@ -19,8 +19,6 @@ import OrdersActive from './OrdersPanel/OrdersActive.vue'
 import OrdersHistory from './OrdersPanel/OrdersHistory.vue'
 
 const PRICE_TABLE_WIDTH = '30%'
-
-const darkMode = inject<Ref<boolean>>('darkMode')!
 
 const market = useMarketStore()
 const filters = useFiltersStore()
@@ -56,7 +54,7 @@ const refreshData = async () => {
   isRefreshing.value = true
   try {
     filters.loadFilters()
-    await Promise.all([fetchData(), refreshOrders()])
+    await Promise.all([fetchData(), market.fetchDelta(), refreshOrders()])
     toast.add({ severity: 'success', summary: 'Готово', detail: 'Данные обновлены', life: 2000 })
   } finally {
     isRefreshing.value = false
@@ -120,16 +118,23 @@ onMounted(() => {
               :outlined="ui.activeChart !== 'trade-smart'"
               @click="ui.activeChart = 'trade-smart'"
             />
+            <Button
+              label="Ордера"
+              size="small"
+              severity="secondary"
+              :outlined="ui.activeChart !== 'orders'"
+              @click="ui.activeChart = 'orders'"
+            />
           </div>
 
           <div class="trading-workspace-content">
 
             <div v-show="ui.activeChart === 'price'" class="trading-workspace-slot">
-              <TradingView :pair="ui.currentPair" :dark-mode="darkMode" />
+              <TradingView :pair="ui.currentPair" :dark-mode="ui.darkMode" />
             </div>
 
             <div v-if="ui.activeChart === 'volume'" class="trading-workspace-slot">
-              <ChartVolume :pair="ui.currentPair" :dark-mode="darkMode" />
+              <ChartVolume :pair="ui.currentPair" :dark-mode="ui.darkMode" />
             </div>
 
             <div v-if="ui.activeChart === 'trade-smart'" class="trading-workspace-slot">
@@ -137,7 +142,7 @@ onMounted(() => {
             </div>
 
             <div v-if="ui.activeChart === 'orders'" class="trading-workspace-slot">
-              <OrdersChart :pair="ui.currentPair" :dark-mode="darkMode" :visible="true" />
+              <OrdersChart :pair="ui.currentPair" :dark-mode="ui.darkMode" :visible="true" />
             </div>
 
           </div>

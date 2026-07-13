@@ -2,14 +2,9 @@
 import Button from 'primevue/button'
 import GrafanaIcon from '../../assets/grafana.svg'
 import JaegerIcon from '../../assets/jaeger.svg'
+import { useUIStore } from '../../stores/ui'
 
-defineProps<{
-  darkMode: boolean
-}>()
-
-const emit = defineEmits<{
-  (e: 'toggle-dark-mode'): void
-}>()
+const ui = useUIStore()
 </script>
 
 <template>
@@ -29,11 +24,11 @@ const emit = defineEmits<{
       </a>
 
       <Button
-        :icon="darkMode ? 'pi pi-moon' : 'pi pi-sun'"
+        :icon="ui.darkMode ? 'pi pi-moon' : 'pi pi-sun'"
         text
         rounded
         severity="secondary"
-        @click="emit('toggle-dark-mode')"
+        @click="ui.toggleDarkMode()"
       />
     </div>
   </div>

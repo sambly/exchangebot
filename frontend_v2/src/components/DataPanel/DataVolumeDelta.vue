@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import type { DeltaFast, DeltaEntry } from '../../types'
-import DataTable from 'primevue/datatable'
+import { ref, computed, onMounted } from 'vue'
+import type { DeltaEntry } from '../../types'
+import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import { useUIStore } from '../../stores/ui'
+import { useMarketStore } from '../../stores/market'
 import { useFiltersStore } from '../../stores/filters'
+import { useScrollToPair, ROW_HEIGHT } from '../../composables/useScrollToPair'
+import DataPanelToolbar from './DataPanelToolbar.vue'
 
 interface VolumeData {
   pair: string
@@ -19,48 +22,15 @@ interface VolumeData {
 }
 
 const ui = useUIStore()
+const market = useMarketStore()
 const filters = useFiltersStore()
 
 const frames = ['1m', '3m', '15m', '1h', '4h', '1d'] as const
 const activeFrame = ref<string>('15m')
-const deltaFast = ref<DeltaFast>({})
-const isLoading = ref(false)
-const error = ref<string | null>(null)
 const tableContainerRef = ref<HTMLElement | null>(null)
 
-async function fetchDelta() {
-  isLoading.value = true
-  error.value = null
-
-  try {
-    const response = await fetch('/trade/api/getChDelta', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const data = await response.json()
-
-    deltaFast.value = data.DeltaFast || {}
-  } catch (err) {
-    error.value =
-      err instanceof Error
-        ? err.message
-        : 'Ошибка загрузки данных'
-
-    console.error('Error loading delta data:', err)
-  } finally {
-    isLoading.value = false
-  }
-}
-
 const displayData = computed(() => {
-  const df = deltaFast.value
+  const df = market.deltaFast
   const filterList = filters.filteredPairs
   const frame = activeFrame.value
 
@@ -96,8 +66,8 @@ function toggleFavorite(pairShort: string) {
   ui.toggleFavorite(pairShort + 'USDT')
 }
 
-const onRowClick = (event: any) => {
-  ui.selectPair(event.data.pair + 'USDT')
+const onRowClick = (event: DataTableRowClickEvent) => {
+  ui.selectPair((event.data as VolumeData).pair + 'USDT')
 }
 
 const fmt = (val: number) => val.toFixed(2)
@@ -106,34 +76,14 @@ const getRowClass = (data: VolumeData) => ({
   'table-row-active': ui.currentPair === data.pair + 'USDT'
 })
 
-const ROW_HEIGHT = 41
+const orderedPairs = computed(() => displayData.value.map(d => d.pair + 'USDT'))
 
-async function scrollToPair() {
-  await nextTick()
-  const idx = displayData.value.findIndex(d => d.pair + 'USDT' === ui.currentPair)
-  if (idx < 0) return
-  const container = (
-    tableContainerRef.value?.querySelector('.p-virtualscroller') ||
-    tableContainerRef.value?.querySelector('.p-datatable-table-container')
-  ) as HTMLElement | null
-  if (!container) return
-  const firstRow = container.querySelector('tbody tr') as HTMLElement | null
-  const rowH = firstRow?.offsetHeight || ROW_HEIGHT
-  const offset = idx * rowH - container.clientHeight / 2 + rowH / 2
-  container.scrollTo({ top: Math.max(0, offset), behavior: 'auto' })
-}
-
-watch(() => ui.currentPair, () => scrollToPair())
-watch(displayData, () => scrollToPair())
-
-watch(() => ui.activeDataPanel, async (val) => {
-  if (val !== 'volume') return
-  await nextTick()
-  requestAnimationFrame(() => scrollToPair())
-})
+const { scrollToPair } = useScrollToPair(tableContainerRef, orderedPairs, 'volume')
 
 onMounted(async () => {
-  await fetchDelta()
+  if (!Object.keys(market.deltaFast).length) {
+    await market.fetchDelta()
+  }
   scrollToPair()
 })
 </script>
@@ -144,30 +94,7 @@ onMounted(async () => {
     <!-- Header -->
     <div class="table-header">
 
-      <div class="filter-buttons">
-        <Button
-          icon="pi pi-heart"
-          size="small"
-          severity="secondary"
-          :outlined="ui.filterMode !== 'favorites'"
-          @click="ui.filterMode = ui.filterMode === 'favorites' ? 'all' : 'favorites'"
-        />
-        <div class="divider" />
-        <Button
-          label="Цена"
-          severity="secondary"
-          size="small"
-          :outlined="ui.activeDataPanel !== 'price'"
-          @click="ui.activeDataPanel = 'price'"
-        />
-        <Button
-          label="Объем"
-          severity="secondary"
-          size="small"
-          :outlined="ui.activeDataPanel !== 'volume'"
-          @click="ui.activeDataPanel = 'volume'"
-        />
-      </div>
+      <DataPanelToolbar />
 
       <div class="frame-buttons">
         <Button
@@ -185,10 +112,10 @@ onMounted(async () => {
 
     <!-- Error -->
     <div
-      v-if="error"
+      v-if="market.deltaError"
       class="error-msg"
     >
-      {{ error }}
+      {{ market.deltaError }}
     </div>
 
     <!-- Table -->
@@ -199,7 +126,7 @@ onMounted(async () => {
     >
       <DataTable
         :value="displayData"
-        :loading="isLoading"
+        :loading="market.isDeltaLoading"
         :scrollable="true"
         scrollHeight="flex"
         :virtualScrollerOptions="{ itemSize: ROW_HEIGHT }"
@@ -339,20 +266,6 @@ onMounted(async () => {
 
   -webkit-overflow-scrolling: touch;
 }
-
-.filter-buttons {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.divider {
-  width: 1px;
-  height: 1.25rem;
-  background: var(--p-content-border-color);
-  flex-shrink: 0;
-}
-
 
 .frame-buttons {
   display: flex;

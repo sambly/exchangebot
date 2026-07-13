@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useOrdersStore } from '../../stores/orders.ts'
+import { useOrdersStore, type Order } from '../../stores/orders.ts'
 import { useUIStore } from '../../stores/ui'
-import DataTable from 'primevue/datatable'
+import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
@@ -58,8 +58,8 @@ function resetFilters() {
   selectedStrategySell.value = ''
 }
 
-function onRowClick(event: any) {
-  ui.selectPair(event.data.Pair)
+function onRowClick(event: DataTableRowClickEvent) {
+  ui.selectPair((event.data as Order).Pair)
   ui.activeChart = 'orders'
 }
 

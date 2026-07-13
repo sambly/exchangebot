@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useOrdersStore, type Order } from '../../stores/orders.ts'
 import { useUIStore } from '../../stores/ui'
 import { useToast } from 'primevue/usetoast'
-import DataTable from 'primevue/datatable'
+import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import OrdersTabSwitcher from './OrdersTabSwitcher.vue'
@@ -36,8 +36,8 @@ function formatTime(timestamp?: string) {
   return isNaN(d.getTime()) ? '-' : d.toLocaleString('en-GB')
 }
 
-function onRowClick(event: any) {
-  ui.selectPair(event.data.Pair)
+function onRowClick(event: DataTableRowClickEvent) {
+  ui.selectPair((event.data as Order).Pair)
   ui.activeChart = 'orders'
 }
 
@@ -54,13 +54,9 @@ async function handleClose(orderId: number) {
 
     if (data.OrdersHistory) {
       const historyOrders = Array.isArray(data.OrdersHistory)
-        ? data.OrdersHistory
+        ? (data.OrdersHistory as Order[])
         : (Object.values(data.OrdersHistory).flat() as Order[])
-      for (const order of historyOrders) {
-        if (!store.history.some(o => o.ID === order.ID)) {
-          store.history.push(order)
-        }
-      }
+      store.addToHistory(historyOrders)
     }
     toast.add({ severity: 'success', summary: 'Сделка закрыта', detail: `#${orderId}`, life: 3000 })
   } catch (err) {

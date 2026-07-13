@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
-import DataTable from 'primevue/datatable'
+import { ref, computed } from 'vue'
+import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
-import Button from 'primevue/button'
 import { useMarketStore } from '../../stores/market'
 import { useUIStore } from '../../stores/ui'
 import { useFiltersStore } from '../../stores/filters'
+import { useScrollToPair, ROW_HEIGHT } from '../../composables/useScrollToPair'
+import DataPanelToolbar from './DataPanelToolbar.vue'
 
 interface PriceData {
   pair: string
@@ -89,70 +90,24 @@ const getChangeClass = (value: number) => {
 }
 
 // Клик по строке
-const onRowClick = (event: any) => {
-  ui.selectPair(event.data.pair + 'USDT')
+const onRowClick = (event: DataTableRowClickEvent) => {
+  ui.selectPair((event.data as PriceData).pair + 'USDT')
 }
 
 const getRowClass = (data: PriceData) => ({
   'table-row-active': ui.currentPair === data.pair + 'USDT'
 })
 
-const ROW_HEIGHT = 41
+const orderedPairs = computed(() => displayedPairs.value.map(p => p.pair + 'USDT'))
 
-async function scrollToPair() {
-  await nextTick()
-  const idx = displayedPairs.value.findIndex(p => p.pair + 'USDT' === ui.currentPair)
-  if (idx < 0) return
-  const container = (
-    tableContainerRef.value?.querySelector('.p-virtualscroller') ||
-    tableContainerRef.value?.querySelector('.p-datatable-table-container')
-  ) as HTMLElement | null
-  if (!container) return
-  const firstRow = container.querySelector('tbody tr') as HTMLElement | null
-  const rowH = firstRow?.offsetHeight || ROW_HEIGHT
-  const offset = idx * rowH - container.clientHeight / 2 + rowH / 2
-  container.scrollTo({ top: Math.max(0, offset), behavior: 'auto' })
-}
-
-watch(() => ui.currentPair, () => scrollToPair())
-watch(displayedPairs, () => scrollToPair())
-
-watch(() => ui.activeDataPanel, async (val) => {
-  if (val !== 'price') return
-  await nextTick()
-  requestAnimationFrame(() => scrollToPair())
-})
+useScrollToPair(tableContainerRef, orderedPairs, 'price')
 </script>
 
 <template>
   <div class="price-table-wrapper">
 
     <div class="table-header">
-
-      <div class="filter-buttons">
-        <Button
-          icon="pi pi-heart"
-          size="small"
-          severity="secondary"
-          :outlined="ui.filterMode !== 'favorites'"
-          @click="ui.filterMode = ui.filterMode === 'favorites' ? 'all' : 'favorites'"
-        />
-        <div class="divider" />
-        <Button
-          label="Цена"
-          severity="secondary"
-          size="small"
-          :outlined="ui.activeDataPanel !== 'price'"
-          @click="ui.activeDataPanel = 'price'"
-        />
-        <Button
-          label="Объем"
-          severity="secondary"
-          size="small"
-          :outlined="ui.activeDataPanel !== 'volume'"
-          @click="ui.activeDataPanel = 'volume'"
-        />
-      </div>
+      <DataPanelToolbar />
     </div>
 
     <div
@@ -288,20 +243,6 @@ watch(() => ui.activeDataPanel, async (val) => {
 
   -webkit-overflow-scrolling: touch;
 }
-
-.filter-buttons {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.divider {
-  width: 1px;
-  height: 1.25rem;
-  background: var(--p-content-border-color);
-  flex-shrink: 0;
-}
-
 
 .loading-msg {
   flex: 1;

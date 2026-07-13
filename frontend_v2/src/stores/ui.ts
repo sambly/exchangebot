@@ -25,10 +25,16 @@ export const useUIStore = defineStore('ui', () => {
   const activeDataPanel = ref<ActiveDataPanel>('price')
   const filterMode = ref<FilterMode>('all')
   const favoritePairs = ref<Set<string>>(loadFavoritesFromStorage())
+  const darkMode = ref<boolean>(localStorage.getItem('darkMode') === 'true')
 
   function selectPair(pair: string) {
     currentPair.value = pair
     localStorage.setItem('currentPair', pair)
+  }
+
+  function toggleDarkMode() {
+    darkMode.value = !darkMode.value
+    localStorage.setItem('darkMode', String(darkMode.value))
   }
 
   function toggleFavorite(pairFull: string) {
@@ -47,7 +53,9 @@ export const useUIStore = defineStore('ui', () => {
     activeDataPanel,
     filterMode,
     favoritePairs,
+    darkMode,
     selectPair,
     toggleFavorite,
+    toggleDarkMode,
   }
 })
