@@ -72,32 +72,24 @@ func (app *Web) routes() *http.ServeMux {
 		}
 	}
 
-	mux.HandleFunc("/trade/api/formingPage", app.basicAuth(instrumentedHandler("/trade/api/formingPage", app.formingPage)))
-	mux.HandleFunc("/trade/api/updatefull", app.basicAuth(instrumentedHandler("/trade/api/updatefull", app.updateFull)))
-	mux.HandleFunc("/trade/api/getChangeDelta", app.basicAuth(instrumentedHandler("/trade/api/getChangeDelta", app.getDeltaFast)))
+	// Рыночные данные
 	mux.HandleFunc("/trade/api/getChPrice", app.basicAuth(instrumentedHandler("/trade/api/getChPrice", app.getChPrice)))
 	mux.HandleFunc("/trade/api/getChDelta", app.basicAuth(instrumentedHandler("/trade/api/getChDelta", app.getChDelta)))
-	mux.HandleFunc("/trade/api/updateTop", app.basicAuth(instrumentedHandler("/trade/api/updateTop", app.updateTop)))
+	mux.HandleFunc("/trade/api/getChangeDelta", app.basicAuth(instrumentedHandler("/trade/api/getChangeDelta", app.getDeltaFast)))
+
+	// Сделки
 	mux.HandleFunc("/trade/api/openDeal", app.basicAuth(instrumentedHandler("/trade/api/openDeal", app.openDeal)))
 	mux.HandleFunc("/trade/api/closeDeal", app.basicAuth(instrumentedHandler("/trade/api/closeDeal", app.closeDeal)))
 	mux.HandleFunc("/trade/api/closeAllDeal", app.basicAuth(instrumentedHandler("/trade/api/closeAllDeal", app.closeAllDeal)))
-
-	// TODO : new API
 	mux.HandleFunc("/trade/api/getOrders", app.basicAuth(instrumentedHandler("/trade/api/getOrders", app.getOrders)))
 	mux.HandleFunc("/trade/api/getStrategies", app.basicAuth(instrumentedHandler("/trade/api/getStrategies", app.getStrategies)))
 
 	mux.HandleFunc("/trade/ws", app.basicAuth(app.echo))
 
-	// Сервер статических файлов (старый фронтенд)
-	v1FS := gzipMiddleware(http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content, "frontend/dist"))))
+	// Сервер статических файлов фронтенда
+	frontendFS := gzipMiddleware(http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content, "frontend/dist"))))
 	mux.HandleFunc("/trade/", app.basicAuth(func(w http.ResponseWriter, r *http.Request) {
-		http.StripPrefix("/trade", instrumentedHandler("/trade", v1FS.ServeHTTP)).ServeHTTP(w, r)
-	}))
-
-	// Новый фронтенд (v2) на /trade/v2/
-	v2FS := gzipMiddleware(http.FileServer(http.FS(getFrontendAssets(app.contentEmbed, app.content, "frontend_v2/dist"))))
-	mux.HandleFunc("/trade/v2/", app.basicAuth(func(w http.ResponseWriter, r *http.Request) {
-		http.StripPrefix("/trade/v2", instrumentedHandler("/trade/v2", v2FS.ServeHTTP)).ServeHTTP(w, r)
+		http.StripPrefix("/trade", instrumentedHandler("/trade", frontendFS.ServeHTTP)).ServeHTTP(w, r)
 	}))
 
 	// Экспонируем метрики на маршруте /metrics

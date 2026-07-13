@@ -110,8 +110,7 @@ tag:
 
 # Запуск docker в одиночном режиме без docker-compose с простыми настройками и sqlite memory
 BUILD_ARGS_DOCKER = \
-    --build-arg GITHUB_TOKEN=$(GITHUB_TOKEN) \
-    --build-arg VITE_GRAFANA_URL=$(VITE_GRAFANA_URL)
+    --build-arg GITHUB_TOKEN=$(GITHUB_TOKEN)
 
 build-simple-docker:
 	docker build $(BUILD_ARGS_DOCKER) -t exchangebot .

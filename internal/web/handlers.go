@@ -19,57 +19,6 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func (web *Web) updateFull(w http.ResponseWriter, _ *http.Request) {
-
-	maps := map[string]interface{}{
-		"MarketsStat": web.App.AssetsPrices.GetAllMarketsStat(),
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(maps); err != nil {
-		appWebLogger.Errorf("error json encoder: %v", err)
-	}
-
-}
-
-func (web *Web) formingPage(w http.ResponseWriter, _ *http.Request) {
-
-	configPath := filepath.Join("configs", "strategy.yaml")
-	var optionByte []byte
-
-	// Список стратегий
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		if err := os.WriteFile(configPath, []byte{}, 0644); err != nil {
-			appWebLogger.Errorf("failed to create strategy file: %v", err)
-			return
-		}
-		optionByte = []byte{}
-	} else {
-		optionByte, err = os.ReadFile(configPath)
-		if err != nil {
-			appWebLogger.Errorf("failed to read strategy file: %v", err)
-			return
-		}
-	}
-
-	var option map[string]interface{}
-	if err := yaml.Unmarshal(optionByte, &option); err != nil {
-		appWebLogger.Errorf("error yaml unmarshal: %v", err)
-	}
-
-	maps := map[string]interface{}{
-		"Pairs":          web.App.AssetsPrices.Pairs,
-		"MarketsStat":    web.App.AssetsPrices.GetAllMarketsStat(),
-		"OrdersActive":   web.App.OrderController.State.GetOrdersActiveCopy(),
-		"OrdersHistory":  web.App.OrderController.State.GetOrdersHistoryCopy(),
-		"OptionStrategy": option,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(maps); err != nil {
-		appWebLogger.Errorf("error json encoder: %v", err)
-	}
-}
-
 func (web *Web) getDeltaFast(w http.ResponseWriter, r *http.Request) {
 
 	data := map[string]string{}
@@ -86,24 +35,6 @@ func (web *Web) getDeltaFast(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(candles); err != nil {
-		appWebLogger.Errorf("error json encoder: %v", err)
-	}
-}
-
-func (web *Web) updateTop(w http.ResponseWriter, r *http.Request) {
-
-	bodyByte, err := io.ReadAll(r.Body)
-	if err != nil {
-		appWebLogger.Errorf("error readfile: %v", err)
-	}
-	pair := string(bodyByte)
-	top, err := web.App.AssetsPrices.GetMarketsStatForPair(pair)
-	if err != nil {
-		appWebLogger.Errorf("error GetMarketsStatForPair: %v", err)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(top); err != nil {
 		appWebLogger.Errorf("error json encoder: %v", err)
 	}
 }

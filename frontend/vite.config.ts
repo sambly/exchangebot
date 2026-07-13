@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
-  base: '/trade/v2/',
+  base: '/trade/',
   plugins: [vue()],
   build: {
     rollupOptions: {
