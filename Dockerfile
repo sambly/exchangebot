@@ -4,10 +4,10 @@ FROM node:23-alpine AS frontend
 WORKDIR /app/frontend
 
 # Копируем только файлы, необходимые для установки зависимостей
-COPY ./frontend/package.json ./frontend/yarn.lock ./frontend/vite.config.js ./
+COPY ./frontend/package.json ./frontend/yarn.lock ./
 
 # Установка зависимостей и сборка
-RUN yarn install
+RUN yarn install --frozen-lockfile
 COPY ./frontend ./
 RUN yarn build
 
