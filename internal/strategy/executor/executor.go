@@ -1,4 +1,4 @@
-package simplebuy
+package executor
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
-	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy/sales"
 	"github.com/sambly/exchangebot/internal/strategy/signal"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
@@ -25,28 +24,37 @@ const (
 	marketBuffer = 1024
 )
 
-var buyLogger = logger.AddFields(map[string]interface{}{
-	"package": "simplebuy",
+var execLogger = logger.AddFields(map[string]interface{}{
+	"package": "executor",
 })
 
-type StrategySimpleBuy struct {
+// Executor - ИСПОЛНИТЕЛЬ СДЕЛОК, а не стратегия.
+//
+// Он не ищет события и не решает, что на рынке происходит - это работа
+// детекторов (anomaly, base). Он отвечает на другой вопрос: "пришёл сигнал -
+// открывать ли по нему позицию, на какую сторону и каким объёмом".
+//
+// Пакет намеренно НЕ ЗНАЕТ ни про anomaly, ни про base: единственный вход -
+// канал signal.Signal. Поэтому новый детектор не требует здесь ни строчки, а
+// новая торговая логика не трогает детекторы.
+type Executor struct {
 	Config       *Config
 	Notification *notification.Notification
-	TelegramMenu *StrategySimpleBuyMenu
+	TelegramMenu *ExecutorMenu
 
-	AssetsPrices    *prices.AssetsPrices
 	OrderController *order.OrderService
 
-	// Signals - вход от ЛЮБОГО детектора (anomaly, base, ...). Стратегия не
-	// знает, кто прислал сигнал, и это осознанно: новый детектор не должен
-	// требовать правок в исполнителе.
+	// Signals - вход от ЛЮБОГО детектора. Кто прислал сигнал, исполнителю
+	// неинтересно: важны только его направление, сила и волатильность пары.
 	Signals chan signal.Signal
 
 	// markets - рыночные тики, переложенные из горутины фида в свою
 	markets chan exModel.MarketsStat
 
-	// StrategyEnable переключается из телеграм-меню, читается своей горутиной
-	StrategyEnable *toggle.Bool
+	// Enabled переключается из телеграм-меню, читается своей горутиной.
+	// Выключение исполнителя НЕ выключает детекторы: сигналы продолжат приходить,
+	// просто по ним не будет сделок.
+	Enabled *toggle.Bool
 
 	positionsMu sync.Mutex
 	positions   map[string][]sales.Position
@@ -56,70 +64,68 @@ type StrategySimpleBuy struct {
 	Sale sales.Sales
 }
 
-func NewStrategy(
+func New(
 	notify *notification.Notification,
-	assetsPrices *prices.AssetsPrices,
 	orderController *order.OrderService,
-) (*StrategySimpleBuy, error) {
+) (*Executor, error) {
 
 	cfg, err := NewConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	str := &StrategySimpleBuy{
+	exec := &Executor{
 		Config:          cfg,
 		Notification:    notify,
-		AssetsPrices:    assetsPrices,
 		OrderController: orderController,
 		Signals:         make(chan signal.Signal, signalBuffer),
 		markets:         make(chan exModel.MarketsStat, marketBuffer),
-		StrategyEnable:  toggle.New(cfg.StrategyEnable),
+		Enabled:         toggle.New(cfg.StrategyEnable),
 		positions:       make(map[string][]sales.Position),
 		lastClose:       make(map[string]time.Time),
 	}
 
-	orderController.AddOrdersDependencies(str.onOrderUpdated)
-	return str, nil
+	orderController.AddOrdersDependencies(exec.onOrderUpdated)
+	return exec, nil
 }
 
-func (s *StrategySimpleBuy) WithTelegramMenu() *StrategySimpleBuy {
-	s.TelegramMenu = NewStrategyMenu(s.Config.Name, s.Config.IDName, s)
+func (s *Executor) WithTelegramMenu() *Executor {
+	s.TelegramMenu = NewMenu(s.Config.Name, s.Config.IDName, s)
 	return s
 }
 
-func (s *StrategySimpleBuy) WithSaleStrategy(sale sales.Sales) *StrategySimpleBuy {
+func (s *Executor) WithSaleStrategy(sale sales.Sales) *Executor {
 	s.Sale = sale
 	return s
 }
 
-func (s *StrategySimpleBuy) GetTelegramMenu() model.WindowHandler {
+func (s *Executor) GetTelegramMenu() model.WindowHandler {
 	return s.TelegramMenu
 }
 
-func (s *StrategySimpleBuy) IsStrategyEnabled() bool   { return s.StrategyEnable.Get() }
-func (s *StrategySimpleBuy) SetStrategyEnabled(v bool) { s.StrategyEnable.Set(v) }
+func (s *Executor) IsEnabled() bool   { return s.Enabled.Get() }
+func (s *Executor) SetEnabled(v bool) { s.Enabled.Set(v) }
 
-// Start - единственное место, где стратегия что-то делает.
+// Start - единственное место, где исполнитель что-то делает.
 //
 // И сигналы, и рыночные тики обрабатываются ЗДЕСЬ, в своей горутине. Раньше
 // проверка позиций жила в OnMarket, то есть исполнялась внутри чтения потока с
 // биржи и ходила оттуда в БД.
-func (s *StrategySimpleBuy) Start(ctx context.Context) error {
+func (s *Executor) Start(ctx context.Context) error {
 	if s.Config.Auto {
-		buyLogger.Infof("авторежим включён: direction=%s minLevel=%d maxPositions=%d size=%v",
-			s.Config.Direction, s.Config.MinLevel, s.Config.MaxPositions, s.Config.Size)
+		execLogger.Infof("авторежим включён: рост→%s падение→%s minLevel=%d maxPositions=%d size=%v",
+			s.Config.OnUp, s.Config.OnDown, s.Config.MinLevel, s.Config.MaxPositions, s.Config.Size)
 	}
 
 	for {
 		select {
 		case sig := <-s.Signals:
-			if s.IsStrategyEnabled() {
+			if s.IsEnabled() {
 				s.onSignal(ctx, sig)
 			}
 
 		case ms := <-s.markets:
-			if s.IsStrategyEnabled() {
+			if s.IsEnabled() {
 				s.checkPositions(ms)
 			}
 
@@ -131,8 +137,8 @@ func (s *StrategySimpleBuy) Start(ctx context.Context) error {
 
 // OnMarket вызывается из горутины фида - поэтому только перекладывает тик в
 // очередь и сразу возвращается.
-func (s *StrategySimpleBuy) OnMarket(ms exModel.MarketsStat) {
-	if !s.IsStrategyEnabled() || s.Sale == nil {
+func (s *Executor) OnMarket(ms exModel.MarketsStat) {
+	if !s.IsEnabled() || s.Sale == nil {
 		return
 	}
 
@@ -143,20 +149,23 @@ func (s *StrategySimpleBuy) OnMarket(ms exModel.MarketsStat) {
 	}
 }
 
-// onSignal решает, входить ли по сигналу
-func (s *StrategySimpleBuy) onSignal(ctx context.Context, sig signal.Signal) {
-	if reason, ok := s.Config.Allows(sig); !ok {
-		buyLogger.Debugf("сигнал %s %s отклонён: %s", sig.Pair, sig.Period, reason)
+// onSignal решает, входить ли по сигналу и НА КАКУЮ СТОРОНУ
+func (s *Executor) onSignal(ctx context.Context, sig signal.Signal) {
+	side, reject, ok := s.Config.SideFor(sig)
+	if !ok {
+		// Debug, не Info: minLevel и sources отсекают почти весь входящий поток,
+		// на уровне info лог был бы нечитаем.
+		execLogger.Debugf("сигнал %s %s отклонён: %s", sig.Pair, sig.Period, reject)
 		return
 	}
 
 	if reason, ok := s.riskAllows(sig); !ok {
-		buyLogger.Infof("вход по %s %s отклонён риск-лимитом: %s", sig.Pair, sig.Period, reason)
+		execLogger.Infof("вход по %s %s отклонён риск-лимитом: %s", sig.Pair, sig.Period, reason)
 		return
 	}
 
 	if s.Config.Auto {
-		s.openPosition(sig)
+		s.openPosition(sig, side)
 		return
 	}
 
@@ -168,7 +177,7 @@ func (s *StrategySimpleBuy) onSignal(ctx context.Context, sig signal.Signal) {
 		return
 	}
 	go func() {
-		newOrder, err := s.TelegramMenu.SendMessageBuy(ctx, sig, takeProfit, stopLoss)
+		newOrder, err := s.TelegramMenu.SendMessageDeal(ctx, sig, side, takeProfit, stopLoss)
 		if err != nil {
 			return
 		}
@@ -177,7 +186,7 @@ func (s *StrategySimpleBuy) onSignal(ctx context.Context, sig signal.Signal) {
 }
 
 // OpenPositions - сколько позиций открыто сейчас (для телеграм-меню)
-func (s *StrategySimpleBuy) OpenPositions() int {
+func (s *Executor) OpenPositions() int {
 	s.positionsMu.Lock()
 	defer s.positionsMu.Unlock()
 
@@ -189,7 +198,7 @@ func (s *StrategySimpleBuy) OpenPositions() int {
 }
 
 // riskAllows - ограничители, без которых авторежим опасен.
-func (s *StrategySimpleBuy) riskAllows(sig signal.Signal) (string, bool) {
+func (s *Executor) riskAllows(sig signal.Signal) (string, bool) {
 	s.positionsMu.Lock()
 	defer s.positionsMu.Unlock()
 
@@ -215,17 +224,52 @@ func (s *StrategySimpleBuy) riskAllows(sig signal.Signal) (string, bool) {
 	return "", true
 }
 
-func (s *StrategySimpleBuy) openPosition(sig signal.Signal) {
+func (s *Executor) openPosition(sig signal.Signal, side order.SideType) {
 	// План считаем ДО открытия: он уходит в БД вместе со сделкой, и потом по
 	// нему можно понять, на что мы рассчитывали, когда входили.
 	takeProfit, stopLoss, hold := s.plan(sig)
 
-	deal := order.Deal{
+	deal := NewDeal(sig, side, s.Config.Size, takeProfit, stopLoss, Auto)
+
+	newOrder, err := s.OrderController.CreateOrderMarket(deal)
+	if err != nil {
+		execLogger.Errorf("не удалось открыть позицию по %s: %v", sig.Pair, err)
+		return
+	}
+
+	position := s.addPosition(newOrder, sig, takeProfit, stopLoss, hold)
+
+	execLogger.Infof("entry pair=%s id=%d side=%s strategy=%s period=%s level=%d z=%.2f price=%v tp=%.2f%% sl=-%.2f%%",
+		sig.Pair, newOrder.ID, side, sig.Source, sig.Period, sig.Level, sig.Strength,
+		newOrder.PriceCreated, position.TakeProfitPercent, position.StopLossPercent)
+
+	if s.Notification != nil {
+		s.Notification.SendMessage(s.NotificationEntry(position))
+	}
+}
+
+// КЕМ инициирована сделка. Отделено от стратегии: стратегия отвечает на вопрос
+// "почему вошли", а это - "как именно нажали кнопку".
+const (
+	Auto     = "auto"     // автомат по сигналу
+	Telegram = "telegram" // подтверждение кнопкой в Telegram
+	Web      = "web"      // руками из веб-интерфейса
+)
+
+// NewDeal собирает сделку из сигнала.
+//
+// Ключевое: Strategy - это ИСТОЧНИК СИГНАЛА (anomaly, base), а не имя
+// исполнителя. Раньше сюда писался simplebuy, и в интерфейсе у всех сделок
+// значилась стратегия "simplebuy" - но simplebuy это механизм покупки, а не
+// причина, по которой мы вошли. Причина - детектор, который дал сигнал.
+func NewDeal(sig signal.Signal, side order.SideType, size, takeProfit, stopLoss float64, executor string) order.Deal {
+	return order.Deal{
 		Pair:     sig.Pair,
-		SideType: order.SideTypeBuy,
-		Size:     s.Config.Size,
+		SideType: side,
+		Size:     size,
 		Frame:    sig.Period,
-		Strategy: s.Config.IDName,
+		Strategy: sig.Source,
+		Executor: executor,
 		Comment:  sig.Reason,
 
 		Level:      sig.Level,
@@ -234,25 +278,9 @@ func (s *StrategySimpleBuy) openPosition(sig signal.Signal) {
 		TakeProfit: takeProfit,
 		StopLoss:   stopLoss,
 	}
-
-	newOrder, err := s.OrderController.CreateOrderMarket(deal)
-	if err != nil {
-		buyLogger.Errorf("не удалось открыть позицию по %s: %v", sig.Pair, err)
-		return
-	}
-
-	position := s.addPosition(newOrder, sig, takeProfit, stopLoss, hold)
-
-	buyLogger.Infof("entry pair=%s id=%d source=%s period=%s level=%d z=%.2f price=%v tp=%.2f%% sl=-%.2f%%",
-		sig.Pair, newOrder.ID, sig.Source, sig.Period, sig.Level, sig.Strength,
-		newOrder.PriceCreated, position.TakeProfitPercent, position.StopLossPercent)
-
-	if s.Notification != nil {
-		s.Notification.SendMessage(s.NotificationEntry(position))
-	}
 }
 
-func (s *StrategySimpleBuy) plan(sig signal.Signal) (takeProfit, stopLoss float64, hold time.Duration) {
+func (s *Executor) plan(sig signal.Signal) (takeProfit, stopLoss float64, hold time.Duration) {
 	if s.Sale == nil {
 		return 0, 0, 0
 	}
@@ -260,7 +288,7 @@ func (s *StrategySimpleBuy) plan(sig signal.Signal) (takeProfit, stopLoss float6
 }
 
 // addPosition запоминает позицию вместе с планом выхода
-func (s *StrategySimpleBuy) addPosition(newOrder order.Order, sig signal.Signal, takeProfit, stopLoss float64, hold time.Duration) sales.Position {
+func (s *Executor) addPosition(newOrder order.Order, sig signal.Signal, takeProfit, stopLoss float64, hold time.Duration) sales.Position {
 	position := sales.Position{
 		Order:             newOrder,
 		Signal:            sig,
@@ -279,7 +307,7 @@ func (s *StrategySimpleBuy) addPosition(newOrder order.Order, sig signal.Signal,
 }
 
 // checkPositions прогоняет открытые позиции пары через политику выхода
-func (s *StrategySimpleBuy) checkPositions(ms exModel.MarketsStat) {
+func (s *Executor) checkPositions(ms exModel.MarketsStat) {
 	if s.Sale == nil {
 		return
 	}
@@ -308,7 +336,7 @@ func (s *StrategySimpleBuy) checkPositions(ms exModel.MarketsStat) {
 	s.removePositions(ms.Pair, closed)
 }
 
-func (s *StrategySimpleBuy) removePositions(pair string, closed map[int64]bool) {
+func (s *Executor) removePositions(pair string, closed map[int64]bool) {
 	s.positionsMu.Lock()
 	defer s.positionsMu.Unlock()
 
@@ -325,7 +353,7 @@ func (s *StrategySimpleBuy) removePositions(pair string, closed map[int64]bool) 
 
 // onOrderUpdated вызывается OrderService при изменении ордера: позиция могла
 // быть закрыта не нами (руками из веба или из Telegram).
-func (s *StrategySimpleBuy) onOrderUpdated(updated order.Order) {
+func (s *Executor) onOrderUpdated(updated order.Order) {
 	if updated.Status != order.OrderStatusTypeClose {
 		return
 	}

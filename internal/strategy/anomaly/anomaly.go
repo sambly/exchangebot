@@ -167,6 +167,43 @@ type AnomalyResult struct {
 	Metrics     map[string]MetricAnomaly
 	CompositeZ  float64
 	IsAnomalous bool
+
+	// HasPrice - была ли посчитана ценовая метрика. Если нет, у результата НЕТ
+	// направления: объём и число сделок растут и на выносе вверх, и на сбросе
+	// вниз, поэтому вывести из них сторону сделки невозможно.
+	HasPrice bool
+	// PriceChange - сырое изменение цены за период, %. Именно оно (а не z-score)
+	// задаёт направление сигнала: z считается относительно МЕДИАНЫ истории, и у
+	// пары в устойчивом росте выросшая цена запросто даёт отрицательный z.
+	PriceChange float64
+	// PriceZ - z-score цены со знаком
+	PriceZ float64
+
+	// HasActivity - была ли посчитана хоть одна метрика объёма/сделок
+	HasActivity bool
+	// ActivityZ - насколько торговая активность выше обычной (z со знаком)
+	ActivityZ float64
+	// Divergent - цена сходила, а активность была НИЖЕ обычной: движение по
+	// пустому стакану. Чаще всего откатывается; в дайджесте помечается ⚡,
+	// чтобы читатель не принял вынос за подтверждённый импульс.
+	Divergent bool
+}
+
+// Семейства метрик. Внутри семейства метрики почти полностью скоррелированы
+// (вырос объём - выросло и число сделок, и объём покупок), поэтому агрегировать
+// их надо вместе, а не считать каждую независимым подтверждением.
+const (
+	familyPrice = "price"
+	// familyActivity - "сколько торгуют": объёмы и число сделок. Метрика
+	// НЕнаправленная: растёт и когда пару разгоняют, и когда сливают.
+	familyActivity = "activity"
+)
+
+func metricFamily(metric string) string {
+	if metric == "price" {
+		return familyPrice
+	}
+	return familyActivity
 }
 
 type MetricAnomaly struct {
@@ -190,6 +227,46 @@ type PeriodState struct {
 	// одного раза за period, а проверку (z-score) делаем каждую минуту
 	// против уже накопленной истории.
 	nextSampleAt time.Time
+
+	// Окно подтверждения (см. PeriodConfig.ConfirmChecks): сколько проверок подряд
+	// аномалия держится и какой у неё ПИКОВЫЙ уровень за это окно. Смена
+	// направления означает, что событие ДРУГОЕ, и счётчик надо начинать заново,
+	// а не досчитывать чужие минуты.
+	pendingChecks    int
+	pendingLevel     int
+	pendingDirection signal.Direction
+}
+
+// confirm - выдержала ли аномалия окно подтверждения.
+//
+// Возвращает true, когда она продержалась checks проверок подряд, и подставляет
+// в результат ПИКОВЫЙ уровень за это окно. Пиковый, а не усреднённый: смысл окна
+// в том, чтобы отсеять секундный дёрг рынка, а не в том, чтобы размазать
+// сильнейшую минуту движения по соседним спокойным.
+func confirm(state *PeriodState, result *AnomalyResult, checks int) bool {
+	if checks <= 1 {
+		return true
+	}
+
+	direction := directionFor(result.PriceChange)
+
+	if state.pendingChecks == 0 || state.pendingDirection != direction {
+		state.pendingChecks = 1
+		state.pendingLevel = result.Level
+		state.pendingDirection = direction
+	} else {
+		state.pendingChecks++
+		if result.Level > state.pendingLevel {
+			state.pendingLevel = result.Level
+		}
+	}
+
+	if state.pendingChecks < checks {
+		return false
+	}
+
+	result.Level = state.pendingLevel
+	return true
 }
 
 // LevelFromZScore определяет уровень аномалии по z-score, учитывая пороги периода
@@ -261,6 +338,13 @@ func (s *AnomalyStrategy) publish(results []*AnomalyResult) {
 	}
 
 	for _, result := range results {
+		// Без ценовой метрики у сигнала нет направления, а исполнитель обязан
+		// выбрать сторону сделки. Молча отдать ему DirectionUp - значит купить
+		// на любом всплеске объёма, в том числе на сбросе.
+		if !result.HasPrice {
+			continue
+		}
+
 		sig := s.signalFrom(result)
 
 		for _, sub := range s.subscribers {
@@ -274,26 +358,33 @@ func (s *AnomalyStrategy) publish(results []*AnomalyResult) {
 }
 
 func (s *AnomalyStrategy) signalFrom(result *AnomalyResult) signal.Signal {
-	direction := signal.DirectionUp
-	if result.CompositeZ < 0 {
-		direction = signal.DirectionDown
-	}
-
-	priceMetric := result.Metrics["price"]
-
 	return signal.Signal{
 		Source:        s.Config.IDName,
 		Pair:          result.Pair,
 		Period:        result.Period,
 		Time:          time.Now(),
-		Direction:     direction,
+		Direction:     directionFor(result.PriceChange),
 		Level:         result.Level,
 		Strength:      result.CompositeZ,
-		ChangePercent: priceMetric.Value,
+		ChangePercent: result.PriceChange,
 		Volatility:    s.priceVolatility(result.Pair, result.Period),
 		Reason: fmt.Sprintf("%s %s z=%.1f level=%d",
 			s.Config.IDName, result.Period, result.CompositeZ, result.Level),
 	}
+}
+
+// directionFor - сторона движения ЦЕНЫ, и только цены.
+//
+// Раньше направление бралось из знака CompositeZ, а это z метрики с максимальным
+// |z| среди всех - в том числе объёма или числа сделок. Но объём ненаправлен: он
+// растёт и когда пару разгоняют, и когда её сливают. Если цена падала на 8%
+// (z=-5) при взлетевшем объёме (z=+9), композит был +9, сигнал уходил как UP, и
+// исполнитель с onUp:buy покупал падающий нож.
+func directionFor(priceChange float64) signal.Direction {
+	if priceChange < 0 {
+		return signal.DirectionDown
+	}
+	return signal.DirectionUp
 }
 
 // priceVolatility - типичное движение цены пары за период (%), по той же
@@ -347,6 +438,10 @@ func NewStrategy(
 			str.states[pair][period] = &PeriodState{}
 			str.initMetricsForPair(pair, period, str.windowSizeForPeriod(period))
 		}
+	}
+
+	if !cfg.Metrics.Price {
+		anomalyLogger.Warn("метрика price выключена: у сигналов нет направления, торговые подписчики их не получат")
 	}
 
 	if cfg.StrategyEnable {
@@ -647,6 +742,42 @@ func statValue(metric string, value float64) float64 {
 	return math.Log(ratio)
 }
 
+// metricSource - ОТКУДА берутся сырые значения метрик за период.
+//
+// Это единственное место, где детектор касается внешнего мира. В бою источник -
+// скользящие окна AssetsPrices; в бэктесте - пара соседних свечей из БД. Всё
+// остальное (история, MAD, z-score, классификация, подтверждение, cooldown)
+// работает поверх и о разнице не знает.
+//
+// Без этого шва бэктестер был бы вынужден держать собственную копию правил
+// детекции - и она неизбежно разошлась бы с боевой, а мы бы об этом не узнали.
+type metricSource interface {
+	value(metric string) (float64, bool)
+}
+
+// liveSource - боевой источник: снимки ChangePrices/ChangeDelta.
+type liveSource struct {
+	cp prices.ChangePrices
+	cd prices.ChangeDelta
+}
+
+func (s liveSource) value(metric string) (float64, bool) {
+	return extractMetricValue(metric, s.cp, s.cd)
+}
+
+// candleSource - источник бэктеста: отношение соседних свечей периода.
+//
+// Это ровно та же величина, что считает рантайм: price = close(t)/close(t-P)-1,
+// дельта объёма = объём за последние P против предыдущих P. Свеча периода и есть
+// одна выборка - на этом же тождестве построено сидирование истории из БД.
+type candleSource struct {
+	prev, current exModel.Candle
+}
+
+func (s candleSource) value(metric string) (float64, bool) {
+	return candleMetricValue(metric, s.prev, s.current)
+}
+
 // extractMetricValue извлекает значение метрики из уже прочитанных снимков
 // ChangePrices/ChangeDelta
 func extractMetricValue(metric string, cp prices.ChangePrices, cd prices.ChangeDelta) (float64, bool) {
@@ -676,6 +807,46 @@ func extractMetricValue(metric string, cp prices.ChangePrices, cd prices.ChangeD
 // почти идентичными перекрывающимися окнами и статистика ломается (см.
 // комментарий у PeriodState.nextSampleAt).
 func (s *AnomalyStrategy) determineLevelForMetrics(pair, period string, thresholds *ThresholdsConfig, commitToHistory bool) *AnomalyResult {
+	src, ok := s.liveSource(pair, period)
+	if !ok {
+		return nil
+	}
+	return s.detect(pair, period, thresholds, commitToHistory, src)
+}
+
+// liveSource читает снимки источников под локами AssetsPrices и требует
+// заполненности только тех датасетов, которые реально нужны активным метрикам:
+// дельта набирается вдвое дольше цены (2*period), и ждать её ради одной лишь
+// метрики price было бы незачем.
+func (s *AnomalyStrategy) liveSource(pair, period string) (metricSource, bool) {
+	var src liveSource
+
+	for _, metricName := range s.getActiveMetricNames() {
+		if needsDelta(metricName) {
+			var ok bool
+			if src.cd, ok = s.AssetsPrices.GetChangeDelta(pair, period); !ok {
+				return nil, false
+			}
+			break
+		}
+	}
+
+	if s.Config.Metrics.Price {
+		var ok bool
+		if src.cp, ok = s.AssetsPrices.GetChangePrices(pair, period); !ok {
+			return nil, false
+		}
+	}
+
+	return src, true
+}
+
+// detect - ЯДРО ДЕТЕКТОРА, единственное для боя и для бэктеста.
+//
+// Всё, что отличает бэктест от боя, спрятано в metricSource. Здесь - история,
+// z-score, классификация: то, что обязано быть одинаковым, иначе бэктест меряет
+// не ту стратегию, которая торгует.
+func (s *AnomalyStrategy) detect(pair, period string, thresholds *ThresholdsConfig, commitToHistory bool, src metricSource) *AnomalyResult {
 	metrics := s.getActiveMetricNames()
 	if len(metrics) == 0 || thresholds == nil {
 		return nil
@@ -688,35 +859,20 @@ func (s *AnomalyStrategy) determineLevelForMetrics(pair, period string, threshol
 		Metrics: make(map[string]MetricAnomaly),
 	}
 
-	// Читаем снимки источников под локами AssetsPrices и требуем заполненности
-	// только тех датасетов, которые реально нужны активным метрикам: дельта
-	// набирается вдвое дольше цены (2*period), и ждать её ради одной лишь
-	// метрики price было бы незачем.
-	var (
-		cp prices.ChangePrices
-		cd prices.ChangeDelta
-	)
-	for _, metricName := range metrics {
-		if needsDelta(metricName) {
-			var ok bool
-			if cd, ok = s.AssetsPrices.GetChangeDelta(pair, period); !ok {
-				return nil
-			}
-			break
-		}
-	}
-	if s.Config.Metrics.Price {
-		var ok bool
-		if cp, ok = s.AssetsPrices.GetChangePrices(pair, period); !ok {
-			return nil
-		}
-	}
-
-	maxZ := 0.0
-	maxLevel := 0
+	// activityZ - насколько торговая активность выше обычной. Берём МАКСИМАЛЬНЫЙ
+	// z среди метрик семейства (volume*/trades*): они сильно скоррелированы, и
+	// смысл у них один - "торгуют больше, чем обычно".
+	//
+	// Здесь нужен СЫРОЙ z, не прошедший через minChange: порог значимости для
+	// объёмов задан как "изменился хотя бы вдвое", то есть ни одна отрицательная
+	// дельта его никогда не пройдёт (упасть на 100% объём не может). Гоняя
+	// activityZ через тот же фильтр, мы бы навсегда ослепли к падению активности -
+	// а это ровно то, что нужно для детекции рассогласования.
+	activityZ := 0.0
+	hasActivity := false
 
 	for _, metricName := range metrics {
-		value, ok := extractMetricValue(metricName, cp, cd)
+		value, ok := src.value(metricName)
 		if !ok {
 			continue
 		}
@@ -742,39 +898,85 @@ func (s *AnomalyStrategy) determineLevelForMetrics(pair, period string, threshol
 			zScore = 0
 		}
 
-		metricLevel := LevelFromZScore(zScore, thresholds)
-
-		// Порог экономической значимости. Z-score меряет статистическую
-		// неожиданность, а не силу события: у стейблкоинов и низковолатильных
-		// пар разброс близок к нулю, поэтому движение на 0.01% честно даёт z=5.
-		// Торговать там нечего, поэтому такие срабатывания гасим независимо от z.
-		if math.Abs(value) < s.minChangeFor(metricName) {
-			metricLevel = 0
-		}
-
-		isAnomaly := metricLevel > 0
+		// Уровень отдельной метрики нужен только для отчёта: что именно
+		// сработало, видно в уведомлении и в логе. Итоговый уровень события
+		// решает classify - по цене или по активности, смотря что это за событие.
+		metricLevel := s.metricLevel(metricName, value, zScore, thresholds)
 
 		result.Metrics[metricName] = MetricAnomaly{
 			Value:     value,
 			ZScore:    zScore,
 			Threshold: thresholdForLevel(metricLevel, thresholds),
-			IsAnomaly: isAnomaly,
+			IsAnomaly: metricLevel > 0,
 		}
 
-		// В composite берём z только тех метрик, что прошли порог значимости,
-		// иначе в заголовок уведомления попадёт z от отфильтрованного шума.
-		if isAnomaly && math.Abs(zScore) > math.Abs(maxZ) {
-			maxZ = zScore
-		}
-		if metricLevel > maxLevel {
-			maxLevel = metricLevel
+		if metricFamily(metricName) == familyActivity {
+			if !hasActivity || zScore > activityZ {
+				activityZ = zScore
+			}
+			hasActivity = true
 		}
 	}
 
-	result.CompositeZ = maxZ
-	result.Level = maxLevel
-	result.IsAnomalous = maxLevel > 0
+	// Цену выносим в отдельные поля: она задаёт направление сигнала, и её нельзя
+	// путать с остальными метриками, которые направления не имеют.
+	if price, ok := result.Metrics["price"]; ok {
+		result.HasPrice = true
+		result.PriceChange = price.Value
+		result.PriceZ = price.ZScore
+	}
+	result.ActivityZ = activityZ
+	result.HasActivity = hasActivity
+
+	s.classify(result, thresholds)
 	return result
+}
+
+// divergenceZ - порог рассогласования: цена сходила, а активность была НИЖЕ
+// обычной хотя бы на столько сигм. Не настраивается: это не ручка стратегии,
+// а определение "движения по пустому стакану" для пометки в дайджесте.
+const divergenceZ = 1.0
+
+// classify решает, есть ли событие и насколько оно сильное.
+//
+// Уровень задаёт ЦЕНА, и только она. Раньше здесь было level = max по всем
+// метрикам, а composite = z метрики с максимальным |z|. Это худшая из возможных
+// агрегаций: метрики volume, volumeBuy, trades, tradesBuy почти полностью
+// скоррелированы (выросла активность - выросло всё), поэтому max по ним означает
+// "берём самую шумную". Уровень 3 можно было получить на одном лишь объёме при
+// стоящей на месте цене - и такой сигнал уходил исполнителю как полноценный.
+//
+// Активность уровень не меняет, но дополняет картину: движение при упавшей
+// активности помечается Divergent - оно прошло по пустому стакану и чаще всего
+// откатывается. Пометка уходит в дайджест и лог, решение по ней - за человеком.
+func (s *AnomalyStrategy) classify(result *AnomalyResult, thresholds *ThresholdsConfig) {
+	priceLevel := 0
+	if result.HasPrice {
+		priceLevel = s.metricLevel("price", result.PriceChange, result.PriceZ, thresholds)
+	}
+
+	if priceLevel == 0 {
+		result.Level = 0
+		result.IsAnomalous = false
+		return
+	}
+
+	result.CompositeZ = result.PriceZ
+	result.Level = priceLevel
+	result.IsAnomalous = true
+	result.Divergent = result.HasActivity && result.ActivityZ <= -divergenceZ
+}
+
+// metricLevel - уровень метрики с учётом порога экономической значимости.
+//
+// Z-score меряет статистическую неожиданность, а не силу события: у стейблкоинов
+// и низковолатильных пар разброс близок к нулю, поэтому движение на 0.01% честно
+// даёт z=5. Торговать там нечего.
+func (s *AnomalyStrategy) metricLevel(metric string, value, zScore float64, thresholds *ThresholdsConfig) int {
+	if math.Abs(value) < s.minChangeFor(metric) {
+		return 0
+	}
+	return LevelFromZScore(zScore, thresholds)
 }
 
 // checkAndNotify проверяет все пары и уведомляет об аномалиях
@@ -830,6 +1032,11 @@ func (s *AnomalyStrategy) checkAndNotify() {
 			}
 
 			if !result.IsAnomalous {
+				// Аномалия прервалась - окно подтверждения начинается заново.
+				// Именно так и отсеивается секундный дёрг рынка: он не переживает
+				// следующую проверку.
+				state.pendingChecks = 0
+
 				// Сбрасывать lastLevel можно ТОЛЬКО после истечения cooldown.
 				// Иначе метрика, болтающаяся вокруг порога, шлёт уведомление
 				// каждую минуту: на "спокойной" минуте lastLevel обнулялся, а на
@@ -842,6 +1049,13 @@ func (s *AnomalyStrategy) checkAndNotify() {
 			}
 
 			allAnomalousResults = append(allAnomalousResults, result)
+
+			// Неподтверждённая аномалия в рыночную метрику попадает (она там для
+			// того и нужна - показать, что творится со всем рынком), но сигналом
+			// и уведомлением ещё не становится.
+			if !confirm(state, result, periodCfg.ConfirmChecks) {
+				continue
+			}
 
 			// Уровни ниже minNotifyLevel в дайджест не идут и cooldown не тратят,
 			// но в рыночной метрике (allAnomalousResults) продолжают учитываться.

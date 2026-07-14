@@ -156,8 +156,10 @@ func TestUpdateOrdersPrice(t *testing.T) {
 	if len(updated) != 1 {
 		t.Fatalf("ожидался 1 обновлённый ордер, получено %d", len(updated))
 	}
-	if updated[0].Profit < 49.9 || updated[0].Profit > 50.1 {
-		t.Fatalf("профит = %+.2f%%, ожидалось +50%% (150 против 100)", updated[0].Profit)
+	// Профит ЧИСТЫЙ: +50% по цене минус комиссии обеих сторон (2 * 0.1%)
+	want := 50.0 - 2*FeePercent
+	if updated[0].Profit < want-0.1 || updated[0].Profit > want+0.1 {
+		t.Fatalf("профит = %+.2f%%, ожидалось %+.2f%% (гросс +50%% минус комиссии)", updated[0].Profit, want)
 	}
 
 	// Портим копию - оригинал не должен измениться
@@ -204,7 +206,35 @@ func TestCalculatePNL(t *testing.T) {
 	if count != 2 {
 		t.Fatalf("активных ордеров %d, ожидалось 2", count)
 	}
-	if profit < 19.9 || profit > 20.1 {
-		t.Fatalf("суммарный профит %+.2f%%, ожидалось +20%% (два ордера по +10%%)", profit)
+	// Два ордера по +10% гросс, у каждого минус комиссии обеих сторон
+	want := 2 * (10.0 - 2*FeePercent)
+	if profit < want-0.1 || profit > want+0.1 {
+		t.Fatalf("суммарный профит %+.2f%%, ожидалось %+.2f%%", profit, want)
+	}
+}
+
+// Комиссия списывается за обе стороны сделки и на закрытии, и в текущем профите
+// открытой позиции. Шорт - симметрично лонгу.
+func TestFeesAppliedToProfit(t *testing.T) {
+	pw := newTestWallet(t, 100)
+
+	created, err := pw.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 1, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket: %v", err)
+	}
+
+	// Цена не сдвинулась: гросс 0, чистый результат - минус комиссии.
+	// Ровно это и отличает честный кошелёк от бесплатного.
+	updated := pw.UpdateOrdersPrice("BTCUSDT", 100)
+	if want := -2 * FeePercent; updated[0].Profit != want {
+		t.Fatalf("профит без движения цены = %v, ожидалось %v (комиссии)", updated[0].Profit, want)
+	}
+
+	closed, err := pw.ClosePosition(created.ID, order.Deal{Strategy: "test"})
+	if err != nil {
+		t.Fatalf("ClosePosition: %v", err)
+	}
+	if want := -2 * FeePercent; closed.Profit != want {
+		t.Fatalf("профит закрытой сделки = %v, ожидалось %v", closed.Profit, want)
 	}
 }

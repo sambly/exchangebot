@@ -17,6 +17,24 @@ var (
 	ErrNoMarketData = errors.New("нет рыночных данных по паре")
 )
 
+// FeePercent - комиссия за ОДНУ сторону сделки, % (Binance spot taker = 0.1).
+// Списывается дважды: вход + выход.
+//
+// Без неё бумажный кошелёк систематически врал в плюс на ~0.2% за круг: сделка,
+// закрытая по тейку +0.5%, отчитывалась как +0.5%, хотя реальная биржа отдала бы
+// +0.3%. На стратегиях с частыми сделками и узкими тейками это разница между
+// "слегка плюсовая" и "убыточная" - именно её и должен показывать форвард-тест.
+const FeePercent = 0.1
+
+// netProfit - профит ПОСЛЕ комиссий обеих сторон, в процентах от входа.
+//
+// Открытым позициям тоже показывается чистый результат "если закрыть сейчас":
+// комиссия входа уже уплачена, комиссия выхода неизбежна, и прятать их до
+// закрытия значило бы показывать в интерфейсе прибыль, которой нет.
+func netProfit(grossPercent float64) float64 {
+	return grossPercent - 2*FeePercent
+}
+
 type PaperWallet struct {
 	sync.Mutex
 	ordersActive  map[string][]*order.Order
@@ -172,6 +190,7 @@ func (p *PaperWallet) CreateOrderMarket(deal order.Deal) (*order.Order, error) {
 		Quantity:     size,
 		Profit:       0,
 		StrategyBuy:  strategy,
+		Executor:     deal.Executor,
 	}
 
 	p.addOrderActive(&order)
@@ -198,10 +217,10 @@ func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, er
 				o.Status = order.OrderStatusTypeClose
 				o.Price = marketStat.Price
 				if o.Side == order.SideTypeBuy {
-					o.Profit = (o.Price / o.PriceCreated * 100) - 100
+					o.Profit = netProfit((o.Price / o.PriceCreated * 100) - 100)
 				}
 				if o.Side == order.SideTypeSell {
-					o.Profit = (o.PriceCreated / o.Price * 100) - 100
+					o.Profit = netProfit((o.PriceCreated / o.Price * 100) - 100)
 				}
 				o.StrategySell = deal.Strategy
 				o.ExitReason = deal.ExitReason
@@ -240,9 +259,9 @@ func (p *PaperWallet) UpdateOrdersPrice(pair string, price float64) []order.Orde
 		if o.PriceCreated != 0 && price != 0 {
 			switch o.Side {
 			case order.SideTypeBuy:
-				o.Profit = (price / o.PriceCreated * 100) - 100
+				o.Profit = netProfit((price / o.PriceCreated * 100) - 100)
 			case order.SideTypeSell:
-				o.Profit = (o.PriceCreated / price * 100) - 100
+				o.Profit = netProfit((o.PriceCreated / price * 100) - 100)
 			}
 		}
 

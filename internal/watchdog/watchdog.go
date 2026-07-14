@@ -54,7 +54,12 @@ var watchdogLogger = logger.AddFields(map[string]interface{}{
 
 var stalePairsGauge = promauto.NewGauge(prometheus.GaugeOpts{
 	Name: "market_feed_stale_pairs",
-	Help: "Количество пар, по которым не приходят рыночные данные",
+	Help: "Количество пар, которые присылали данные и замолчали",
+})
+
+var noDataPairsGauge = promauto.NewGauge(prometheus.GaugeOpts{
+	Name: "market_feed_no_data_pairs",
+	Help: "Количество пар, по которым не пришло ни одного тика (скорее всего нет подписки)",
 })
 
 // Watchdog пишет только в логи и в метрику market_feed_stale_pairs:
@@ -64,9 +69,13 @@ type Watchdog struct {
 	pairs        []string
 
 	startedAt time.Time
-	// stale - пары, о молчании которых мы уже сообщили. Нужен, чтобы писать
+	// stale - пары, которые присылали данные и замолчали. Нужен, чтобы писать
 	// о переходе (замолчала / снова заговорила), а не каждую минуту об одном и том же.
 	stale map[string]bool
+	// noData - пары, по которым не пришло НИ ОДНОГО тика. Это другое состояние:
+	// такая пара не "замолчала", у неё скорее всего просто нет подписки, и
+	// сообщать о ней надо один раз, а не мигать ею вечно.
+	noData map[string]bool
 }
 
 func New(assetsPrices *prices.AssetsPrices, pairs []string) *Watchdog {
@@ -74,6 +83,7 @@ func New(assetsPrices *prices.AssetsPrices, pairs []string) *Watchdog {
 		assetsPrices: assetsPrices,
 		pairs:        pairs,
 		stale:        make(map[string]bool),
+		noData:       make(map[string]bool),
 	}
 }
 
@@ -100,33 +110,43 @@ func (w *Watchdog) Start(ctx context.Context) error {
 func (w *Watchdog) check(now time.Time) {
 	stats := w.assetsPrices.GetAllMarketsStat()
 
-	wentSilent := make([]string, 0)
+	// Три РАЗНЫХ состояния, которые раньше сваливались в одно сообщение
+	// "тишина > 15m" - и оно врало про пары, по которым данных не было вообще.
+	wentSilent := make([]string, 0)  // была живой и замолчала
+	neverStarted := make([]string, 0) // не прислала ни одного тика с запуска
 	recovered := make([]string, 0)
 
 	for _, pair := range w.pairs {
 		stat, ok := stats[pair]
+		hasData := ok && !stat.Time.IsZero()
+
+		// Пара не прислала НИ ОДНОГО тика. Это не "замолчала" - это скорее всего
+		// вообще нет подписки: exchange_service на такие пары отвечает
+		// "no such pair" (делистинг, опечатка в pairs.txt). Сообщаем один раз и
+		// больше не трогаем: ждать от неё нечего, а мигать ей нечем.
+		if !hasData {
+			if now.Sub(w.startedAt) < startGrace {
+				continue // подписки поднимаются не мгновенно
+			}
+			if !w.noData[pair] {
+				w.noData[pair] = true
+				neverStarted = append(neverStarted, pair)
+			}
+			continue
+		}
+
+		// Данные по паре пришли - значит про подписку мы больше не гадаем
+		delete(w.noData, pair)
 
 		// Неликвид не сторожим: по нему просто нет сделок, и молчание - норма.
-		// Оборот берём из MarketsStat.Volume (это QuoteVolume за 24ч, сразу в USDT).
-		//
-		// Два исключения, и оба важны:
-		//   - пара БЕЗ ЕДИНОГО тика (Time == 0): оборот у неё тоже нулевой, но это
-		//     не признак неликвида - мы про неё просто ничего не знаем. Такая пара
-		//     как раз и может быть мёртвой подпиской с самого старта;
-		//   - пара, УЖЕ помеченная молчащей: ведём её до восстановления, иначе она
-		//     тихо исчезнет из-под наблюдения вместе с протухшим оборотом.
-		knownLiquidity := ok && !stat.Time.IsZero()
-		if knownLiquidity && stat.Volume < minDailyVolume && !w.stale[pair] {
+		// Оборот берём из MarketsStat.Volume (QuoteVolume за 24ч, сразу в USDT).
+		// Пару, УЖЕ помеченную молчащей, ведём до восстановления, иначе она тихо
+		// исчезнет из-под наблюдения вместе с протухшим оборотом.
+		if stat.Volume < minDailyVolume && !w.stale[pair] {
 			continue
 		}
 
-		fresh := ok && !stat.Time.IsZero() && now.Sub(stat.Time) <= staleAfter
-
-		// По паре не пришло ещё ни одного тика: на старте это нормально,
-		// подписки поднимаются не мгновенно.
-		if (!ok || stat.Time.IsZero()) && now.Sub(w.startedAt) < startGrace {
-			continue
-		}
+		fresh := now.Sub(stat.Time) <= staleAfter
 
 		switch {
 		case !fresh && !w.stale[pair]:
@@ -139,11 +159,18 @@ func (w *Watchdog) check(now time.Time) {
 	}
 
 	stalePairsGauge.Set(float64(len(w.stale)))
+	noDataPairsGauge.Set(float64(len(w.noData)))
+
+	if len(neverStarted) > 0 {
+		sort.Strings(neverStarted)
+		watchdogLogger.Errorf("нет подписки: по %d парам не пришло ни одного тика с запуска: %s",
+			len(neverStarted), formatPairs(neverStarted))
+	}
 
 	if len(wentSilent) > 0 {
 		sort.Strings(wentSilent)
-		watchdogLogger.Errorf("нет рыночных данных (тишина > %v) по %d парам: %s",
-			staleAfter, len(wentSilent), formatPairs(wentSilent))
+		watchdogLogger.Errorf("данные пропали: %d пар молчат дольше %v: %s",
+			len(wentSilent), staleAfter, formatPairs(wentSilent))
 	}
 
 	if len(recovered) > 0 {

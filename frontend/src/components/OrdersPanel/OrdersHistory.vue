@@ -70,6 +70,24 @@ function colorProfit(profit?: number) {
   if (profit === undefined) return 'inherit'
   return profit > 0 ? 'var(--p-green-500)' : profit < 0 ? 'var(--p-red-500)' : 'inherit'
 }
+
+// Причина выхода: сработал план (take-profit), выбило стопом (stop-loss),
+// сигнал протух (timeout) или закрыли руками.
+const EXIT_REASON_LABELS: Record<string, string> = {
+  'take-profit': 'Тейк',
+  'stop-loss': 'Стоп',
+  timeout: 'Таймаут',
+  manual: 'Вручную'
+}
+function exitReasonLabel(reason?: string) {
+  if (!reason) return '-'
+  return EXIT_REASON_LABELS[reason] ?? reason
+}
+function colorExitReason(reason?: string) {
+  if (reason === 'take-profit') return 'var(--p-green-500)'
+  if (reason === 'stop-loss') return 'var(--p-red-500)'
+  return 'inherit'
+}
 function formatProfit(profit?: number) {
   return profit !== undefined
     ? profit.toLocaleString('ru', { maximumFractionDigits: 2, minimumFractionDigits: 2, notation: 'compact' })
@@ -143,6 +161,16 @@ function formatTime(timestamp?: string) {
         <template #body="{ data }">
           <div>{{ data.StrategyBuy }}</div>
           <div style="font-size:0.8em; opacity:0.7">{{ data.StrategySell }}</div>
+        </template>
+      </Column>
+      <!-- Причина выхода: по ней видно, сработал план или выбило стопом.
+           Без неё нельзя понять, работает стратегия или нет. -->
+      <Column header="Выход" :sortable="true" field="ExitReason" style="min-width: 110px">
+        <template #body="{ data }">
+          <span :style="{ color: colorExitReason(data.ExitReason), fontWeight: 500 }">
+            {{ exitReasonLabel(data.ExitReason) }}
+          </span>
+          <div v-if="data.Executor" style="font-size:0.8em; opacity:0.7">{{ data.Executor }}</div>
         </template>
       </Column>
     </DataTable>

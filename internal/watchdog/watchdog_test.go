@@ -135,15 +135,55 @@ func TestWatchdogSilentDuringStartGrace(t *testing.T) {
 	}
 }
 
-// После grace-периода пара, по которой не пришло ни одного тика, - это мёртвая
-// подписка, а не "просто тихая пара".
+// Пара, по которой не пришло НИ ОДНОГО тика, - это отдельное состояние:
+// скорее всего у неё вообще нет подписки (exchange_service отвечает "no such
+// pair"). Раньше она валилась в общее сообщение "тишина > 15m", хотя никакой
+// тишины не было - данных не было вовсе.
 func TestWatchdogReportsPairWithoutTicksAfterGrace(t *testing.T) {
-	w, _ := newTestWatchdog(t, []string{"BTCUSDT"})
+	w, _ := newTestWatchdog(t, []string{"DEADUSDT"})
 	w.startedAt = time.Now().Add(-time.Hour)
 
 	w.check(time.Now())
 
-	if !w.stale["BTCUSDT"] {
-		t.Fatal("пара без единого тика после grace-периода должна быть помечена")
+	if !w.noData["DEADUSDT"] {
+		t.Fatal("пара без единого тика должна попасть в noData")
+	}
+	if w.stale["DEADUSDT"] {
+		t.Fatal("пара без единого тика - это не 'замолчала', в stale ей не место")
+	}
+}
+
+// О паре без подписки сообщаем ОДИН раз: ждать от неё нечего, мигать нечем.
+func TestWatchdogReportsMissingPairOnlyOnce(t *testing.T) {
+	w, _ := newTestWatchdog(t, []string{"DEADUSDT"})
+	w.startedAt = time.Now().Add(-time.Hour)
+
+	w.check(time.Now())
+	first := len(w.noData)
+
+	w.check(time.Now().Add(time.Minute))
+
+	if len(w.noData) != first {
+		t.Fatalf("состояние не должно меняться: было %d, стало %d", first, len(w.noData))
+	}
+}
+
+// Если по паре без подписки внезапно пошли данные - она возвращается в обычный
+// режим наблюдения.
+func TestWatchdogPairWithoutTicksThenRecovers(t *testing.T) {
+	w, ap := newTestWatchdog(t, []string{"BTCUSDT"})
+	w.startedAt = time.Now().Add(-time.Hour)
+
+	w.check(time.Now())
+	if !w.noData["BTCUSDT"] {
+		t.Fatal("пара без тиков должна попасть в noData")
+	}
+
+	now := time.Now()
+	ap.OnMarket(exModel.MarketsStat{Pair: "BTCUSDT", Price: 100, Volume: 900_000_000, Time: now})
+	w.check(now)
+
+	if w.noData["BTCUSDT"] {
+		t.Fatal("данные пошли - пару надо убрать из noData")
 	}
 }

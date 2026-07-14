@@ -14,8 +14,8 @@ import (
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy/anomaly"
 	"github.com/sambly/exchangebot/internal/strategy/base"
+	"github.com/sambly/exchangebot/internal/strategy/executor"
 	"github.com/sambly/exchangebot/internal/strategy/sales/simplesale"
-	simplebuy "github.com/sambly/exchangebot/internal/strategy/simpleBuy"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
 
@@ -72,10 +72,15 @@ func NewControllerStrategy(
 
 // build собирает граф стратегий.
 //
-// Детекторы (base, anomaly) публикуют сигналы, исполнитель (simpleBuy) на них
-// подписан, политика выхода (simplesale) отвечает за закрытие. Кто на кого
-// подписан - решается ЗДЕСЬ, а не внутри стратегий: поэтому новый детектор не
-// тащит за собой торговую логику, а новая торговая логика не трогает детекторы.
+// Три роли, и они не пересекаются:
+//   - ДЕТЕКТОРЫ (base, anomaly) - находят события и публикуют сигналы;
+//   - ИСПОЛНИТЕЛЬ (executor) - решает, открывать ли позицию по сигналу;
+//   - ПОЛИТИКА ВЫХОДА (simplesale) - решает, когда закрывать.
+//
+// Кто на кого подписан, решается ЗДЕСЬ, а не внутри пакетов. Поэтому новый
+// детектор не тащит за собой торговую логику, а новая торговая логика не
+// трогает детекторы: executor не импортирует ни anomaly, ни base - только
+// signal.
 func (cs *ControllerStrategy) build() error {
 
 	baseStrategy, err := base.NewStrategy(cs.AssetsPrices, cs.Periods, cs.Pairs, cs.Notification)
@@ -93,26 +98,26 @@ func (cs *ControllerStrategy) build() error {
 	}
 	cs.AddStrategy(anomalyStrategy)
 
-	simpleBuyStrategy, err := simplebuy.NewStrategy(cs.Notification, cs.AssetsPrices, cs.OrderController)
+	tradeExecutor, err := executor.New(cs.Notification, cs.OrderController)
 	if err != nil {
 		return err
 	}
 	if cs.TelegramEnable {
-		simpleBuyStrategy.WithTelegramMenu()
+		tradeExecutor.WithTelegramMenu()
 	}
 
-	simpleSaleStrategy, err := simplesale.NewStrategy(cs.OrderController)
+	exitPolicy, err := simplesale.NewStrategy(cs.OrderController)
 	if err != nil {
 		return err
 	}
-	simpleBuyStrategy.WithSaleStrategy(simpleSaleStrategy)
+	tradeExecutor.WithSaleStrategy(exitPolicy)
 
-	// Исполнитель слушает оба детектора. Какие сигналы он реально берёт в
-	// работу - решают фильтры в его конфиге (sources, minLevel, direction).
-	baseStrategy.Subscribe(simpleBuyStrategy.Signals)
-	anomalyStrategy.Subscribe(simpleBuyStrategy.Signals)
+	// Исполнитель слушает оба детектора. Какие сигналы он реально берёт в работу -
+	// решают фильтры в его конфиге (sources, minLevel, onUp/onDown).
+	baseStrategy.Subscribe(tradeExecutor.Signals)
+	anomalyStrategy.Subscribe(tradeExecutor.Signals)
 
-	cs.AddStrategy(simpleBuyStrategy)
+	cs.AddStrategy(tradeExecutor)
 
 	return nil
 }

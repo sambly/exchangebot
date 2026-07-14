@@ -150,6 +150,7 @@ func (os *OrderService) CreateOrderMarket(deal Deal) (Order, error) {
 		IdOrder:      uint(order.ID),
 		Frame:        deal.Frame,
 		Strategy:     deal.Strategy,
+		Executor:     deal.Executor,
 		Comment:      deal.Comment,
 		MarketsStat:  mkStatJSON,
 		ChangePrices: chDataJSON,

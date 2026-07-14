@@ -63,20 +63,12 @@ func (str *StrategySimpleSale) Plan(sig signal.Signal) (takeProfit, stopLoss flo
 // закрытие происходило только при достижении прибыли. Это и была главная
 // проблема "продажи наугад".
 func (str *StrategySimpleSale) Execute(ms exModel.MarketsStat, position sales.Position) bool {
-	entry := position.Order.PriceCreated
-	if entry == 0 || ms.Price == 0 {
-		return false
-	}
-
-	profit := (ms.Price/entry)*100 - 100
-	if position.Order.Side == order.SideTypeSell {
-		profit = -profit
-	}
-
-	reason, exit := str.exitReason(profit, position)
+	reason, exit := str.ShouldExit(ms.Price, time.Now(), position)
 	if !exit {
 		return false
 	}
+
+	profit := profitPercent(ms.Price, position)
 
 	deal := order.Deal{
 		Strategy:   str.Config.IDName,
@@ -95,18 +87,45 @@ func (str *StrategySimpleSale) Execute(ms exModel.MarketsStat, position sales.Po
 	return true
 }
 
-func (str *StrategySimpleSale) exitReason(profit float64, position sales.Position) (sales.ExitReason, bool) {
+// ShouldExit - чистое решение о выходе: ни БД, ни биржи, ни time.Now().
+//
+// Благодаря этому одно и то же правило работает и в бою (по живому тику), и в
+// бэктесте (по исторической свече и симулированному времени). Иначе бэктестер
+// был бы вынужден держать собственную копию правил выхода - и рано или поздно
+// она разошлась бы с боевой.
+func (str *StrategySimpleSale) ShouldExit(price float64, at time.Time, position sales.Position) (sales.ExitReason, bool) {
+	if position.Order.PriceCreated == 0 || price == 0 {
+		return "", false
+	}
+
+	profit := profitPercent(price, position)
+
 	switch {
 	case profit >= position.TakeProfitPercent:
 		return sales.ExitTakeProfit, true
 	case profit <= -position.StopLossPercent:
 		return sales.ExitStopLoss, true
-	case !position.Deadline.IsZero() && time.Now().After(position.Deadline):
+	case !position.Deadline.IsZero() && at.After(position.Deadline):
 		// Сигнал протух: движения, которого мы ждали, не случилось.
 		// Держать позицию дальше не за что.
 		return sales.ExitTimeout, true
 	}
 	return "", false
+}
+
+// profitPercent - прибыль позиции при данной цене, % от входа.
+// У шорта знак обратный: падение цены - это прибыль.
+func profitPercent(price float64, position sales.Position) float64 {
+	entry := position.Order.PriceCreated
+	if entry == 0 {
+		return 0
+	}
+
+	profit := (price/entry)*100 - 100
+	if position.Order.Side == order.SideTypeSell {
+		profit = -profit
+	}
+	return profit
 }
 
 func clamp(value, min, max float64) float64 {

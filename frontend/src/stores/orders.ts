@@ -8,8 +8,13 @@ export interface Order {
   PriceCreated?: number
   Price?: number
   Profit?: number
+  /** ПОЧЕМУ вошли и почему вышли: источник сигнала (anomaly, base) или manual */
   StrategyBuy?: string
   StrategySell?: string
+  /** КЕМ инициирована сделка: auto | telegram | web */
+  Executor?: string
+  /** ПОЧЕМУ закрыли: take-profit | stop-loss | timeout | manual */
+  ExitReason?: string
   TimeCreated?: string
   Time?: string
   Status?: string

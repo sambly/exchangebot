@@ -1,4 +1,4 @@
-package simplebuy
+package executor
 
 import (
 	"testing"
@@ -10,21 +10,22 @@ import (
 	"github.com/sambly/exchangebot/internal/toggle"
 )
 
-func testStrategy() *StrategySimpleBuy {
-	return &StrategySimpleBuy{
+func testStrategy() *Executor {
+	return &Executor{
 		Config: &Config{
 			IDName:              "simplebuy",
 			Auto:                true,
-			Direction:           "up",
+			OnUp:                "buy",
+			OnDown:              "sell",
 			MinLevel:            2,
 			Sources:             []string{"anomaly"},
 			Size:                1.0,
 			MaxPositions:        2,
 			PairCooldownMinutes: 60,
 		},
-		StrategyEnable: toggle.New(true),
-		positions:      make(map[string][]sales.Position),
-		lastClose:      make(map[string]time.Time),
+		Enabled:   toggle.New(true),
+		positions: make(map[string][]sales.Position),
+		lastClose: make(map[string]time.Time),
 	}
 }
 
@@ -35,36 +36,54 @@ func sig(pair string, level int, direction signal.Direction, source string) sign
 	}
 }
 
-// Фильтры конфига: слабые сигналы, чужое направление и чужой источник не торгуем.
-func TestConfigAllows(t *testing.T) {
-	cfg := testStrategy().Config
-
+// Направление сигнала и сторона сделки - РАЗНЫЕ вещи. Раньше сторона всегда
+// была BUY, и на аномальное падение приходило предложение купить (поймать нож).
+func TestSideForSignal(t *testing.T) {
 	cases := []struct {
-		name string
-		sig  signal.Signal
-		want bool
+		name     string
+		onUp     string
+		onDown   string
+		sig      signal.Signal
+		wantSide order.SideType
+		wantOK   bool
 	}{
-		{"подходит", sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), true},
-		{"слабый уровень", sig("BTCUSDT", 1, signal.DirectionUp, "anomaly"), false},
-		{"падение при direction=up", sig("BTCUSDT", 3, signal.DirectionDown, "anomaly"), false},
-		{"чужой источник", sig("BTCUSDT", 3, signal.DirectionUp, "base"), false},
+		{"рост → покупка", "buy", "sell", sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), order.SideTypeBuy, true},
+		{"падение → продажа", "buy", "sell", sig("BTCUSDT", 2, signal.DirectionDown, "anomaly"), order.SideTypeSell, true},
+		{"падение → покупка (игра на отскок)", "buy", "buy", sig("BTCUSDT", 2, signal.DirectionDown, "anomaly"), order.SideTypeBuy, true},
+		{"рост → продажа (игра на откат)", "sell", "skip", sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), order.SideTypeSell, true},
+		{"падения не торгуем", "buy", "skip", sig("BTCUSDT", 3, signal.DirectionDown, "anomaly"), "", false},
+		{"слабый уровень", "buy", "sell", sig("BTCUSDT", 1, signal.DirectionUp, "anomaly"), "", false},
+		{"чужой источник", "buy", "sell", sig("BTCUSDT", 3, signal.DirectionUp, "base"), "", false},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if _, ok := cfg.Allows(c.sig); ok != c.want {
-				t.Fatalf("Allows() = %v, ожидалось %v", ok, c.want)
+			cfg := testStrategy().Config
+			cfg.OnUp, cfg.OnDown = c.onUp, c.onDown
+
+			side, _, ok := cfg.SideFor(c.sig)
+			if ok != c.wantOK || side != c.wantSide {
+				t.Fatalf("SideFor() = (%q, %v), ожидалось (%q, %v)", side, ok, c.wantSide, c.wantOK)
 			}
 		})
 	}
 }
 
-func TestConfigDirectionBoth(t *testing.T) {
-	cfg := testStrategy().Config
-	cfg.Direction = "both"
+// Стратегия в ордере - это ИСТОЧНИК СИГНАЛА (почему вошли), а не имя исполнителя.
+// Раньше во все сделки писалось "simplebuy" - но это механизм покупки, а не причина.
+func TestDealCarriesSignalSourceAsStrategy(t *testing.T) {
+	s := sig("BTCUSDT", 2, signal.DirectionUp, "anomaly")
 
-	if _, ok := cfg.Allows(sig("BTCUSDT", 2, signal.DirectionDown, "anomaly")); !ok {
-		t.Fatal("при direction=both падение должно торговаться")
+	deal := NewDeal(s, order.SideTypeBuy, 1.0, 2.0, 1.5, Telegram)
+
+	if deal.Strategy != "anomaly" {
+		t.Errorf("стратегия сделки = %q, ожидалось %q (источник сигнала)", deal.Strategy, "anomaly")
+	}
+	if deal.Executor != Telegram {
+		t.Errorf("исполнитель = %q, ожидалось %q", deal.Executor, Telegram)
+	}
+	if deal.Level != s.Level || deal.Strength != s.Strength {
+		t.Error("сила сигнала должна уезжать в сделку вместе с планом")
 	}
 }
 
@@ -131,5 +150,26 @@ func TestPositionRemovedOnExternalClose(t *testing.T) {
 
 	if open != 0 {
 		t.Fatalf("после внешнего закрытия позиция должна исчезнуть, осталось %d", open)
+	}
+}
+
+// SideFor превращает направление сигнала в сторону сделки по onUp/onDown
+// и отсекает слабые сигналы по minLevel.
+func TestSideFor(t *testing.T) {
+	cfg := &Config{OnUp: "buy", OnDown: "sell", MinLevel: 2}
+
+	up := signal.Signal{Level: 2, Direction: signal.DirectionUp}
+	if side, reason, ok := cfg.SideFor(up); !ok || side != order.SideTypeBuy {
+		t.Fatalf("рост уровня 2 должен давать BUY, получено (%v, %q, %v)", side, reason, ok)
+	}
+
+	down := signal.Signal{Level: 3, Direction: signal.DirectionDown}
+	if side, reason, ok := cfg.SideFor(down); !ok || side != order.SideTypeSell {
+		t.Fatalf("падение уровня 3 должно давать SELL, получено (%v, %q, %v)", side, reason, ok)
+	}
+
+	weak := signal.Signal{Level: 1, Direction: signal.DirectionUp}
+	if _, _, ok := cfg.SideFor(weak); ok {
+		t.Fatal("уровень 1 ниже minLevel 2 - торговаться не должен")
 	}
 }

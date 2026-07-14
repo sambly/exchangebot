@@ -96,8 +96,8 @@ func (s *AnomalyStrategy) NotificationDigest(results []*AnomalyResult) {
 		out += fmt.Sprintf("%s %s\n", iconForLevel(maxLevel), pair)
 
 		for _, result := range pairResults {
-			out += fmt.Sprintf("   %s z=%.1f | %s\n",
-				result.Period, result.CompositeZ, anomalousMetrics(result))
+			out += fmt.Sprintf("   %s%s z=%.1f | %s\n",
+				result.Period, divergentTag(result), result.CompositeZ, anomalousMetrics(result))
 		}
 
 		// Ссылка - последней строкой блока: она нужна, чтобы открыть график,
@@ -110,6 +110,17 @@ func (s *AnomalyStrategy) NotificationDigest(results []*AnomalyResult) {
 	}
 
 	s.Notification.SendMessage(out)
+}
+
+// divergentTag - пометка рассогласованного движения: цена сходила, а торговая
+// активность была НИЖЕ обычной. Такое движение прошло по пустому стакану и чаще
+// всего откатывается - читатель дайджеста должен видеть это сразу, а не
+// принимать вынос за подтверждённый импульс.
+func divergentTag(result *AnomalyResult) string {
+	if result.Divergent {
+		return " ⚡пустой стакан"
+	}
+	return ""
 }
 
 // pairStrength - максимальный уровень пары и максимальный |z| среди её периодов
@@ -193,8 +204,9 @@ func (s *AnomalyStrategy) logAnomalies(all, notified []*AnomalyResult) {
 	})
 
 	for _, result := range sorted {
-		anomalyLogger.Infof("anomaly pair=%s period=%s level=%d z=%.2f notified=%t metrics=[%s]",
+		anomalyLogger.Infof("anomaly pair=%s period=%s level=%d z=%.2f activityZ=%.2f divergent=%t notified=%t metrics=[%s]",
 			result.Pair, result.Period, result.Level, result.CompositeZ,
+			result.ActivityZ, result.Divergent,
 			sent[result.Pair+"|"+result.Period], anomalousMetrics(result))
 	}
 }

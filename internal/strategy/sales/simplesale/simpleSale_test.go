@@ -104,32 +104,54 @@ func position(entry, takeProfit, stopLoss float64, deadline time.Time) sales.Pos
 
 // Главное, чего не было раньше: стоп-лосс. Позиция в минусе висела вечно,
 // потому что закрытие происходило только при достижении прибыли.
-func TestExitReason(t *testing.T) {
+//
+// Тест зовёт ShouldExit - чистое решение, общее для боя и бэктеста. Вход у всех
+// позиций по 100, поэтому цена = 100 + желаемый профит в процентах.
+func TestShouldExit(t *testing.T) {
 	str := testSale()
 
-	future := time.Now().Add(time.Hour)
-	past := time.Now().Add(-time.Hour)
+	now := time.Now()
+	future := now.Add(time.Hour)
+	past := now.Add(-time.Hour)
 
 	cases := []struct {
-		name   string
-		profit float64
-		pos    sales.Position
-		want   sales.ExitReason
-		exit   bool
+		name  string
+		price float64
+		pos   sales.Position
+		want  sales.ExitReason
+		exit  bool
 	}{
-		{"тейк сработал", 2.5, position(100, 2.0, 1.5, future), sales.ExitTakeProfit, true},
-		{"стоп сработал", -1.8, position(100, 2.0, 1.5, future), sales.ExitStopLoss, true},
-		{"внутри коридора - держим", 0.7, position(100, 2.0, 1.5, future), "", false},
-		{"сигнал протух", 0.3, position(100, 2.0, 1.5, past), sales.ExitTimeout, true},
-		{"тейк важнее таймаута", 5.0, position(100, 2.0, 1.5, past), sales.ExitTakeProfit, true},
+		{"тейк сработал", 102.5, position(100, 2.0, 1.5, future), sales.ExitTakeProfit, true},
+		{"стоп сработал", 98.2, position(100, 2.0, 1.5, future), sales.ExitStopLoss, true},
+		{"внутри коридора - держим", 100.7, position(100, 2.0, 1.5, future), "", false},
+		{"сигнал протух", 100.3, position(100, 2.0, 1.5, past), sales.ExitTimeout, true},
+		{"тейк важнее таймаута", 105.0, position(100, 2.0, 1.5, past), sales.ExitTakeProfit, true},
+		{"нулевая цена - не решение, а отсутствие данных", 0, position(100, 2.0, 1.5, past), "", false},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			reason, exit := str.exitReason(c.profit, c.pos)
+			reason, exit := str.ShouldExit(c.price, now, c.pos)
 			if exit != c.exit || reason != c.want {
-				t.Fatalf("profit=%+.2f%% → (%q, %v), ожидалось (%q, %v)", c.profit, reason, exit, c.want, c.exit)
+				t.Fatalf("price=%.2f → (%q, %v), ожидалось (%q, %v)", c.price, reason, exit, c.want, c.exit)
 			}
 		})
+	}
+}
+
+// У шорта прибыль перевёрнута: падение цены - это плюс. Проверяем, что тейк
+// шорта срабатывает на падении, а стоп - на росте.
+func TestShouldExitShortSide(t *testing.T) {
+	str := testSale()
+	future := time.Now().Add(time.Hour)
+
+	pos := position(100, 2.0, 1.5, future)
+	pos.Order.Side = order.SideTypeSell
+
+	if reason, exit := str.ShouldExit(97.5, time.Now(), pos); !exit || reason != sales.ExitTakeProfit {
+		t.Fatalf("падение до 97.5 для шорта - тейк, получено (%q, %v)", reason, exit)
+	}
+	if reason, exit := str.ShouldExit(101.8, time.Now(), pos); !exit || reason != sales.ExitStopLoss {
+		t.Fatalf("рост до 101.8 для шорта - стоп, получено (%q, %v)", reason, exit)
 	}
 }

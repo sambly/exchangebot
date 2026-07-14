@@ -38,10 +38,19 @@ type Order struct {
 	Status       OrderStatusType `gorm:"column:status"`
 	PriceCreated float64         `gorm:"column:price_created"`
 	Price        float64         `gorm:"column:price"`
-	Quantity     float64         `gorm:"column:quantity"`
-	Profit       float64         `gorm:"column:profit"`
-	StrategyBuy  string          `gorm:"column:strategy_buy"`
-	StrategySell string          `gorm:"column:strategy_sell"`
+	Quantity float64 `gorm:"column:quantity"`
+	Profit   float64 `gorm:"column:profit"`
+
+	// StrategyBuy / StrategySell - ПОЧЕМУ вошли и почему вышли: имя детектора
+	// (anomaly, base) или "manual".
+	//
+	// Раньше сюда писался simplebuy - но это исполнитель, механизм покупки, а не
+	// причина сделки. Кто именно нажал кнопку, теперь пишется в Executor.
+	StrategyBuy  string `gorm:"column:strategy_buy"`
+	StrategySell string `gorm:"column:strategy_sell"`
+
+	// Executor - КЕМ инициирована сделка: auto, telegram, web.
+	Executor string `gorm:"column:executor"`
 
 	// ExitReason - ПОЧЕМУ закрыли: take-profit, stop-loss, timeout, manual.
 	// Раньше причина терялась: при закрытии сохранялась только стратегия, и по
@@ -56,6 +65,7 @@ type OrderInfo struct {
 	Frame        string         `gorm:"column:frame"`
 	Strategy     string         `gorm:"column:strategy"`
 	Comment      string         `gorm:"column:comment"`
+	Executor     string         `gorm:"column:executor"`
 	MarketsStat  datatypes.JSON `gorm:"column:markets_stat"`
 	ChangePrices datatypes.JSON `gorm:"column:change_prices"`
 	DeltaFast    datatypes.JSON `gorm:"column:delta_fast"`
@@ -75,7 +85,11 @@ type Deal struct {
 	SideType SideType
 	Size     float64
 	Frame    string
+	// Strategy - источник сигнала (anomaly, base) или "manual", а НЕ имя
+	// исполнителя: см. комментарий к Order.StrategyBuy.
 	Strategy string
+	// Executor - кто инициировал: auto, telegram, web
+	Executor string
 	Comment  string
 
 	// Заполняется при входе (план сделки и сила сигнала) и при выходе

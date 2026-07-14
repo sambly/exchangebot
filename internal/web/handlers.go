@@ -2,14 +2,17 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/websocket"
 	"github.com/sambly/exchangebot/internal/order"
+	"github.com/sambly/exchangebot/internal/strategy/executor"
 	"gopkg.in/yaml.v3"
 )
 
@@ -47,13 +50,24 @@ func (web *Web) openDeal(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.Unmarshal(bodyByte, &deal); err != nil {
 		appWebLogger.Errorf("error json unmarshal: %v", err)
+		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
 		return
 	}
 
+	// Имя пары приходит из интерфейса и может нести лишние пробелы или перевод
+	// строки. Без обрезки лукап падал с загадочным
+	// "market stat for pair NEOUSDT  not found" - обрати внимание на два пробела.
+	deal.Pair = strings.TrimSpace(deal.Pair)
 	deal.Size = 1.0
-	_, err := web.App.OrderController.CreateOrderMarket(deal)
-	if err != nil {
+	deal.Executor = executor.Web
+
+	if _, err := web.App.OrderController.CreateOrderMarket(deal); err != nil {
+		// Ошибку ОБЯЗАТЕЛЬНО отдаём наружу: фронт проверяет res.ok и показывает
+		// toast. Раньше при ошибке уходил 200 OK, и интерфейс бодро сообщал
+		// "Сделка открыта", хотя её не было.
 		appWebLogger.Errorf("error CreateOrderMarket: %v", err)
+		http.Error(w, fmt.Sprintf("не удалось открыть сделку: %v", err), http.StatusBadRequest)
+		return
 	}
 
 	orderActives := web.App.OrderController.State.GetOrdersActiveCopy()
@@ -68,13 +82,24 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 	bodyByte, err := io.ReadAll(r.Body)
 	if err != nil {
 		appWebLogger.Errorf("error readfile: %v", err)
+		http.Error(w, "не удалось прочитать тело запроса", http.StatusBadRequest)
+		return
 	}
 
-	id, _ := strconv.ParseInt(string(bodyByte), 10, 64)
-	deal := order.Deal{Strategy: "manual", ExitReason: "manual"}
+	// Раньше ParseInt шёл без проверки, и мусорный id молча превращался в 0.
+	id, err := strconv.ParseInt(strings.TrimSpace(string(bodyByte)), 10, 64)
+	if err != nil {
+		appWebLogger.Errorf("некорректный id ордера %q: %v", string(bodyByte), err)
+		http.Error(w, "некорректный id ордера", http.StatusBadRequest)
+		return
+	}
+
+	deal := order.Deal{Strategy: "manual", ExitReason: "manual", Executor: executor.Web}
 
 	if err := web.App.OrderController.ClosePosition(id, deal); err != nil {
 		appWebLogger.Errorf("error ClosePosition: %v", err)
+		http.Error(w, fmt.Sprintf("не удалось закрыть сделку: %v", err), http.StatusBadRequest)
+		return
 	}
 
 	orders := map[string]interface{}{
@@ -89,7 +114,7 @@ func (web *Web) closeDeal(w http.ResponseWriter, r *http.Request) {
 
 func (web *Web) closeAllDeal(w http.ResponseWriter, _ *http.Request) {
 
-	deal := order.Deal{Strategy: "manual", ExitReason: "manual"}
+	deal := order.Deal{Strategy: "manual", ExitReason: "manual", Executor: executor.Web}
 	for _, orders := range web.App.OrderController.State.GetOrdersActiveCopy() {
 		for _, order := range orders {
 			if err := web.App.OrderController.ClosePosition(order.ID, deal); err != nil {
