@@ -19,13 +19,16 @@ const props = defineProps<{
   visible?: boolean
 }>()
 
-let isLoading = false
+let isInitializing = false
+let isDisposed = false
 
 const store = useOrdersStore()
 
 const ordersForPair = computed(() =>
   [...store.active, ...store.history].filter(o => o.Pair === props.pair)
 )
+
+const hasOrders = computed(() => ordersForPair.value.length > 0)
 
 const chartContainer = ref<HTMLDivElement | null>(null)
 const frames = ['1m', '3m', '15m', '1h', '4h', '1d'] as const
@@ -35,14 +38,40 @@ let chart: IChartApi | null = null
 let candleSeries: ISeriesApi<'Candlestick'> | null = null
 let resizeObserver: ResizeObserver | null = null
 let isInitialized = false
+let tooltip: HTMLDivElement | null = null
+let spinnerEl: HTMLDivElement | null = null
 
 const textColor = () => props.darkMode ? '#d1d4dc' : '#111'
 const bgColor = () => props.darkMode ? '#131722' : '#ffffff'
 const gridColor = () => props.darkMode ? '#2B2B43' : '#E1E3EA'
 
+// ======================================================
+// SPINNER
+// ======================================================
+
+function showSpinner() {
+  if (!chartContainer.value) return
+  hideSpinner()
+  spinnerEl = document.createElement('div')
+  spinnerEl.className = 'chart-loading-overlay chart-loading-overlay-dom'
+  spinnerEl.innerHTML = `<div class="p-progressspinner" style="width:40px;height:40px"><svg class="p-progressspinner-svg" viewBox="25 25 50 50" style="animation-duration:2s"><circle class="p-progressspinner-circle" cx="50" cy="50" r="20" fill="none" stroke-width="4" stroke-miterlimit="10" style="stroke:var(--p-primary-color, #3B82F6)"/></svg></div>`
+  chartContainer.value.appendChild(spinnerEl)
+}
+
+function hideSpinner() {
+  spinnerEl?.remove()
+  spinnerEl = null
+}
+
+// ======================================================
+
 function waitForSize(): Promise<void> {
   return new Promise(resolve => {
     const check = () => {
+      if (isDisposed) {
+        resolve()
+        return
+      }
       const el = chartContainer.value
       if (el && el.clientWidth > 0 && el.clientHeight > 0) {
         resolve()
@@ -122,11 +151,82 @@ function initChart() {
       secondsVisible: false
     }
   })
+
+  createTooltip()
+}
+
+function getTooltipBackground() {
+  return props.darkMode
+    ? 'rgba(19,23,34,0.95)'
+    : 'rgba(255,255,255,0.95)'
+}
+
+function createTooltip() {
+  if (!chartContainer.value) return
+
+  tooltip?.remove()
+
+  tooltip = document.createElement('div')
+
+  tooltip.style.position = 'absolute'
+  tooltip.style.top = '8px'
+  tooltip.style.left = '8px'
+  tooltip.style.padding = '8px 10px'
+  tooltip.style.fontSize = '12px'
+  tooltip.style.borderRadius = '6px'
+  tooltip.style.pointerEvents = 'none'
+  tooltip.style.zIndex = '10'
+
+  tooltip.style.background = getTooltipBackground()
+
+  tooltip.style.color = textColor()
+
+  tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)'
+
+  chartContainer.value.appendChild(tooltip)
+}
+
+function attachCrosshair() {
+  if (!chart || !tooltip) return
+
+  chart.subscribeCrosshairMove(param => {
+    if (!param.time) {
+      tooltip!.style.display = 'none'
+      return
+    }
+
+    tooltip!.style.display = 'block'
+
+    const point = param.seriesData.get(candleSeries!) as any
+    if (!point) return
+
+    const fmt = (v: number) =>
+      Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })
+
+    tooltip!.innerHTML = `
+      <div style="font-weight:600;margin-bottom:6px;">
+        ${props.pair}
+      </div>
+      <div style="color:#22c55e;margin-top:2px;">
+        Open:  ${fmt(point.open)}
+      </div>
+      <div style="color:#22c55e;margin-top:2px;">
+        High:  ${fmt(point.high)}
+      </div>
+      <div style="color:#ef4444;margin-top:2px;">
+        Low:   ${fmt(point.low)}
+      </div>
+      <div style="color:#ef4444;margin-top:2px;">
+        Close: ${fmt(point.close)}
+      </div>
+    `
+  })
 }
 
 async function loadData() {
   if (!chart) return
 
+  showSpinner()
   try {
     const raw = await fetchCandles(props.pair, activeFrame.value)
     if (!Array.isArray(raw) || raw.length === 0) return
@@ -161,22 +261,27 @@ async function loadData() {
     }
 
     chart.timeScale().fitContent()
+
+    attachCrosshair()
   } catch (err) {
     console.error('loadData error:', err)
+  } finally {
+    hideSpinner()
   }
 }
 
 async function initialize() {
-  if (isLoading) return
-  isLoading = true
+  if (isInitializing) return
+  isInitializing = true
   try {
     await nextTick()
     await waitForSize()
+    if (isDisposed) return
     initChart()
     await loadData()
     isInitialized = true
   } finally {
-    isLoading = false
+    isInitializing = false
   }
 }
 
@@ -215,6 +320,10 @@ watch(() => props.darkMode, () => {
       horzLines: { color: gridColor() }
     }
   })
+  if (tooltip) {
+    tooltip.style.background = getTooltipBackground()
+    tooltip.style.color = textColor()
+  }
 })
 
 onMounted(() => {
@@ -228,11 +337,14 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  isDisposed = true
   resizeObserver?.disconnect()
   if (chart) {
     chart.remove()
     chart = null
   }
+  tooltip?.remove()
+  hideSpinner()
 })
 </script>
 
@@ -249,7 +361,11 @@ onBeforeUnmount(() => {
         @click="activeFrame = f"
       />
     </div>
-    <div ref="chartContainer" class="chart-container" />
+    <div ref="chartContainer" class="chart-container">
+      <div v-if="!hasOrders" class="no-orders-placeholder">
+        Нет ордеров
+      </div>
+    </div>
   </div>
 </template>
 
@@ -274,5 +390,28 @@ onBeforeUnmount(() => {
   min-height: 0;
   position: relative;
   overflow: hidden;
+}
+
+:global(.chart-loading-overlay-dom) {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--p-content-background, transparent) 60%, transparent);
+  z-index: 20;
+  pointer-events: none;
+}
+
+.no-orders-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--p-text-muted-color, #999);
+  font-size: 0.9rem;
+  background: var(--p-content-background, #fff);
+  z-index: 15;
 }
 </style>

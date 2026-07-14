@@ -66,7 +66,7 @@ async function createWidget() {
     theme: getTheme(),
     style: '1',
     locale: 'ru',
-    toolbar_bg: '#f1f3f6',
+    toolbar_bg: props.darkMode ? '#131722' : '#f1f3f6',
     enable_publishing: false,
     allow_symbol_change: true,
     width: width,
@@ -109,13 +109,11 @@ watch(() => props.pair, (newPair) => {
   }
 })
 
-// Смена темы — без пересоздания
+// Смена темы — виджет встраиваемый (tv.js), changeTheme() у него не работает
+// надёжно (toolbar_bg/loading_screen всё равно заданы только при создании),
+// поэтому пересоздаём виджет целиком с актуальной темой
 watch(() => props.darkMode, () => {
-  if (widget && isWidgetReady) {
-    widget.changeTheme(getTheme())
-  } else {
-    createWidget()
-  }
+  createWidget()
 })
 
 onBeforeUnmount(() => {

@@ -124,6 +124,14 @@ function formatTime(timestamp?: string) {
         <Select v-model="selectedStrategySell" :options="strategySellOptions" placeholder="Стратегия продажи" :filter="true" size="small" class="filter-select" />
         <Button label="Сброс" size="small" severity="secondary" text @click="resetFilters" />
       </div>  
+      <Button
+        :icon="ui.ordersBarSize === 'large' ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
+        size="small"
+        severity="secondary"
+        text
+        style="margin-left: auto"
+        @click="ui.toggleOrdersBarSize()"
+      />
     </div>
 
     <DataTable

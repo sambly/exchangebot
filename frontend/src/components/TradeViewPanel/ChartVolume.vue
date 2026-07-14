@@ -64,6 +64,7 @@ const chartContainer = ref<HTMLDivElement | null>(null)
 const selectedFrame = ref('1h')
 
 const selectedDeltas = ref<string[]>([
+  'Price',
   'Volume',
   'VolumeBuy',
   'VolumeAsk'
@@ -79,6 +80,7 @@ const frames = [
 ]
 
 const deltaOptions = [
+  { label: 'Price', value: 'Price' },
   { label: 'Volume', value: 'Volume' },
   { label: 'Volume Buy', value: 'VolumeBuy' },
   { label: 'Volume Ask', value: 'VolumeAsk' },
@@ -100,6 +102,7 @@ const seriesMap = new Map<string, ISeriesApi<'Line'>>()
 
 let resizeObserver: ResizeObserver | null = null
 let tooltip: HTMLDivElement | null = null
+let spinnerEl: HTMLDivElement | null = null
 
 // ======================================================
 // THEME
@@ -127,6 +130,30 @@ function getTooltipBackground() {
   return props.darkMode
     ? 'rgba(19,23,34,0.95)'
     : 'rgba(255,255,255,0.95)'
+}
+
+function getPriceColor() {
+  return props.darkMode
+    ? '#e0e0e0'
+    : '#555555'
+}
+
+// ======================================================
+// SPINNER
+// ======================================================
+
+function showSpinner() {
+  if (!chartContainer.value) return
+  hideSpinner()
+  spinnerEl = document.createElement('div')
+  spinnerEl.className = 'chart-loading-overlay chart-loading-overlay-dom'
+  spinnerEl.innerHTML = `<div class="p-progressspinner" style="width:40px;height:40px"><svg class="p-progressspinner-svg" viewBox="25 25 50 50" style="animation-duration:2s"><circle class="p-progressspinner-circle" cx="50" cy="50" r="20" fill="none" stroke-width="4" stroke-miterlimit="10" style="stroke:var(--p-primary-color, #3B82F6)"/></svg></div>`
+  chartContainer.value.appendChild(spinnerEl)
+}
+
+function hideSpinner() {
+  spinnerEl?.remove()
+  spinnerEl = null
 }
 
 // ======================================================
@@ -207,24 +234,34 @@ function attachCrosshair() {
       const point =
         param.seriesData.get(series) as any
 
-      const value =
-        point?.value !== undefined
-          ? Number(point.value).toLocaleString(
-              'en-US',
-              {
-                maximumFractionDigits: 0
-              }
-            )
+      if (key === 'Price') {
+        const value = point?.value !== undefined
+          ? Number(point.value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })
           : '—'
 
-      html += `
-        <div style="
-          color:${colors[index % colors.length]};
-          margin-top:4px;
-        ">
-          ${key}: ${value}
-        </div>
-      `
+        html += `
+          <div style="
+            color:${getPriceColor()};
+            margin-top:4px;
+            font-weight:500;
+          ">
+            ${key}: ${value}
+          </div>
+        `
+      } else {
+        const value = point?.value !== undefined
+          ? Number(point.value).toLocaleString('en-US', { maximumFractionDigits: 0 })
+          : '—'
+
+        html += `
+          <div style="
+            color:${colors[index % colors.length]};
+            margin-top:4px;
+          ">
+            ${key}: ${value}
+          </div>
+        `
+      }
 
       index++
     }
@@ -234,100 +271,141 @@ function attachCrosshair() {
 }
 
 // ======================================================
+// CLEANUP — удаляем chart + tooltip, но сохраняем контейнер
+// ======================================================
+
+function cleanupChart() {
+  if (chart) {
+    chart.remove()
+    chart = null
+  }
+  tooltip?.remove()
+  tooltip = null
+  seriesMap.clear()
+}
+
+// ======================================================
 // CREATE CHART
 // ======================================================
 
 async function createChartView() {
   if (!chartContainer.value) return
 
-  const raw = await fetchData()
+  showSpinner()
 
-  if (!Array.isArray(raw)) return
+  try {
+    const raw = await fetchData()
 
-  chartContainer.value.innerHTML = ''
+    if (!Array.isArray(raw)) return
 
-  seriesMap.clear()
+    cleanupChart()
 
-  const width =
-    chartContainer.value.clientWidth
+    const width =
+      chartContainer.value.clientWidth
 
-  const height =
-    chartContainer.value.clientHeight
+    const height =
+      chartContainer.value.clientHeight
 
-  chart = createChart(
-    chartContainer.value,
-    {
-      width,
-      height,
+    chart = createChart(
+      chartContainer.value,
+      {
+        width,
+        height,
 
-      layout: {
-        textColor: getTextColor(),
+        layout: {
+          textColor: getTextColor(),
 
-        background: {
-          type: ColorType.Solid,
-          color: getBackgroundColor()
-        }
-      },
-
-      grid: {
-        vertLines: {
-          color: getGridColor()
+          background: {
+            type: ColorType.Solid,
+            color: getBackgroundColor()
+          }
         },
 
-        horzLines: {
-          color: getGridColor()
+        grid: {
+          vertLines: {
+            color: getGridColor()
+          },
+
+          horzLines: {
+            color: getGridColor()
+          }
+        },
+
+        timeScale: {
+          timeVisible: true,
+          secondsVisible: false
         }
-      },
-
-      rightPriceScale: {
-        scaleMargins: {
-          top: 0.1,
-          bottom: 0.1
-        }
-      },
-
-      timeScale: {
-        timeVisible: true,
-        secondsVisible: false
-      }
-    }
-  )
-
-  createTooltip()
-
-  let colorIndex = 0
-
-  for (const delta of selectedDeltas.value) {
-    const series = chart.addSeries(
-      LineSeries,
-      {
-        color:
-          colors[
-            colorIndex % colors.length
-          ],
-
-        lineWidth: 2
       }
     )
 
-    const data = raw.map((item: any) => ({
-      time: Math.floor(
-        new Date(item.Time).getTime() / 1000
-      ) as Time,
+    createTooltip()
 
-      value: Number(item[delta])
-    }))
+    let colorIndex = 0
+    let hasPrice = false
+    let hasDelta = false
 
-    series.setData(data)
+    for (const delta of selectedDeltas.value) {
+      const isPrice = delta === 'Price'
+      const fieldName = isPrice ? 'Close' : delta
 
-    seriesMap.set(delta, series)
+      const series = chart.addSeries(
+        LineSeries,
+        {
+          color: isPrice
+            ? getPriceColor()
+            : colors[colorIndex % colors.length],
 
-    colorIndex++
+          lineWidth: 2,
+          priceScaleId: isPrice ? 'price' : 'delta',
+          lastValueVisible: true
+        }
+      )
+
+      if (isPrice) {
+        hasPrice = true
+      } else {
+        hasDelta = true
+        colorIndex++
+      }
+
+      const data = raw.map((item: any) => ({
+        time: Math.floor(
+          new Date(item.Time).getTime() / 1000
+        ) as Time,
+
+        value: Number(item[fieldName])
+      }))
+
+      series.setData(data)
+
+      seriesMap.set(delta, series)
+    }
+
+    // Configure price scales only if they exist
+    if (hasPrice) {
+      chart.priceScale('price').applyOptions({
+        scaleMargins: {
+          top: 0.01,
+          bottom: hasDelta ? 0.4 : 0.1
+        }
+      })
+    }
+
+    if (hasDelta) {
+      chart.priceScale('delta').applyOptions({
+        scaleMargins: {
+          top: hasPrice ? 0.4 : 0.1,
+          bottom: 0.1
+        }
+      })
+    }
+
+    chart.timeScale().fitContent()
+
+    attachCrosshair()
+  } finally {
+    hideSpinner()
   }
-
-  chart.timeScale().fitContent()
-
-  attachCrosshair()
 }
 
 // ======================================================
@@ -354,10 +432,7 @@ function resizeChart() {
 async function refreshChart() {
   await nextTick()
 
-  if (chart) {
-    chart.remove()
-    chart = null
-  }
+  cleanupChart()
 
   await createChartView()
 }
@@ -438,12 +513,9 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
 
-  if (chart) {
-    chart.remove()
-    chart = null
-  }
+  cleanupChart()
 
-  tooltip?.remove()
+  hideSpinner()
 })
 </script>
 
@@ -500,5 +572,16 @@ onBeforeUnmount(() => {
   min-height: 0;
 
   position: relative;
+}
+
+:global(.chart-loading-overlay-dom) {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--p-content-background, transparent) 60%, transparent);
+  z-index: 20;
+  pointer-events: none;
 }
 </style>
