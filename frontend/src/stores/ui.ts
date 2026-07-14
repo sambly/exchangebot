@@ -5,6 +5,7 @@ export type ActiveChart = 'price' | 'volume' | 'trade-smart' | 'orders'
 export type ActiveOrdersTab = 'active' | 'history'
 export type ActiveDataPanel = 'price' | 'volume'
 export type FilterMode = 'all' | 'favorites'
+export type OrdersBarSize = 'compact' | 'large'
 
 function loadFavoritesFromStorage(): Set<string> {
   try {
@@ -26,6 +27,7 @@ export const useUIStore = defineStore('ui', () => {
   const filterMode = ref<FilterMode>('all')
   const favoritePairs = ref<Set<string>>(loadFavoritesFromStorage())
   const darkMode = ref<boolean>(localStorage.getItem('darkMode') === 'true')
+  const ordersBarSize = ref<OrdersBarSize>('compact')
 
   function selectPair(pair: string) {
     currentPair.value = pair
@@ -35,6 +37,10 @@ export const useUIStore = defineStore('ui', () => {
   function toggleDarkMode() {
     darkMode.value = !darkMode.value
     localStorage.setItem('darkMode', String(darkMode.value))
+  }
+
+  function toggleOrdersBarSize() {
+    ordersBarSize.value = ordersBarSize.value === 'compact' ? 'large' : 'compact'
   }
 
   function toggleFavorite(pairFull: string) {
@@ -54,8 +60,10 @@ export const useUIStore = defineStore('ui', () => {
     filterMode,
     favoritePairs,
     darkMode,
+    ordersBarSize,
     selectPair,
     toggleFavorite,
     toggleDarkMode,
+    toggleOrdersBarSize,
   }
 })

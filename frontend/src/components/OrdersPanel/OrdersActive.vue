@@ -100,8 +100,15 @@ async function handleCloseAll() {
         size="small"
         severity="secondary"
         outlined
-        style="margin-left: auto"
         @click="handleCloseAll"
+      />
+      <Button
+        :icon="ui.ordersBarSize === 'large' ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
+        size="small"
+        severity="secondary"
+        text
+        style="margin-left: auto"
+        @click="ui.toggleOrdersBarSize()"
       />
     </div>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 
@@ -27,6 +27,8 @@ const { refreshOrders } = useOrders()
 const toast = useToast()
 
 const isRefreshing = ref(false)
+
+const ordersBarHeight = computed(() => ui.ordersBarSize === 'large' ? '40vh' : '20vh')
 
 const fetchData = async () => {
   try {
@@ -243,7 +245,7 @@ onMounted(() => {
 
 .orders-bar {
   flex-shrink: 0;
-  height: 220px;
+  height: v-bind(ordersBarHeight);
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--p-content-border-color);
