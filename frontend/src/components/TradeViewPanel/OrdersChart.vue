@@ -31,7 +31,7 @@ const ordersForPair = computed(() =>
 const hasOrders = computed(() => ordersForPair.value.length > 0)
 
 const chartContainer = ref<HTMLDivElement | null>(null)
-const frames = ['1m', '3m', '15m', '1h', '4h', '1d'] as const
+const frames = ['1m', '3m', '15m', '1h', '4h', '12h'] as const
 const activeFrame = ref<string>('15m')
 
 let chart: IChartApi | null = null

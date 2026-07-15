@@ -71,7 +71,7 @@ func runBacktest(cmd *cobra.Command, args []string) error {
 		"15m": 15 * time.Minute,
 		"1h":  time.Hour,
 		"4h":  4 * time.Hour,
-		"1d":  12 * time.Hour,
+		"12h": 12 * time.Hour,
 	}
 	periodDuration, ok := periods[backtestPeriod]
 	if !ok {

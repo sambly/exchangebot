@@ -25,7 +25,7 @@ const ui = useUIStore()
 const market = useMarketStore()
 const filters = useFiltersStore()
 
-const frames = ['1m', '3m', '15m', '1h', '4h', '1d'] as const
+const frames = ['1m', '3m', '15m', '1h', '4h', '12h'] as const
 const activeFrame = ref<string>('15m')
 const tableContainerRef = ref<HTMLElement | null>(null)
 

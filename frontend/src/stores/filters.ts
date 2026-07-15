@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useMarketStore } from './market'
 
-export const PERIODS = ['1m', '3m', '15m', '1h', '4h', '1d'] as const
+export const PERIODS = ['1m', '3m', '15m', '1h', '4h', '12h'] as const
 export type Period = typeof PERIODS[number]
 
 type PeriodFilterMap = Record<Period, { min: number | null; max: number | null }>

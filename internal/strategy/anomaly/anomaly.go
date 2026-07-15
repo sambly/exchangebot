@@ -643,8 +643,7 @@ func (s *AnomalyStrategy) windowSizeForPeriod(period string) int {
 }
 
 // cooldownForPeriod - cooldown равен реальной длительности периода, взятой из
-// основного конфига (s.Periods). Держать здесь собственную таблицу "1d -> 24h"
-// нельзя: в конфиге приложения период "1d" задан как 12 часов, и таблица
+// основного конфига (s.Periods): собственная таблица длительностей здесь
 // разошлась бы с тем, что стратегия использует для nextSampleAt.
 func (s *AnomalyStrategy) cooldownForPeriod(period string) time.Duration {
 	return s.Periods[period]

@@ -23,7 +23,7 @@
 | Приложение | Репозиторий | Роль |
 |---|---|---|
 | **exchange_service** | `../exchangeService` | Единственный, кто общается с Binance. Держит WebSocket-подписки и раздаёт данные клиентам по gRPC. Он же — библиотека (`pkg/exchange`, `pkg/model`), которую импортируют оба остальных. |
-| **feederapp** | `../feederapp` | Слушает **сделки** через gRPC, нарезает их в свечи по периодам и пишет в MySQL (`candles_1m … candles_1d`). |
+| **feederapp** | `../feederapp` | Слушает **сделки** через gRPC, нарезает их в свечи по периодам и пишет в MySQL (`candles_1m … candles_12h`). |
 | **exchangebot** | этот репозиторий | Слушает **тикеры** через gRPC, читает свечи из MySQL, считает метрики, гоняет стратегии, отдаёт веб и Telegram. |
 
 ```
@@ -564,8 +564,8 @@ type Sales interface {
 **18. Периоды объявлены в четырёх местах.**
 [root.go:153](internal/cobra/root.go#L153) (карта период→длительность), [db.go:21](internal/database/db.go#L21) (`candlesTablesList`), [changePeriods.go:16](internal/telegram/menu/account/changePeriods.go#L16) (кнопки меню, по одной на период, каждая со своим `b.Handle`) и `cmd/main.go` в feederapp. Разъедутся — молча сломается всё. Вынести в один пакет-источник, из него генерировать и список таблиц, и кнопки.
 
-**19. `1d` — это 12 часов.**
-Так задано и в боте, и в feederapp, то есть данные консистентны, но имя врёт. Любой новый человек (и любая новая стратегия) на этом споткнётся. Либо переименовать в `12h` везде разом, либо крупно задокументировать.
+**19. ✅ `1d` — это 12 часов.** *(исправлено)*
+Период переименован в `12h` везде разом (бот, feederapp, фронтенд, таблица `candles_12h` — см. миграцию `RENAME TABLE candles_1d TO candles_12h`). Имя больше не врёт.
 
 **20. Метрики Prometheus дублируются.**
 `dbOperationDuration/Total` в `orderDb.go` и `pricesDbOperationDuration/Total` в `pricesDb.go` — одинаковые обёртки с копипастой замера в каждом методе. Один декоратор `observe(op string, fn func() error) error` уберёт по 8 строк из каждого метода репозитория.

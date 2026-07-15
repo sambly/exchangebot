@@ -18,7 +18,7 @@ var (
 	period_15m = tele.Btn{Text: "15m"}
 	period_1h  = tele.Btn{Text: "1h"}
 	period_4h  = tele.Btn{Text: "4h"}
-	period_1d  = tele.Btn{Text: "1d"}
+	period_12h = tele.Btn{Text: "12h"}
 
 	defaultButtonsChangePeriods = [][]tele.Btn{
 		{period_1m},
@@ -26,7 +26,7 @@ var (
 		{period_15m},
 		{period_1h},
 		{period_4h},
-		{period_1d},
+		{period_12h},
 		{global.BtnBack, global.BtnMainMenu},
 	}
 )
@@ -82,7 +82,7 @@ func (m *ChangePeriodsMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 		return m.handlePeriod(c, handler)
 	})
 
-	b.Handle(&period_1d, func(c tele.Context) error {
+	b.Handle(&period_12h, func(c tele.Context) error {
 		return m.handlePeriod(c, handler)
 	})
 }

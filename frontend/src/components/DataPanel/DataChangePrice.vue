@@ -17,7 +17,7 @@ interface PriceData {
   '15m': number
   '1h': number
   '4h': number
-  '1d': number
+  '12h': number
   isFavorite: boolean
 }
 
@@ -27,7 +27,7 @@ const filters = useFiltersStore()
 
 const tableContainerRef = ref<HTMLElement | null>(null)
 
-const TIME_PERIODS = ['1m', '3m', '15m', '1h', '4h', '1d'] as const
+const TIME_PERIODS = ['1m', '3m', '15m', '1h', '4h', '12h'] as const
 
 const pairs = computed(() => {
   const ms = market.marketsStat
@@ -46,7 +46,7 @@ const pairs = computed(() => {
       '15m': cp[pair]?.['15m']?.ChangePercent || 0,
       '1h': cp[pair]?.['1h']?.ChangePercent || 0,
       '4h': cp[pair]?.['4h']?.ChangePercent || 0,
-      '1d': cp[pair]?.['1d']?.ChangePercent || 0,
+      '12h': cp[pair]?.['12h']?.ChangePercent || 0,
       isFavorite: ui.favoritePairs.has(pair)
     })
   }

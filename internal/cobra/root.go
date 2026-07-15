@@ -157,7 +157,7 @@ func run(cmd *cobra.Command, args []string) error {
 		"15m": time.Minute * 15,
 		"1h":  time.Hour,
 		"4h":  time.Hour * 4,
-		"1d":  time.Hour * 12,
+		"12h": time.Hour * 12,
 	}
 
 	settings := model.Settings{

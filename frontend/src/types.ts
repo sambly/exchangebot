@@ -20,7 +20,7 @@ export interface ChangePrices {
     '15m': ChangePriceEntry
     '1h': ChangePriceEntry
     '4h': ChangePriceEntry
-    '1d': ChangePriceEntry
+    '12h': ChangePriceEntry
   }
 }
 

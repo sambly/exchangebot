@@ -147,7 +147,7 @@ periods:
       level1: 3.5
       level2: 5.0
       level3: 8.0
-  1d:
+  12h:
     enabled: true
     historyWindowSize: 14
     thresholds:

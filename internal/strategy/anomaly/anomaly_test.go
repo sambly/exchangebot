@@ -249,12 +249,12 @@ func setPrice(t *testing.T, ap *prices.AssetsPrices, pair, period string, change
 // requiredSamples определяет, заработает ли период: пока в буфере меньше этого
 // числа значений, ZScore возвращает 0, и стратегия по периоду молчит.
 //
-// Именно на этом мы и обожглись: 4h и 1d молчали сутками, потому что в БД не
+// Именно на этом мы и обожглись: 4h и 12h молчали сутками, потому что в БД не
 // хватало глубины истории, а лог сидирования рапортовал "засеяно 418 пар".
 func TestRequiredSamples(t *testing.T) {
 	periods := map[string]time.Duration{
 		"15m": 15 * time.Minute,
-		"1d":  12 * time.Hour,
+		"12h": 12 * time.Hour,
 	}
 	str := testStrategy([]string{"BTCUSDT"}, periods)
 	str.Config.MinSamples = 20
@@ -265,11 +265,11 @@ func TestRequiredSamples(t *testing.T) {
 		t.Errorf("для 15m нужно %d выборок, ожидалось 20", got)
 	}
 
-	// Окно 1d МЕНЬШЕ minSamples: требование клампится по окну, иначе период
+	// Окно 12h МЕНЬШЕ minSamples: требование клампится по окну, иначе период
 	// не заработал бы никогда - в буфер просто не влезло бы 20 значений.
-	str.Config.Periods["1d"].HistoryWindowSize = 14
-	if got := str.requiredSamples("1d"); got != 14 {
-		t.Errorf("для 1d нужно %d выборок, ожидалось 14 (клампинг по окну)", got)
+	str.Config.Periods["12h"].HistoryWindowSize = 14
+	if got := str.requiredSamples("12h"); got != 14 {
+		t.Errorf("для 12h нужно %d выборок, ожидалось 14 (клампинг по окну)", got)
 	}
 }
 
@@ -522,14 +522,14 @@ func TestClassifyVolumeOnlySpikeIsNotAnomaly(t *testing.T) {
 func TestCooldownEqualsPeriodDuration(t *testing.T) {
 	periods := map[string]time.Duration{
 		"15m": 15 * time.Minute,
-		"1d":  12 * time.Hour, // в конфиге приложения "1d" - это 12 часов
+		"12h": 12 * time.Hour,
 	}
 	str := testStrategy([]string{"BTCUSDT"}, periods)
 
 	// Cooldown берётся из реальной длительности периода, а не из таблицы имён:
-	// иначе "1d" дал бы 24 часа и разошёлся с тем, что бот считает периодом.
-	if got := str.cooldownForPeriod("1d"); got != 12*time.Hour {
-		t.Fatalf("cooldown для 1d = %v, ожидалось 12h", got)
+	// иначе своя таблица разошлась бы с тем, что бот считает периодом.
+	if got := str.cooldownForPeriod("12h"); got != 12*time.Hour {
+		t.Fatalf("cooldown для 12h = %v, ожидалось 12h", got)
 	}
 	if got := str.cooldownForPeriod("15m"); got != 15*time.Minute {
 		t.Fatalf("cooldown для 15m = %v, ожидалось 15m", got)

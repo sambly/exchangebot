@@ -76,7 +76,7 @@ const frames = [
   '15m',
   '1h',
   '4h',
-  '1d'
+  '12h'
 ]
 
 const deltaOptions = [

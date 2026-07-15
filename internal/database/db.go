@@ -24,7 +24,7 @@ var (
 	ordersTable       string   = "orders"
 	ordersInfoTable   string   = "order_infos"
 	candlesTables     string   = "candles_" // + periods
-	candlesTablesList []string = []string{"1m", "3m", "15m", "1h", "4h", "1d"}
+	candlesTablesList []string = []string{"1m", "3m", "15m", "1h", "4h", "12h"}
 	basePeriod        string   = "1m"
 )
 

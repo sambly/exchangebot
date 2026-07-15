@@ -153,8 +153,8 @@ func periodDuration(period string) time.Duration {
 		return time.Hour
 	case "4h":
 		return 4 * time.Hour
-	case "1d":
-		return 12 * time.Hour // в конфиге приложения "1d" - это 12 часов
+	case "12h":
+		return 12 * time.Hour
 	default:
 		return time.Hour
 	}

@@ -84,7 +84,7 @@ import { useUIStore } from '../../stores/ui'
 const ui = useUIStore()
 const toast = useToast()
 
-const timeframes = ['1m', '15m', '1h', '4h', '1d']
+const timeframes = ['1m', '15m', '1h', '4h', '12h']
 const activeFrame = ref('15m')
 
 interface StrategyOption {
