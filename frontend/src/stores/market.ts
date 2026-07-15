@@ -1,18 +1,24 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { MarketsStat, ChangePrices, DeltaFast } from '../types'
+import type { MarketsStat, ChangePrices, DeltaFast, FeedStatus } from '../types'
 
 export const useMarketStore = defineStore('market', () => {
   const marketsStat = ref<MarketsStat>({})
   const changePrices = ref<ChangePrices>({})
   const deltaFast = ref<DeltaFast>({})
+  const feedStatus = ref<FeedStatus>({})
 
   const isDeltaLoading = ref(false)
   const deltaError = ref<string | null>(null)
 
-  function setMarketData(data: { MarketsStat?: MarketsStat; ChangePrices?: ChangePrices }) {
+  function setMarketData(data: {
+    MarketsStat?: MarketsStat
+    ChangePrices?: ChangePrices
+    FeedStatus?: FeedStatus
+  }) {
     if (data.MarketsStat) marketsStat.value = data.MarketsStat
     if (data.ChangePrices) changePrices.value = data.ChangePrices
+    if (data.FeedStatus) feedStatus.value = data.FeedStatus
   }
 
   async function fetchDelta() {
@@ -40,6 +46,7 @@ export const useMarketStore = defineStore('market', () => {
     marketsStat,
     changePrices,
     deltaFast,
+    feedStatus,
     isDeltaLoading,
     deltaError,
     setMarketData,

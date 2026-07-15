@@ -39,6 +39,7 @@ const fetchData = async () => {
     market.setMarketData({
       MarketsStat: data.MarketsStat,
       ChangePrices: data.ChangePrices,
+      FeedStatus: data.FeedStatus,
     })
 
     const pairs = Object.keys(data.ChangePrices || {})

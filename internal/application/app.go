@@ -6,6 +6,7 @@ import (
 
 	"github.com/sambly/exchangeService/pkg/exchange"
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	pb "github.com/sambly/exchangeService/pkg/pb"
 	"github.com/sambly/exchangeService/pkg/telemetry"
 	"github.com/sambly/exchangebot/internal/account"
 	"github.com/sambly/exchangebot/internal/config"
@@ -17,7 +18,6 @@ import (
 	"github.com/sambly/exchangebot/internal/paperwallet"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy"
-	"github.com/sambly/exchangebot/internal/watchdog"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 )
@@ -37,7 +37,10 @@ type Application struct {
 	OrderController    *order.OrderService
 	PaperWallet        *paperwallet.PaperWallet
 	ControllerStrategy *strategy.ControllerStrategy
-	Watchdog           *watchdog.Watchdog
+
+	// statusClient читает статус подписки на пару прямо из exchange_service
+	// (RPC GetAllMarketPairsStatus). nil в режиме прямого подключения к бирже.
+	statusClient pb.ExchangeServiceClient
 }
 
 var appLogger = logger.AddFieldsEmpty()
@@ -49,7 +52,8 @@ func NewApp(
 	db *gorm.DB,
 	socketsMessage *notification.SocketsMessage,
 	cfg *config.Config,
-	notification *notification.Notification) (*Application, error) {
+	notification *notification.Notification,
+	statusClient pb.ExchangeServiceClient) (*Application, error) {
 
 	orderDB := database.NewOrderDb(db)
 	pricesDB := database.NewPricesDb(db)
@@ -86,7 +90,7 @@ func NewApp(
 		OrderController:    orderController,
 		PaperWallet:        paperWallet,
 		ControllerStrategy: controllerStrategy,
-		Watchdog:           watchdog.New(assetsPrices, settings.Pairs),
+		statusClient:       statusClient,
 	}
 
 	return app, nil
@@ -149,15 +153,40 @@ func (app *Application) Run(ctx context.Context) error {
 		return app.ControllerStrategy.StartAll(gCtx)
 	})
 
-	// Сторож фида: подписка на пару может умереть в exchangeService, и
-	// приложение этого не заметит - оно продолжит работать на застывших данных.
-	g.Go(func() error {
-		return app.Watchdog.Start(gCtx)
-	})
-
 	duration := time.Since(timeStart)
 	appLogger.Infof("Время выполнения предварительной загрузки данных: %v ", duration)
 	appLogger.Infof("Время старта: %v ", timeStart)
 
 	return g.Wait()
+}
+
+// GetMarketPairsStatus читает статус подписки на каждую пару прямо из
+// exchange_service (Active/Inactive). Вызывается по запросу из веб-хендлера,
+// а не фоновой горутиной: статус нужен ровно тогда, когда фронт обновляет цены.
+//
+// Статус нельзя получить из самого потока MarketsStat: когда пара Inactive,
+// по ней не идёт ни одного сообщения, поэтому источник - отдельный unary-RPC.
+//
+// В режиме прямого подключения к бирже (statusClient == nil) и при любой
+// ошибке возвращается пустая карта: индикатор статуса - подсказка, а не то,
+// ради чего стоит ронять весь ответ с ценами.
+func (app *Application) GetMarketPairsStatus(ctx context.Context) map[string]string {
+	if app.statusClient == nil {
+		return map[string]string{}
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	resp, err := app.statusClient.GetAllMarketPairsStatus(ctx, &pb.Empty{})
+	if err != nil {
+		appLogger.Errorf("get all market pairs status: %v", err)
+		return map[string]string{}
+	}
+
+	out := make(map[string]string, len(resp.Pairs))
+	for _, p := range resp.Pairs {
+		out[p.Pair] = p.Status
+	}
+	return out
 }

@@ -24,9 +24,17 @@ export interface ChangePrices {
   }
 }
 
+// Статус подписки exchange_service на пару: "Active" | "Inactive".
+// Пара может отсутствовать в карте, если exchange_service ещё не ответил -
+// это неопределённый статус, а не "Inactive".
+export interface FeedStatus {
+  [pair: string]: string
+}
+
 export interface GetChPriceResponse {
   MarketsStat: MarketsStat
   ChangePrices: ChangePrices
+  FeedStatus: FeedStatus
 }
 
 // Ответ от /trade/api/getChDelta

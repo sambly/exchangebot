@@ -154,11 +154,12 @@ func (web *Web) echo(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (web *Web) getChPrice(w http.ResponseWriter, _ *http.Request) {
+func (web *Web) getChPrice(w http.ResponseWriter, r *http.Request) {
 
 	maps := map[string]interface{}{
 		"MarketsStat":  web.App.AssetsPrices.GetAllMarketsStat(),
 		"ChangePrices": web.App.AssetsPrices.GetAllChPrice(),
+		"FeedStatus":   web.App.GetMarketPairsStatus(r.Context()),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

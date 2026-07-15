@@ -21,6 +21,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/sambly/exchangeService/pkg/exchange"
 	"github.com/sambly/exchangeService/pkg/logadapter"
+	pb "github.com/sambly/exchangeService/pkg/pb"
 	"github.com/sambly/exchangeService/pkg/telemetry"
 	"github.com/sambly/exchangebot"
 	"github.com/sambly/exchangebot/internal/application"
@@ -177,6 +178,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	var exflow exchange.Exflow
 	var conn *grpc.ClientConn
+	var statusClient pb.ExchangeServiceClient
 	switch cfg.ExchangeType {
 	case "exchange":
 		exflow = binance
@@ -190,6 +192,7 @@ func run(cmd *cobra.Command, args []string) error {
 			mainLogger.Fatalf("did not connect to grpc: %v", err)
 		}
 		defer conn.Close()
+		statusClient = pb.NewExchangeServiceClient(conn)
 	}
 
 	dataFeed := exchange.NewDataFeed(
@@ -210,6 +213,7 @@ func run(cmd *cobra.Command, args []string) error {
 		socketsMessage,
 		cfg,
 		notificationService,
+		statusClient,
 	)
 	if err != nil {
 		mainLogger.Fatal(err)

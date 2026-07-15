@@ -36,21 +36,55 @@ const ch24Color = computed(() => {
   if (val == null) return 'inherit'
   return val > 0 ? 'var(--p-green-500)' : val < 0 ? 'var(--p-red-500)' : 'inherit'
 })
+
+// Статус подписки exchange_service на текущую пару.
+// Три состояния: активна (зелёный), неактивна (красный), неизвестно
+// (серый - exchange_service ещё не ответил или это не выбранная пара).
+const feedStatus = computed(() => market.feedStatus[ui.currentPair])
+
+const feedStatusColor = computed(() => {
+  switch (feedStatus.value) {
+    case 'Active':
+      return 'var(--p-green-500)'
+    case 'Inactive':
+      return 'var(--p-red-500)'
+    default:
+      return 'var(--p-surface-400)'
+  }
+})
+
+const feedStatusTitle = computed(() => {
+  switch (feedStatus.value) {
+    case 'Active':
+      return 'Фид активен: данные по паре идут'
+    case 'Inactive':
+      return 'Фид неактивен: подписка на паре оборвана'
+    default:
+      return 'Статус фида неизвестен'
+  }
+})
 </script>
 
 <template>
   <div class="header-info">
     <div class="header-info-left">
-      <Select
-        :options="pairOptions"
-        :model-value="selectedOption"
-        @update:model-value="onPairChange"
-        placeholder="Пара"
-        :filter="true"
-        :showClear="false"
-        size="small"
-        class="pair-select"
-      />
+      <div class="pair-selector">
+        <span
+          class="feed-status-dot"
+          :style="{ backgroundColor: feedStatusColor }"
+          :title="feedStatusTitle"
+        />
+        <Select
+          :options="pairOptions"
+          :model-value="selectedOption"
+          @update:model-value="onPairChange"
+          placeholder="Пара"
+          :filter="true"
+          :showClear="false"
+          size="small"
+          class="pair-select"
+        />
+      </div>
       <div class="stats-row">
         <div class="stat-item">
           <span class="stat-label">24часа:</span>
@@ -78,6 +112,20 @@ const ch24Color = computed(() => {
   display: flex;
   align-items: center;
   gap: 1.5rem;
+}
+
+.pair-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.feed-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background-color 0.3s ease;
 }
 
 .stats-row {
