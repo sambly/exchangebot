@@ -101,4 +101,11 @@ type Deal struct {
 	TakeProfit float64
 	StopLoss   float64
 	ExitReason string
+
+	// SalePolicy - имя политики выхода (Sales.Name), которая при входе
+	// поставила позицию под наблюдение (см. Executor.addPosition). Пусто у
+	// сделок, открытых напрямую из веба: они минуют Executor и никогда не
+	// были ничем не отслежены - это так и для новых, и для старых сделок,
+	// не следствие рестарта. Пишется в Order.StrategySell при создании.
+	SalePolicy string
 }

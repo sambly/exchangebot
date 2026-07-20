@@ -42,6 +42,12 @@ const (
 )
 
 type Sales interface {
+	// Name - имя политики выхода (IDName из её конфига), например "salesimple".
+	// Пишется в Order.StrategySell СРАЗУ при входе (см. Executor.addPosition) -
+	// до того, как позиция реально закрылась, чтобы было видно, какая политика
+	// её ведёт, а не только то, чем в итоге закрыли.
+	Name() string
+
 	// Plan считает план выхода для сигнала: сколько брать и где резать.
 	Plan(sig signal.Signal) (takeProfit, stopLoss float64, hold time.Duration)
 

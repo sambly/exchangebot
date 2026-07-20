@@ -135,6 +135,20 @@ async function handleCloseAll() {
         </template>
       </Column>
       <Column field="StrategyBuy" header="Стратегия" style="min-width: 100px" />
+      <Column header="Выход" style="min-width: 100px">
+        <template #body="{ data }">
+          <span v-if="data.StrategySell" :title="'Позицию отслеживает: ' + data.StrategySell">
+            {{ data.StrategySell }}
+          </span>
+          <span
+            v-else
+            style="color: var(--p-orange-500)"
+            title="Стратегия выхода не подключена: позиция была открыта вручную из веба, либо приложение перезапускалось после её открытия. Тейк/стоп/таймаут по ней автоматически не сработают — закрыть можно только вручную."
+          >
+            не отслеживается
+          </span>
+        </template>
+      </Column>
       <Column header="Дата" style="min-width: 140px">
         <template #body="{ data }">{{ formatTime(data.TimeCreated) }}</template>
       </Column>

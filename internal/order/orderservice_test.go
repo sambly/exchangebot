@@ -38,7 +38,8 @@ func (r *stubOrderRepo) ClosePosition(int64, *order.Order) error {
 	r.closed++
 	return nil
 }
-func (*stubOrderRepo) CreateInfo(*order.OrderInfo) error { return nil }
+func (*stubOrderRepo) CreateInfo(*order.OrderInfo) error     { return nil }
+func (*stubOrderRepo) ClearSalePolicyForActiveOrders() error { return nil }
 
 func newTestService(t *testing.T) (*order.OrderService, *paperwallet.PaperWallet, *notification.SocketsMessage) {
 	t.Helper()

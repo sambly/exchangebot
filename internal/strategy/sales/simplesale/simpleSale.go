@@ -28,6 +28,10 @@ func NewStrategy(orderController *order.OrderService) (*StrategySimpleSale, erro
 	return &StrategySimpleSale{Config: cfg, OrderController: orderController}, nil
 }
 
+func (str *StrategySimpleSale) Name() string {
+	return str.Config.IDName
+}
+
 // Plan считает план выхода в единицах ВОЛАТИЛЬНОСТИ ПАРЫ, а не в абсолютных
 // процентах.
 //

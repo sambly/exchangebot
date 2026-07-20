@@ -190,6 +190,7 @@ func (p *PaperWallet) CreateOrderMarket(deal order.Deal) (*order.Order, error) {
 		Quantity:     size,
 		Profit:       0,
 		StrategyBuy:  strategy,
+		StrategySell: deal.SalePolicy,
 		Executor:     deal.Executor,
 	}
 

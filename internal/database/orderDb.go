@@ -96,6 +96,24 @@ func (r *OrderDb) ClosePosition(id int64, updateData *order.Order) error {
 	return nil
 }
 
+func (r *OrderDb) ClearSalePolicyForActiveOrders() error {
+	start := time.Now()
+	err := r.db.Model(&order.Order{}).
+		Where("status = ?", order.OrderStatusTypeActive).
+		Update("strategy_sell", "").Error
+	duration := time.Since(start).Seconds()
+
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+
+	dbOperationDuration.WithLabelValues("clear_sale_policy_for_active_orders", status).Observe(duration)
+	dbOperationTotal.WithLabelValues("clear_sale_policy_for_active_orders", status).Inc()
+
+	return err
+}
+
 func (r *OrderDb) CreateInfo(ordersInfo *order.OrderInfo) error {
 	start := time.Now()
 	err := r.db.Create(&ordersInfo).Error

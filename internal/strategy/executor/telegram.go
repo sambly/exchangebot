@@ -163,7 +163,7 @@ func (m *ExecutorMenu) SendMessageDeal(ctx context.Context, sig signal.Signal, s
 	// frame и comment парсились из строки callback'а, что было и хрупко
 	// (индексация без проверки длины), и бедно - план сделки туда не влезал.
 	handler := func(c tele.Context) error {
-		deal := NewDeal(sig, side, m.Executor.Config.Size, takeProfit, stopLoss, Telegram)
+		deal := NewDeal(sig, side, m.Executor.Config.Size, takeProfit, stopLoss, Telegram, m.Executor.saleName())
 
 		order, err := m.Executor.OrderController.CreateOrderMarket(deal)
 		if err != nil {

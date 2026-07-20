@@ -21,6 +21,14 @@ type Repository interface {
 	Create(o *Order) error
 	ClosePosition(id int64, updateData *Order) error
 	CreateInfo(ordersInfo *OrderInfo) error
+
+	// ClearSalePolicyForActiveOrders сбрасывает StrategySell у всех активных
+	// ордеров. Вызывается один раз при старте (см. NewOrderService): Executor
+	// всегда поднимается с пустой картой позиций (см. ARCHITECTURE.md) и не
+	// восстанавливает наблюдение за уже открытыми сделками, поэтому значение,
+	// записанное при входе в прошлом запуске, вводило бы в заблуждение - будто
+	// позицию по-прежнему кто-то ведёт.
+	ClearSalePolicyForActiveOrders() error
 }
 
 type TradeState interface {
@@ -80,6 +88,21 @@ func NewOrderService(
 	orders, err := repo.GetAll()
 	if err != nil {
 		return nil, err
+	}
+
+	// Executor всегда поднимается с пустой картой позиций и не восстанавливает
+	// наблюдение за уже открытыми сделками (см. ARCHITECTURE.md) - поэтому
+	// StrategySell, записанный в прошлом запуске при входе, теперь врёт: будто
+	// позицию по-прежнему кто-то ведёт. Чистим и в БД, и в только что
+	// загруженных объектах, чтобы UI сразу показал актуальное состояние.
+	if err := repo.ClearSalePolicyForActiveOrders(); err != nil {
+		orderLogger.Errorf("clear sale policy for active orders: %v", err)
+	} else {
+		for _, o := range orders {
+			if o.Status == OrderStatusTypeActive {
+				o.StrategySell = ""
+			}
+		}
 	}
 
 	os.Orders = orders

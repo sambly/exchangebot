@@ -229,7 +229,7 @@ func (s *Executor) openPosition(sig signal.Signal, side order.SideType) {
 	// нему можно понять, на что мы рассчитывали, когда входили.
 	takeProfit, stopLoss, hold := s.plan(sig)
 
-	deal := NewDeal(sig, side, s.Config.Size, takeProfit, stopLoss, Auto)
+	deal := NewDeal(sig, side, s.Config.Size, takeProfit, stopLoss, Auto, s.saleName())
 
 	newOrder, err := s.OrderController.CreateOrderMarket(deal)
 	if err != nil {
@@ -262,7 +262,11 @@ const (
 // исполнителя. Раньше сюда писался simplebuy, и в интерфейсе у всех сделок
 // значилась стратегия "simplebuy" - но simplebuy это механизм покупки, а не
 // причина, по которой мы вошли. Причина - детектор, который дал сигнал.
-func NewDeal(sig signal.Signal, side order.SideType, size, takeProfit, stopLoss float64, executor string) order.Deal {
+//
+// salePolicy - имя политики выхода, которая берёт позицию под наблюдение
+// (см. Sales.Name, Executor.addPosition); пишется в Order.StrategySell сразу,
+// а не только при закрытии.
+func NewDeal(sig signal.Signal, side order.SideType, size, takeProfit, stopLoss float64, executor, salePolicy string) order.Deal {
 	return order.Deal{
 		Pair:     sig.Pair,
 		SideType: side,
@@ -277,7 +281,18 @@ func NewDeal(sig signal.Signal, side order.SideType, size, takeProfit, stopLoss 
 		Volatility: sig.Volatility,
 		TakeProfit: takeProfit,
 		StopLoss:   stopLoss,
+		SalePolicy: salePolicy,
 	}
+}
+
+// saleName - имя прикреплённой политики выхода, если она есть. Отдельный
+// метод, а не прямой s.Sale.Name(): у Sale бывает nil (пока не подключена
+// политика выхода, см. WithSaleStrategy), и вызывающим не нужно об этом помнить.
+func (s *Executor) saleName() string {
+	if s.Sale == nil {
+		return ""
+	}
+	return s.Sale.Name()
 }
 
 func (s *Executor) plan(sig signal.Signal) (takeProfit, stopLoss float64, hold time.Duration) {

@@ -74,7 +74,7 @@ func TestSideForSignal(t *testing.T) {
 func TestDealCarriesSignalSourceAsStrategy(t *testing.T) {
 	s := sig("BTCUSDT", 2, signal.DirectionUp, "anomaly")
 
-	deal := NewDeal(s, order.SideTypeBuy, 1.0, 2.0, 1.5, Telegram)
+	deal := NewDeal(s, order.SideTypeBuy, 1.0, 2.0, 1.5, Telegram, "salesimple")
 
 	if deal.Strategy != "anomaly" {
 		t.Errorf("стратегия сделки = %q, ожидалось %q (источник сигнала)", deal.Strategy, "anomaly")
@@ -84,6 +84,9 @@ func TestDealCarriesSignalSourceAsStrategy(t *testing.T) {
 	}
 	if deal.Level != s.Level || deal.Strength != s.Strength {
 		t.Error("сила сигнала должна уезжать в сделку вместе с планом")
+	}
+	if deal.SalePolicy != "salesimple" {
+		t.Errorf("SalePolicy = %q, ожидалось %q (имя политики выхода, для статуса в открытых сделках)", deal.SalePolicy, "salesimple")
 	}
 }
 
