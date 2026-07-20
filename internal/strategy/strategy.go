@@ -96,6 +96,9 @@ func (cs *ControllerStrategy) build() error {
 	if err != nil {
 		return err
 	}
+	if cs.TelegramEnable {
+		anomalyStrategy.WithTelegramMenu()
+	}
 	cs.AddStrategy(anomalyStrategy)
 
 	tradeExecutor, err := executor.New(cs.Notification, cs.OrderController)

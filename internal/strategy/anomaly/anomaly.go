@@ -14,6 +14,7 @@ import (
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy/signal"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
+	"github.com/sambly/exchangebot/internal/toggle"
 )
 
 // Константы перевода робастных оценок разброса в шкалу стандартного отклонения
@@ -303,6 +304,13 @@ func thresholdForLevel(level int, thresholds *ThresholdsConfig) float64 {
 type AnomalyStrategy struct {
 	Config       *Config
 	Notification *notification.Notification
+	TelegramMenu *AnomalyMenu
+
+	// StrategyEnable/NotificationEnable переключаются из телеграм-меню, а
+	// читаются горутиной стратегии - поэтому живут отдельно от Config, за
+	// мьютексом (см. пакет toggle).
+	StrategyEnable     *toggle.Bool
+	NotificationEnable *toggle.Bool
 
 	AssetsPrices *prices.AssetsPrices
 	Periods      map[string]time.Duration
@@ -416,13 +424,15 @@ func NewStrategy(
 	}
 
 	str := &AnomalyStrategy{
-		Config:       cfg,
-		AssetsPrices: assetsPrices,
-		Periods:      periods,
-		Notification: notify,
-		history:      make(map[string]map[string]map[string]*MetricRecord),
-		states:       make(map[string]map[string]*PeriodState),
-		marketStates: make(map[string]*PeriodState),
+		Config:             cfg,
+		AssetsPrices:       assetsPrices,
+		Periods:            periods,
+		Notification:       notify,
+		StrategyEnable:     toggle.New(cfg.StrategyEnable),
+		NotificationEnable: toggle.New(cfg.NotificationEnable),
+		history:            make(map[string]map[string]map[string]*MetricRecord),
+		states:             make(map[string]map[string]*PeriodState),
+		marketStates:       make(map[string]*PeriodState),
 	}
 
 	for period := range periods {
@@ -444,11 +454,16 @@ func NewStrategy(
 		anomalyLogger.Warn("метрика price выключена: у сигналов нет направления, торговые подписчики их не получат")
 	}
 
-	if cfg.StrategyEnable {
+	if str.StrategyEnable.Get() {
 		str.seedHistory()
 	}
 
 	return str, nil
+}
+
+func (s *AnomalyStrategy) WithTelegramMenu() *AnomalyStrategy {
+	s.TelegramMenu = NewMenu(s.Config.Name, s.Config.IDName, s)
+	return s
 }
 
 // seedHistory заполняет историю метрик из БД при старте.
@@ -980,7 +995,7 @@ func (s *AnomalyStrategy) metricLevel(metric string, value, zScore float64, thre
 
 // checkAndNotify проверяет все пары и уведомляет об аномалиях
 func (s *AnomalyStrategy) checkAndNotify() {
-	if !s.Config.StrategyEnable {
+	if !s.StrategyEnable.Get() {
 		return
 	}
 
@@ -1091,7 +1106,7 @@ func (s *AnomalyStrategy) checkAndNotify() {
 
 	// Все аномалии одного тика уходят ОДНИМ дайджестом. Отдельным сообщением на
 	// пару это нечитаемо: на рыночном движении сотни пар аномальны одновременно.
-	if s.Config.NotificationEnable && len(notifyResults) > 0 {
+	if s.NotificationEnable.Get() && len(notifyResults) > 0 {
 		s.NotificationDigest(notifyResults)
 	}
 
@@ -1142,7 +1157,7 @@ func (s *AnomalyStrategy) checkMarketAnomaly(anomalousResults []*AnomalyResult, 
 			results = results[:3]
 		}
 
-		if percent < s.Config.MarketMetric.AnomalyPercentThreshold || !s.Config.NotificationEnable {
+		if percent < s.Config.MarketMetric.AnomalyPercentThreshold || !s.NotificationEnable.Get() {
 			continue
 		}
 
@@ -1178,9 +1193,9 @@ func (s *AnomalyStrategy) Start(ctx context.Context) error {
 	}
 }
 
-// GetTelegramMenu возвращает меню для телеграма (опционально)
+// GetTelegramMenu возвращает меню для телеграма
 func (s *AnomalyStrategy) GetTelegramMenu() model.WindowHandler {
-	return nil
+	return s.TelegramMenu
 }
 
 // OnMarket получает рыночные данные

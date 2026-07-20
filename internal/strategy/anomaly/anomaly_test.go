@@ -10,6 +10,7 @@ import (
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy/signal"
+	"github.com/sambly/exchangebot/internal/toggle"
 )
 
 type stubPricesRepo struct{}
@@ -170,9 +171,9 @@ func testStrategy(pairs []string, periods map[string]time.Duration) *AnomalyStra
 		// а он набирается вдвое дольше (2 x period) - в юнит-тесте это лишнее.
 		Metrics:    MetricsConfig{Price: true},
 		MinSamples: 2,
-		MinChange:      map[string]float64{"price": 1.0, "volume": 100.0},
-		MinScale:       map[string]float64{"price": 0.35, "volume": 0.25},
-		Periods:        map[string]*PeriodConfig{},
+		MinChange:  map[string]float64{"price": 1.0, "volume": 100.0},
+		MinScale:   map[string]float64{"price": 0.35, "volume": 0.25},
+		Periods:    map[string]*PeriodConfig{},
 	}
 	for period := range periods {
 		cfg.Periods[period] = &PeriodConfig{
@@ -183,11 +184,13 @@ func testStrategy(pairs []string, periods map[string]time.Duration) *AnomalyStra
 	}
 
 	str := &AnomalyStrategy{
-		Config:       cfg,
-		Periods:      periods,
-		history:      make(map[string]map[string]map[string]*MetricRecord),
-		states:       make(map[string]map[string]*PeriodState),
-		marketStates: make(map[string]*PeriodState),
+		Config:             cfg,
+		Periods:            periods,
+		StrategyEnable:     toggle.New(cfg.StrategyEnable),
+		NotificationEnable: toggle.New(cfg.NotificationEnable),
+		history:            make(map[string]map[string]map[string]*MetricRecord),
+		states:             make(map[string]map[string]*PeriodState),
+		marketStates:       make(map[string]*PeriodState),
 	}
 
 	for period := range periods {
@@ -295,7 +298,7 @@ func TestCooldownSuppressesFlapping(t *testing.T) {
 	notify := notification.NewNotificationService(true)
 
 	str := testStrategy([]string{pair}, periods)
-	str.Config.NotificationEnable = true
+	str.NotificationEnable.Set(true)
 	str.AssetsPrices = ap
 	str.Notification = notify
 
@@ -357,7 +360,7 @@ func TestMinChangeSuppressesTinyMoves(t *testing.T) {
 	notify := notification.NewNotificationService(true)
 
 	str := testStrategy([]string{pair}, periods)
-	str.Config.NotificationEnable = true
+	str.NotificationEnable.Set(true)
 	str.AssetsPrices = ap
 	str.Notification = notify
 
