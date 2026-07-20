@@ -29,6 +29,22 @@ type pricesDb struct {
 	db *gorm.DB
 }
 
+// tradesAskValue вычисляет число ask/sell-сделок как trades-tradesBuy. Но если
+// tradesBuy==0 при trades>0 — это НЕ "все сделки на продажу", а отсутствие
+// данных: бэкофилл и heal-on-close в feederapp берут данные из klines Binance,
+// а klines не отдают число тейкер-buy сделок (см. exchangeService ARCHITECTURE.md
+// §3.7 — amount_trade_buy для таких строк честно 0). Прямое trades-0 исказило бы
+// картину (выглядело бы как 100% sell-давление), поэтому в этом случае
+// возвращаем тот же признак "нет данных" — 0, а не искажённое значение.
+// ActiveAskVolume/VolumeAsk (объём, не число сделок) этой проблемы не имеет:
+// klines честно отдают taker-buy volume, поэтому Volume-VolumeBuy всегда корректно.
+func tradesAskValue(trades, tradesBuy int64) int64 {
+	if tradesBuy == 0 && trades > 0 {
+		return 0
+	}
+	return trades - tradesBuy
+}
+
 func NewPricesDb(db *gorm.DB) *pricesDb {
 	return &pricesDb{db: db}
 }
@@ -55,7 +71,7 @@ func (r *pricesDb) SelectMarketStateTimev2(timeRounding time.Time) ([]exModel.Ca
 	}
 
 	for i := range candles {
-		candles[i].AmountTradeAsk = candles[i].AmountTrade - candles[i].AmountTradeBuy
+		candles[i].AmountTradeAsk = tradesAskValue(candles[i].AmountTrade, candles[i].AmountTradeBuy)
 		candles[i].ActiveAskVolume = candles[i].Volume - candles[i].ActiveBuyVolume
 	}
 
@@ -88,7 +104,7 @@ func (r *pricesDb) SelectCandlesFromPeriod(period string, from time.Time) ([]exM
 	}
 
 	for i := range candles {
-		candles[i].AmountTradeAsk = candles[i].AmountTrade - candles[i].AmountTradeBuy
+		candles[i].AmountTradeAsk = tradesAskValue(candles[i].AmountTrade, candles[i].AmountTradeBuy)
 		candles[i].ActiveAskVolume = candles[i].Volume - candles[i].ActiveBuyVolume
 	}
 
@@ -117,7 +133,7 @@ func (r *pricesDb) SelectDeltaPeriod(pair string, period string) ([]model.Change
 	}
 
 	for i := range candles {
-		candles[i].TradesAsk = candles[i].Trades - candles[i].TradesBuy
+		candles[i].TradesAsk = tradesAskValue(candles[i].Trades, candles[i].TradesBuy)
 		candles[i].VolumeAsk = candles[i].Volume - candles[i].VolumeBuy
 	}
 
