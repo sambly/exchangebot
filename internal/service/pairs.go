@@ -5,15 +5,19 @@ import (
 	"context"
 	"fmt"
 	"os"
-
-	"github.com/sambly/exchangeService/pkg/exchange"
 )
 
-func GetPairs(ctx context.Context, fromFile bool, exch exchange.Exchange) ([]string, error) {
+// PairsProvider — источник списка пар. Его удовлетворяют и Binance, и gRPC-клиент
+// exchangeService, поэтому пары можно брать из того же источника, что и поток данных.
+type PairsProvider interface {
+	GetPairsToUSDT(ctx context.Context) ([]string, error)
+}
+
+func GetPairs(ctx context.Context, fromFile bool, provider PairsProvider) ([]string, error) {
 	if fromFile {
 		return GetPairsFile("configs/pairs.txt")
 	}
-	return exch.GetPairsToUSDT(ctx)
+	return provider.GetPairsToUSDT(ctx)
 }
 
 func GetPairsFile(fileName string) ([]string, error) {

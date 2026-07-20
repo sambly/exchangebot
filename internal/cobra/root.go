@@ -144,7 +144,33 @@ func run(cmd *cobra.Command, args []string) error {
 		mainLogger.Fatalf("failed to create exchange instance: %v", err)
 	}
 
-	pairs, err := service.GetPairs(ctx, cfg.PairsFromFile, binance)
+	// Источник потока данных и списка пар выбирается режимом.
+	var exflow exchange.Exflow
+	var conn *grpc.ClientConn
+	var statusClient pb.ExchangeServiceClient
+	pairsProvider := service.PairsProvider(binance)
+	switch cfg.ExchangeType {
+	case "exchange":
+		exflow = binance
+	case "grpc":
+		client, c, cerr := exchange.NewClientGrpc(
+			fmt.Sprintf("%s:%s", cfg.GRPC.Host, cfg.GRPC.Port),
+			exchange.WithClientLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
+			exchange.WithClientTracer(telemetry.Tracer),
+		)
+		if cerr != nil {
+			mainLogger.Fatalf("did not connect to grpc: %v", cerr)
+		}
+		conn = c
+		defer conn.Close()
+		exflow = client
+		pairsProvider = client
+		statusClient = pb.NewExchangeServiceClient(conn)
+	default:
+		mainLogger.Fatalf("unknown exchange type: %q", cfg.ExchangeType)
+	}
+
+	pairs, err := service.GetPairs(ctx, cfg.PairsFromFile, pairsProvider)
 	if err != nil {
 		mainLogger.Fatalf("failed get pairs: %v", err)
 	}
@@ -175,25 +201,6 @@ func run(cmd *cobra.Command, args []string) error {
 
 	notificationService := notification.NewNotificationService(cfg.NotificationEnable)
 	socketsMessage := notification.NewSocketsMessage()
-
-	var exflow exchange.Exflow
-	var conn *grpc.ClientConn
-	var statusClient pb.ExchangeServiceClient
-	switch cfg.ExchangeType {
-	case "exchange":
-		exflow = binance
-	case "grpc":
-		exflow, conn, err = exchange.NewClientGrpc(
-			fmt.Sprintf("%s:%s", cfg.GRPC.Host, cfg.GRPC.Port),
-			exchange.WithClientLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
-			exchange.WithClientTracer(telemetry.Tracer),
-		)
-		if err != nil {
-			mainLogger.Fatalf("did not connect to grpc: %v", err)
-		}
-		defer conn.Close()
-		statusClient = pb.NewExchangeServiceClient(conn)
-	}
 
 	dataFeed := exchange.NewDataFeed(
 		exflow,
