@@ -17,6 +17,13 @@ function onPairChange(displayName: string) {
   ui.selectPair(displayName + 'USDT')
 }
 
+const priceTop = computed(() => {
+  const stat = market.marketsStat[ui.currentPair]
+  return stat?.Price != null
+    ? stat.Price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })
+    : ''
+})
+
 const ch24Top = computed(() => {
   const stat = market.marketsStat[ui.currentPair]
   return stat?.Ch24 != null
@@ -86,6 +93,10 @@ const feedStatusTitle = computed(() => {
         />
       </div>
       <div class="stats-row">
+        <div class="stat-item">
+          <span class="stat-label">Цена:</span>
+          <span class="stat-value">{{ priceTop }}</span>
+        </div>
         <div class="stat-item">
           <span class="stat-label">24часа:</span>
           <span class="stat-value" :style="{ color: ch24Color }">{{ ch24Top }}</span>

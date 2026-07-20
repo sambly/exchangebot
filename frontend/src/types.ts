@@ -1,5 +1,6 @@
 // Ответ от /trade/api/getChPrice
 export interface MarketsStatEntry {
+  Price: number
   Volume: number
   Ch24: number
 }
