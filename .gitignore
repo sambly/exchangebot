@@ -16,7 +16,9 @@
 *.log
 
 certs/*
-!certs/.gitkeep 
+!certs/.gitkeep
+
+dist/
 
 .env
 *.bak

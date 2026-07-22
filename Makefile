@@ -127,3 +127,25 @@ run-simple-docker:
                -e DB_TYPE=sqlite \
 			   -e DB_HOST_DOCKER=127.0.0.1 \
                -p 80:80 exchangebot
+
+
+# Локальная сборка приложения в отдельную папку со всеми файлами,
+# нужными для запуска (без docker): бинарник, конфиги, .env, конфиги стратегий.
+.PHONY: build-local clean-local
+DIST_DIR := dist
+
+clean-local:
+	rm -rf $(DIST_DIR)
+
+build-local: clean-local
+	@echo "Building frontend..."
+	cd frontend && yarn install --frozen-lockfile && yarn build
+	@echo "Building Go binary..."
+	mkdir -p $(DIST_DIR)
+	go build -o $(DIST_DIR)/exchangebot.exe ./cmd/cobra
+	@echo "Copying runtime files..."
+	cp config.yaml $(DIST_DIR)/config.yaml
+	cp .env $(DIST_DIR)/.env
+	cp -r configs $(DIST_DIR)/configs
+	find internal/strategy -type f \( -name "config.yaml" -o -name "config.example.yaml" \) -exec cp --parents {} $(DIST_DIR) \;
+	@echo "Done: $(DIST_DIR)/exchangebot.exe"
