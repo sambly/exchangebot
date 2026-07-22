@@ -34,6 +34,21 @@ type Telegram struct {
 	Enable             bool   `mapstructure:"enable" yaml:"enable"`
 	UseProxy           bool   `mapstructure:"use-proxy" yaml:"use-proxy"`
 	ProxyURL           string `mapstructure:"proxy-url" yaml:"proxy-url"`
+
+	// UseCustomAPI переключает базовый URL Bot API с api.telegram.org на
+	// CustomAPIURL - неофициальный адрес (прокладка), которая сама уже стучится
+	// в Telegram. В отличие от UseProxy (туннелирование через HTTP/SOCKS-прокси
+	// до настоящего api.telegram.org) здесь меняется сам хост назначения запроса.
+	UseCustomAPI bool   `mapstructure:"use-custom-api" yaml:"use-custom-api"`
+	CustomAPIURL string `mapstructure:"custom-api-url" yaml:"custom-api-url"`
+
+	// WebhookEnable переключает бота с long-polling на webhook. Публичный URL
+	// вебхука собирается как WebhookURL+WebhookPath и должен быть уже проброшен
+	// внешним reverse-proxy на веб-сервер приложения.
+	WebhookEnable bool   `mapstructure:"webhook-enable" yaml:"webhook-enable"`
+	WebhookURL    string `mapstructure:"webhook-url" yaml:"webhook-url"`
+	WebhookPath   string `mapstructure:"webhook-path" yaml:"webhook-path"`
+	WebhookSecret string `mapstructure:"webhook-secret" yaml:"webhook-secret"`
 }
 type Database struct {
 	Type       string `mapstructure:"type" yaml:"type"`

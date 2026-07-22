@@ -230,15 +230,23 @@ func run(cmd *cobra.Command, args []string) error {
 	if cfg.Telegram.Enable {
 		telega, err = telegram.NewTelegram(app, cfg.Telegram)
 		if err != nil {
-			mainLogger.Fatal(err)
+			mainLogger.Errorf("Telegram не запущен из-за ошибки инициализации, продолжаем без него: %v", err)
+			telega = nil
+		} else {
+			notificationService.AddService(telega)
+			mainLogger.Info("Telegram инициализирован и запущен")
 		}
-		notificationService.AddService(telega)
-		mainLogger.Info("Telegram инициализирован и запущен")
 	} else {
 		mainLogger.Info("Telegram не запущен: отключен в конфигурации")
 	}
 
 	web := web.NewWeb(app, socketsMessage, cfg.Web, exchangebot.Content)
+
+	if telega != nil {
+		if handler := telega.WebhookHandler(); handler != nil {
+			web.SetTelegramWebhook(telega.WebhookPath(), handler)
+		}
+	}
 
 	g, gCtx := errgroup.WithContext(ctx)
 

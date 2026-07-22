@@ -21,6 +21,19 @@ tlg:
     enable: false
     use-proxy: false
     proxy-url: ""
+    # use-custom-api: false - обращаться к api.telegram.org напрямую (по умолчанию).
+    # true - обращаться к custom-api-url вместо api.telegram.org (неофициальная
+    # прокладка, которая сама уже общается с Telegram).
+    use-custom-api: false
+    custom-api-url: ""
+    # webhook-enable: false - long-polling (по умолчанию); true - webhook.
+    # webhook-url - публичный домен (например https://example.com), без пути.
+    # webhook-path - путь, на который reverse-proxy проксирует запросы Telegram
+    # на веб-сервер приложения, например /telegram/webhook/<random>.
+    webhook-enable: false
+    webhook-url: ""
+    webhook-path: ""
+    webhook-secret: ""
 db:
     type: mysql
     name: datafeeder

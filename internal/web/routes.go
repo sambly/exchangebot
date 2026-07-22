@@ -95,6 +95,13 @@ func (app *Web) routes() *http.ServeMux {
 	// Экспонируем метрики на маршруте /metrics
 	mux.Handle("/metrics", promhttp.Handler())
 
+	// Приём апдейтов Telegram в режиме webhook. Без basicAuth - Telegram не
+	// шлёт эти креды, защита - секретный путь + SecretToken (проверяется
+	// внутри tele.Webhook.ServeHTTP).
+	if app.telegramWebhookHandler != nil && app.telegramWebhookPath != "" {
+		mux.Handle(app.telegramWebhookPath, app.telegramWebhookHandler)
+	}
+
 	return mux
 }
 

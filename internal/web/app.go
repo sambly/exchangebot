@@ -28,6 +28,9 @@ type Web struct {
 	contentEmbed bool
 	content      embed.FS
 	auth         auth
+
+	telegramWebhookPath    string
+	telegramWebhookHandler http.Handler
 }
 
 type auth struct {
@@ -114,6 +117,13 @@ func NewWeb(app *application.Application, socketsMessage *notification.SocketsMe
 	web.auth = auth
 
 	return web
+}
+
+// SetTelegramWebhook монтирует хендлер Telegram-вебхука на указанный путь.
+// Должен вызываться до Run - роуты собираются один раз при старте сервера.
+func (w *Web) SetTelegramWebhook(path string, handler http.Handler) {
+	w.telegramWebhookPath = path
+	w.telegramWebhookHandler = handler
 }
 
 func (w *Web) Run(ctx context.Context) error {
