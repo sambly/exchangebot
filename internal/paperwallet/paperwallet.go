@@ -105,6 +105,33 @@ func (p *PaperWallet) removeOrderActive(pair string, id int64) {
 	}
 }
 
+// RemoveOrderHistory удаляет закрытую сделку из истории по id и возвращает
+// удалённый ордер. История хранится по парам, поэтому id ищется перебором.
+func (p *PaperWallet) RemoveOrderHistory(id int64) (*order.Order, error) {
+	p.Lock()
+	defer p.Unlock()
+
+	for pair, orders := range p.ordersHistory {
+		for i, o := range orders {
+			if o.ID == id {
+				removed := *o
+				p.ordersHistory[pair] = append(orders[:i], orders[i+1:]...)
+				return &removed, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("ордер истории id=%d не найден", id)
+}
+
+// ClearHistory полностью очищает историю закрытых сделок. Активных сделок не
+// касается.
+func (p *PaperWallet) ClearHistory() {
+	p.Lock()
+	defer p.Unlock()
+	p.ordersHistory = make(map[string][]*order.Order)
+}
+
 func (p *PaperWallet) GetOrdersActiveCopy() map[string][]order.Order {
 	p.Lock()
 	defer p.Unlock()

@@ -21,6 +21,8 @@ type Repository interface {
 	Create(o *Order) error
 	ClosePosition(id int64, updateData *Order) error
 	CreateInfo(ordersInfo *OrderInfo) error
+	Delete(id int64) error
+	DeleteAllHistory() error
 
 	// ClearSalePolicyForActiveOrders сбрасывает StrategySell у всех активных
 	// ордеров. Вызывается один раз при старте (см. NewOrderService): Executor
@@ -40,6 +42,8 @@ type TradeState interface {
 	GetOrdersHistoryCopy() (orders map[string][]Order)
 	CreateOrderMarket(deal Deal) (*Order, error)
 	ClosePosition(id int64, deal Deal) (*Order, error)
+	RemoveOrderHistory(id int64) (*Order, error)
+	ClearHistory()
 	UpdateOrdersPrice(pair string, price float64) []Order
 	CalculatePNL() (count int, profit float64)
 }
@@ -224,6 +228,61 @@ func (os *OrderService) ClosePosition(id int64, deal Deal) error {
 	os.updateOrdersDependencies(*order)
 
 	messageOrder, _ := json.Marshal(map[string]interface{}{"orderDelete": order})
+	os.socketsMessage.SendData(messageOrder)
+
+	return nil
+}
+
+// DeleteHistoryOrder удаляет закрытую сделку из истории насовсем - из памяти и
+// из БД. В отличие от ClosePosition, откатить это действие нельзя, поэтому
+// подтверждение запрашивается на фронте, а не здесь.
+func (os *OrderService) DeleteHistoryOrder(id int64) error {
+
+	deletedOrder, err := os.State.RemoveOrderHistory(id)
+	if err != nil {
+		return err
+	}
+
+	if err := os.Repo.Delete(id); err != nil {
+		return err
+	}
+
+	os.mtx.Lock()
+	for i, o := range os.Orders {
+		if o.ID == id {
+			os.Orders = append(os.Orders[:i], os.Orders[i+1:]...)
+			break
+		}
+	}
+	os.mtx.Unlock()
+
+	messageOrder, _ := json.Marshal(map[string]interface{}{"orderHistoryDelete": deletedOrder})
+	os.socketsMessage.SendData(messageOrder)
+
+	return nil
+}
+
+// DeleteAllHistoryOrders очищает всю историю закрытых сделок - из памяти и из
+// БД. Активных сделок не касается.
+func (os *OrderService) DeleteAllHistoryOrders() error {
+
+	if err := os.Repo.DeleteAllHistory(); err != nil {
+		return err
+	}
+
+	os.State.ClearHistory()
+
+	os.mtx.Lock()
+	remaining := os.Orders[:0]
+	for _, o := range os.Orders {
+		if o.Status != OrderStatusTypeClose {
+			remaining = append(remaining, o)
+		}
+	}
+	os.Orders = remaining
+	os.mtx.Unlock()
+
+	messageOrder, _ := json.Marshal(map[string]interface{}{"orderHistoryClear": true})
 	os.socketsMessage.SendData(messageOrder)
 
 	return nil

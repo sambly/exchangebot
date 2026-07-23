@@ -114,6 +114,58 @@ func (r *OrderDb) ClearSalePolicyForActiveOrders() error {
 	return err
 }
 
+func (r *OrderDb) Delete(id int64) error {
+	start := time.Now()
+
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id_order = ?", id).Delete(&order.OrderInfo{}).Error; err != nil {
+			return err
+		}
+		result := tx.Delete(&order.Order{}, id)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return fmt.Errorf("order with id %d not found", id)
+		}
+		return nil
+	})
+
+	duration := time.Since(start).Seconds()
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+
+	dbOperationDuration.WithLabelValues("delete", status).Observe(duration)
+	dbOperationTotal.WithLabelValues("delete", status).Inc()
+
+	return err
+}
+
+func (r *OrderDb) DeleteAllHistory() error {
+	start := time.Now()
+
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		historyIDs := tx.Model(&order.Order{}).Select("id").Where("status = ?", order.OrderStatusTypeClose)
+		if err := tx.Where("id_order IN (?)", historyIDs).Delete(&order.OrderInfo{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("status = ?", order.OrderStatusTypeClose).Delete(&order.Order{}).Error
+	})
+
+	duration := time.Since(start).Seconds()
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+
+	dbOperationDuration.WithLabelValues("delete_all_history", status).Observe(duration)
+	dbOperationTotal.WithLabelValues("delete_all_history", status).Inc()
+
+	return err
+}
+
 func (r *OrderDb) CreateInfo(ordersInfo *order.OrderInfo) error {
 	start := time.Now()
 	err := r.db.Create(&ordersInfo).Error

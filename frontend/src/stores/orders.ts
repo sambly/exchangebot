@@ -57,6 +57,14 @@ export const useOrdersStore = defineStore('orders', () => {
     }
   }
 
+  function removeFromHistory(orderId: number) {
+    history.value = history.value.filter(o => o.ID !== orderId)
+  }
+
+  function clearHistory() {
+    history.value = []
+  }
+
   const sortedActive = computed(() =>
     [...active.value].sort((a, b) => new Date(b.TimeCreated || 0).getTime() - new Date(a.TimeCreated || 0).getTime())
   )
@@ -74,6 +82,8 @@ export const useOrdersStore = defineStore('orders', () => {
     addOrder,
     removeOrder,
     addToHistory,
+    removeFromHistory,
+    clearHistory,
     sortedActive,
     sortedHistory,
   }

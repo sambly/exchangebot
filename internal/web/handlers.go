@@ -133,6 +133,54 @@ func (web *Web) closeAllDeal(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+func (web *Web) deleteHistoryOrder(w http.ResponseWriter, r *http.Request) {
+	bodyByte, err := io.ReadAll(r.Body)
+	if err != nil {
+		appWebLogger.Errorf("error readfile: %v", err)
+		http.Error(w, "не удалось прочитать тело запроса", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.ParseInt(strings.TrimSpace(string(bodyByte)), 10, 64)
+	if err != nil {
+		appWebLogger.Errorf("некорректный id ордера %q: %v", string(bodyByte), err)
+		http.Error(w, "некорректный id ордера", http.StatusBadRequest)
+		return
+	}
+
+	if err := web.App.OrderController.DeleteHistoryOrder(id); err != nil {
+		appWebLogger.Errorf("error DeleteHistoryOrder: %v", err)
+		http.Error(w, fmt.Sprintf("не удалось удалить сделку: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	orders := map[string]interface{}{
+		"OrdersHistory": web.App.OrderController.State.GetOrdersHistoryCopy(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(orders); err != nil {
+		appWebLogger.Errorf("error json encoder: %v", err)
+	}
+}
+
+func (web *Web) deleteAllHistoryOrders(w http.ResponseWriter, _ *http.Request) {
+	if err := web.App.OrderController.DeleteAllHistoryOrders(); err != nil {
+		appWebLogger.Errorf("error DeleteAllHistoryOrders: %v", err)
+		http.Error(w, fmt.Sprintf("не удалось удалить историю сделок: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	orders := map[string]interface{}{
+		"OrdersHistory": web.App.OrderController.State.GetOrdersHistoryCopy(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(orders); err != nil {
+		appWebLogger.Errorf("error json encoder: %v", err)
+	}
+}
+
 // echo регистрирует WebSocket-клиента для рассылки обновлений (SendDataRun).
 // Читающий цикл нужен только чтобы заметить закрытие соединения клиентом.
 func (web *Web) echo(w http.ResponseWriter, r *http.Request) {

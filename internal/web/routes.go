@@ -82,6 +82,8 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/trade/api/closeDeal", app.basicAuth(instrumentedHandler("/trade/api/closeDeal", app.closeDeal)))
 	mux.HandleFunc("/trade/api/closeAllDeal", app.basicAuth(instrumentedHandler("/trade/api/closeAllDeal", app.closeAllDeal)))
 	mux.HandleFunc("/trade/api/getOrders", app.basicAuth(instrumentedHandler("/trade/api/getOrders", app.getOrders)))
+	mux.HandleFunc("/trade/api/deleteHistoryOrder", app.basicAuth(instrumentedHandler("/trade/api/deleteHistoryOrder", app.deleteHistoryOrder)))
+	mux.HandleFunc("/trade/api/deleteAllHistoryOrders", app.basicAuth(instrumentedHandler("/trade/api/deleteAllHistoryOrders", app.deleteAllHistoryOrders)))
 	mux.HandleFunc("/trade/api/getStrategies", app.basicAuth(instrumentedHandler("/trade/api/getStrategies", app.getStrategies)))
 
 	mux.HandleFunc("/trade/ws", app.basicAuth(app.echo))

@@ -26,8 +26,10 @@ func (stubPricesRepo) SelectCandlesFromPeriod(string, time.Time) ([]exModel.Cand
 }
 
 type stubOrderRepo struct {
-	mu     sync.Mutex
-	closed int
+	mu         sync.Mutex
+	closed     int
+	deleted    []int64
+	deletedAll int
 }
 
 func (*stubOrderRepo) GetAll() ([]*order.Order, error) { return nil, nil }
@@ -40,8 +42,26 @@ func (r *stubOrderRepo) ClosePosition(int64, *order.Order) error {
 }
 func (*stubOrderRepo) CreateInfo(*order.OrderInfo) error     { return nil }
 func (*stubOrderRepo) ClearSalePolicyForActiveOrders() error { return nil }
+func (r *stubOrderRepo) Delete(id int64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.deleted = append(r.deleted, id)
+	return nil
+}
+func (r *stubOrderRepo) DeleteAllHistory() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.deletedAll++
+	return nil
+}
 
 func newTestService(t *testing.T) (*order.OrderService, *paperwallet.PaperWallet, *notification.SocketsMessage) {
+	t.Helper()
+	svc, pw, sockets, _ := newTestServiceWithRepo(t)
+	return svc, pw, sockets
+}
+
+func newTestServiceWithRepo(t *testing.T) (*order.OrderService, *paperwallet.PaperWallet, *notification.SocketsMessage, *stubOrderRepo) {
 	t.Helper()
 
 	periods := map[string]time.Duration{"15m": 15 * time.Minute}
@@ -53,12 +73,13 @@ func newTestService(t *testing.T) (*order.OrderService, *paperwallet.PaperWallet
 
 	pw := paperwallet.NewPaperWallet(ap)
 	sockets := notification.NewSocketsMessage()
+	repo := &stubOrderRepo{}
 
-	svc, err := order.NewOrderService(&stubOrderRepo{}, pw, sockets, ap)
+	svc, err := order.NewOrderService(repo, pw, sockets, ap)
 	if err != nil {
 		t.Fatalf("NewOrderService: %v", err)
 	}
-	return svc, pw, sockets
+	return svc, pw, sockets, repo
 }
 
 // OnMarket исполняется внутри горутины фида, а observer'ы в exchangeService
@@ -145,5 +166,109 @@ func TestClosePositionConcurrentSameID(t *testing.T) {
 	}
 	if success != 1 {
 		t.Fatalf("позиция должна закрыться ровно один раз, успешных закрытий: %d", success)
+	}
+}
+
+// Удаление сделки из истории должно убрать её и из TradeState, и из БД
+// (репозитория), а активных сделок не касаться.
+func TestDeleteHistoryOrder(t *testing.T) {
+	svc, pw, _, repo := newTestServiceWithRepo(t)
+
+	created, err := svc.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 1, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket: %v", err)
+	}
+	if err := svc.ClosePosition(created.ID, order.Deal{Strategy: "manual"}); err != nil {
+		t.Fatalf("ClosePosition: %v", err)
+	}
+
+	if err := svc.DeleteHistoryOrder(created.ID); err != nil {
+		t.Fatalf("DeleteHistoryOrder: %v", err)
+	}
+
+	history := pw.GetOrdersHistoryCopy()
+	for _, orders := range history {
+		for _, o := range orders {
+			if o.ID == created.ID {
+				t.Fatalf("ордер id=%d всё ещё в истории после удаления", created.ID)
+			}
+		}
+	}
+
+	repo.mu.Lock()
+	deleted := append([]int64(nil), repo.deleted...)
+	repo.mu.Unlock()
+	if len(deleted) != 1 || deleted[0] != created.ID {
+		t.Fatalf("ожидался вызов Repo.Delete(%d), получено: %v", created.ID, deleted)
+	}
+
+	// Повторное удаление того же ордера - ошибка, а не тихий no-op.
+	if err := svc.DeleteHistoryOrder(created.ID); err == nil {
+		t.Fatal("ожидалась ошибка при повторном удалении уже удалённого ордера")
+	}
+}
+
+// Удаление несуществующего ордера из истории - ошибка, и Repo.Delete не
+// должен вызываться вовсе (иначе улетит DELETE по чужому/неизвестному id).
+func TestDeleteHistoryOrderUnknownID(t *testing.T) {
+	svc, _, _, repo := newTestServiceWithRepo(t)
+
+	if err := svc.DeleteHistoryOrder(999); err == nil {
+		t.Fatal("ожидалась ошибка при удалении несуществующего ордера истории")
+	}
+
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	if len(repo.deleted) != 0 {
+		t.Fatalf("Repo.Delete не должен вызываться для несуществующего ордера, вызван с: %v", repo.deleted)
+	}
+}
+
+// "Удалить всё" должен очищать только историю, оставляя активные сделки
+// нетронутыми.
+func TestDeleteAllHistoryOrders(t *testing.T) {
+	svc, pw, _, repo := newTestServiceWithRepo(t)
+
+	closed, err := svc.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 1, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket (closed): %v", err)
+	}
+	if err := svc.ClosePosition(closed.ID, order.Deal{Strategy: "manual"}); err != nil {
+		t.Fatalf("ClosePosition: %v", err)
+	}
+
+	active, err := svc.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 1, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket (active): %v", err)
+	}
+
+	if err := svc.DeleteAllHistoryOrders(); err != nil {
+		t.Fatalf("DeleteAllHistoryOrders: %v", err)
+	}
+
+	history := pw.GetOrdersHistoryCopy()
+	for _, orders := range history {
+		if len(orders) != 0 {
+			t.Fatalf("история не пуста после DeleteAllHistoryOrders: %v", orders)
+		}
+	}
+
+	activeOrders := pw.GetOrdersActiveCopy()
+	found := false
+	for _, orders := range activeOrders {
+		for _, o := range orders {
+			if o.ID == active.ID {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("активный ордер id=%d не должен исчезать при очистке истории", active.ID)
+	}
+
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	if repo.deletedAll != 1 {
+		t.Fatalf("ожидался ровно один вызов Repo.DeleteAllHistory, получено: %d", repo.deletedAll)
 	}
 }

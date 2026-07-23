@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useOrdersStore, type Order } from '../../stores/orders.ts'
 import { useUIStore } from '../../stores/ui'
+import { useToast } from 'primevue/usetoast'
 import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
@@ -10,6 +11,7 @@ import OrdersTabSwitcher from './OrdersTabSwitcher.vue'
 
 const store = useOrdersStore()
 const ui = useUIStore()
+const toast = useToast()
 
 const selectedPair = ref('')
 const selectedInterval = ref('all')
@@ -98,6 +100,36 @@ function formatTime(timestamp?: string) {
   const d = new Date(timestamp)
   return isNaN(d.getTime()) ? '-' : d.toLocaleString('en-GB')
 }
+
+async function handleDelete(orderId: number) {
+  try {
+    const res = await fetch('/trade/api/deleteHistoryOrder', {
+      method: 'POST',
+      body: String(orderId),
+    })
+    if (!res.ok) throw new Error(await res.text())
+
+    store.removeFromHistory(orderId)
+    toast.add({ severity: 'success', summary: 'Сделка удалена', detail: `#${orderId}`, life: 3000 })
+  } catch (err) {
+    console.error('Error deleting order:', err)
+    toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Не удалось удалить сделку', life: 4000 })
+  }
+}
+
+async function handleDeleteAll() {
+  if (!confirm('Вы подтверждаете удаление ВСЕЙ истории сделок? Это действие необратимо.')) return
+  try {
+    const res = await fetch('/trade/api/deleteAllHistoryOrders', { method: 'POST' })
+    if (!res.ok) throw new Error(await res.text())
+
+    store.clearHistory()
+    toast.add({ severity: 'success', summary: 'История сделок удалена', life: 3000 })
+  } catch (err) {
+    console.error('Error deleting all history:', err)
+    toast.add({ severity: 'error', summary: 'Ошибка', detail: 'Не удалось удалить историю сделок', life: 4000 })
+  }
+}
 </script>
 
 <template>
@@ -123,7 +155,15 @@ function formatTime(timestamp?: string) {
         <Select v-model="selectedStrategyBuy" :options="strategyBuyOptions" placeholder="Стратегия покупки" :filter="true" size="small" class="filter-select" />
         <Select v-model="selectedStrategySell" :options="strategySellOptions" placeholder="Стратегия продажи" :filter="true" size="small" class="filter-select" />
         <Button label="Сброс" size="small" severity="secondary" text @click="resetFilters" />
-      </div>  
+      </div>
+      <Button
+        label="Удалить все"
+        icon="pi pi-trash"
+        size="small"
+        severity="danger"
+        outlined
+        @click="handleDeleteAll"
+      />
       <Button
         :icon="ui.ordersBarSize === 'large' ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
         size="small"
@@ -179,6 +219,11 @@ function formatTime(timestamp?: string) {
             {{ exitReasonLabel(data.ExitReason) }}
           </span>
           <div v-if="data.Executor" style="font-size:0.8em; opacity:0.7">{{ data.Executor }}</div>
+        </template>
+      </Column>
+      <Column header="" style="width: 60px">
+        <template #body="{ data }">
+          <Button icon="pi pi-trash" size="small" severity="danger" text @click.stop="handleDelete(data.ID)" />
         </template>
       </Column>
     </DataTable>
