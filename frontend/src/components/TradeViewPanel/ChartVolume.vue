@@ -40,8 +40,7 @@ import {
   LineSeries,
   ColorType,
   type IChartApi,
-  type ISeriesApi,
-  type Time
+  type ISeriesApi
 } from 'lightweight-charts'
 
 import {
@@ -53,6 +52,7 @@ import {
 } from 'vue'
 
 import Button from 'primevue/button'
+import { toChartTime } from '../../utils/chartTime'
 
 const props = defineProps<{
   pair: string
@@ -99,6 +99,10 @@ const colors = [
 let chart: IChartApi | null = null
 
 const seriesMap = new Map<string, ISeriesApi<'Line'>>()
+// Тултип берёт цвет отсюда, а не пересчитывает свой индекс - раньше он
+// считал позицию по ВСЕМ сериям (включая Price), а серии красились по
+// индексу только среди дельт, и цвета в лейблах расходились с линиями.
+const seriesColorMap = new Map<string, string>()
 
 let resizeObserver: ResizeObserver | null = null
 let tooltip: HTMLDivElement | null = null
@@ -228,11 +232,11 @@ function attachCrosshair() {
       </div>
     `
 
-    let index = 0
-
     for (const [key, series] of seriesMap.entries()) {
       const point =
         param.seriesData.get(series) as any
+
+      const color = seriesColorMap.get(key) ?? getPriceColor()
 
       if (key === 'Price') {
         const value = point?.value !== undefined
@@ -241,7 +245,7 @@ function attachCrosshair() {
 
         html += `
           <div style="
-            color:${getPriceColor()};
+            color:${color};
             margin-top:4px;
             font-weight:500;
           ">
@@ -255,15 +259,13 @@ function attachCrosshair() {
 
         html += `
           <div style="
-            color:${colors[index % colors.length]};
+            color:${color};
             margin-top:4px;
           ">
             ${key}: ${value}
           </div>
         `
       }
-
-      index++
     }
 
     tooltip!.innerHTML = html
@@ -282,6 +284,7 @@ function cleanupChart() {
   tooltip?.remove()
   tooltip = null
   seriesMap.clear()
+  seriesColorMap.clear()
 }
 
 // ======================================================
@@ -348,13 +351,14 @@ async function createChartView() {
       const isPrice = delta === 'Price'
       const fieldName = isPrice ? 'Close' : delta
 
+      const seriesColor = isPrice
+        ? getPriceColor()
+        : colors[colorIndex % colors.length]
+
       const series = chart.addSeries(
         LineSeries,
         {
-          color: isPrice
-            ? getPriceColor()
-            : colors[colorIndex % colors.length],
-
+          color: seriesColor,
           lineWidth: 2,
           priceScaleId: isPrice ? 'price' : 'delta',
           lastValueVisible: true
@@ -369,16 +373,14 @@ async function createChartView() {
       }
 
       const data = raw.map((item: any) => ({
-        time: Math.floor(
-          new Date(item.Time).getTime() / 1000
-        ) as Time,
-
+        time: toChartTime(item.Time),
         value: Number(item[fieldName])
       }))
 
       series.setData(data)
 
       seriesMap.set(delta, series)
+      seriesColorMap.set(delta, seriesColor)
     }
 
     // Configure price scales only if they exist

@@ -70,9 +70,22 @@ func (r *OrderDb) Create(o *order.Order) error {
 
 func (r *OrderDb) ClosePosition(id int64, updateData *order.Order) error {
 	start := time.Now()
+
+	// Updates(struct) молча пропускает поля с zero-value (пустая строка, 0,
+	// нулевое время) - не попадают в SQL вообще. Один совпавший с 0 Profit
+	// или будущий вызов с пустым ExitReason тихо не запишутся в БД, при этом
+	// в памяти и в ответе API будет казаться, что всё сохранилось. Явная
+	// map с колонками гарантирует запись независимо от значений.
 	result := r.db.Model(&order.Order{}).
 		Where("id = ?", id).
-		Updates(updateData)
+		Updates(map[string]interface{}{
+			"time":          updateData.Time,
+			"status":        updateData.Status,
+			"price":         updateData.Price,
+			"profit":        updateData.Profit,
+			"strategy_sell": updateData.StrategySell,
+			"exit_reason":   updateData.ExitReason,
+		})
 	duration := time.Since(start).Seconds()
 
 	status := "success"

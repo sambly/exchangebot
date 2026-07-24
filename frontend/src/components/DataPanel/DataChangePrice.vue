@@ -6,6 +6,7 @@ import { useMarketStore } from '../../stores/market'
 import { useUIStore } from '../../stores/ui'
 import { useFiltersStore } from '../../stores/filters'
 import { useScrollToPair, ROW_HEIGHT } from '../../composables/useScrollToPair'
+import { compareByField } from '../../utils/tableSort'
 import DataPanelToolbar from './DataPanelToolbar.vue'
 
 interface PriceData {
@@ -61,6 +62,19 @@ const displayedPairs = computed(() => {
   return pairs.value
 })
 
+// Сортировка ведётся здесь (а не отдана целиком PrimeVue), чтобы orderedPairs
+// ниже точно совпадал с порядком отрисованных строк - иначе useScrollToPair
+// центрирует не ту строку после клика по заголовку столбца.
+const sortField = ref<string | undefined>(undefined)
+const sortOrder = ref<number>(1)
+
+const sortedPairs = computed(() => {
+  if (!sortField.value || !sortOrder.value) return displayedPairs.value
+  const field = sortField.value
+  const order = sortOrder.value
+  return [...displayedPairs.value].sort((a, b) => compareByField(a, b, field, order))
+})
+
 function toggleFavorite(pairShort: string) {
   ui.toggleFavorite(pairShort + 'USDT')
 }
@@ -98,7 +112,7 @@ const getRowClass = (data: PriceData) => ({
   'table-row-active': ui.currentPair === data.pair + 'USDT'
 })
 
-const orderedPairs = computed(() => displayedPairs.value.map(p => p.pair + 'USDT'))
+const orderedPairs = computed(() => sortedPairs.value.map(p => p.pair + 'USDT'))
 
 useScrollToPair(tableContainerRef, orderedPairs, 'price')
 </script>
@@ -123,7 +137,9 @@ useScrollToPair(tableContainerRef, orderedPairs, 'price')
       class="table-container"
     >
       <DataTable
-        :value="displayedPairs"
+        :value="sortedPairs"
+        v-model:sortField="sortField"
+        v-model:sortOrder="sortOrder"
         :scrollable="true"
         scrollHeight="flex"
         :virtualScrollerOptions="{ itemSize: ROW_HEIGHT }"

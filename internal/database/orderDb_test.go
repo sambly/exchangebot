@@ -65,6 +65,69 @@ func TestOrderDbDelete(t *testing.T) {
 	}
 }
 
+// ClosePosition раньше писал через Updates(struct), который молча пропускает
+// поля с zero-value (0, "", нулевое время) - они не попадали в SQL вообще.
+// Здесь сознательно закрываем ордер с Profit=0 и ExitReason="" - значениями,
+// которые "нулевые" в терминах Go, но должны реально попасть в БД, а не
+// оставить в колонках то, что было записано при создании.
+func TestOrderDbClosePositionPersistsZeroValueFields(t *testing.T) {
+	r := newTestDB(t)
+
+	created := time.Now()
+	o := &order.Order{
+		TimeCreated:  created,
+		Time:         created,
+		Pair:         "BTCUSDT",
+		Status:       order.OrderStatusTypeActive,
+		PriceCreated: 100,
+		Price:        100,
+		Profit:       5.5,             // заведомо ненулевое - должно быть перезаписано на 0
+		StrategySell: "salesimple",    // "кто наблюдает" на активной сделке
+		ExitReason:   "PRECLOSE_STUB", // должно быть перезаписано на ""
+	}
+	if err := r.Create(o); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	closeTime := created.Add(time.Hour)
+	update := &order.Order{
+		Time:         closeTime,
+		Status:       order.OrderStatusTypeClose,
+		Price:        100, // цена не изменилась - Profit после комиссий действительно 0
+		Profit:       0,
+		StrategySell: "",
+		ExitReason:   "",
+	}
+	if err := r.ClosePosition(o.ID, update); err != nil {
+		t.Fatalf("ClosePosition: %v", err)
+	}
+
+	orders, err := r.GetAll()
+	if err != nil {
+		t.Fatalf("GetAll: %v", err)
+	}
+	if len(orders) != 1 {
+		t.Fatalf("ожидался 1 ордер, получено %d", len(orders))
+	}
+	got := orders[0]
+
+	if got.Status != order.OrderStatusTypeClose {
+		t.Fatalf("Status: ожидалось %q, получено %q", order.OrderStatusTypeClose, got.Status)
+	}
+	if got.Profit != 0 {
+		t.Fatalf("Profit: ожидался 0, получено %v (zero-value был молча пропущен)", got.Profit)
+	}
+	if got.StrategySell != "" {
+		t.Fatalf("StrategySell: ожидалась пустая строка, получено %q (zero-value был молча пропущен)", got.StrategySell)
+	}
+	if got.ExitReason != "" {
+		t.Fatalf("ExitReason: ожидалась пустая строка, получено %q (zero-value был молча пропущен)", got.ExitReason)
+	}
+	if !got.Time.Equal(closeTime) {
+		t.Fatalf("Time: ожидалось %v, получено %v", closeTime, got.Time)
+	}
+}
+
 // Delete несуществующего id - ошибка, ничего не удаляется по чужим строкам.
 func TestOrderDbDeleteNotFound(t *testing.T) {
 	r := newTestDB(t)

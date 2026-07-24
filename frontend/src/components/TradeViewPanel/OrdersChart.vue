@@ -7,11 +7,11 @@ import {
   ColorType,
   type IChartApi,
   type ISeriesApi,
-  type CandlestickData,
-  type Time
+  type CandlestickData
 } from 'lightweight-charts'
 import { useOrdersStore } from '../../stores/orders'
 import Button from 'primevue/button'
+import { toChartTime } from '../../utils/chartTime'
 
 const props = defineProps<{
   pair: string
@@ -97,10 +97,8 @@ function buildMarkers(): any[] {
   const markers: any[] = []
 
   for (const order of ordersForPair.value) {
-    const tOpen = Math.floor(new Date(order.TimeCreated || 0).getTime() / 1000) as Time
-    const tClose = order.Time
-      ? Math.floor(new Date(order.Time).getTime() / 1000) as Time
-      : null
+    const tOpen = toChartTime(order.TimeCreated)
+    const tClose = order.Time ? toChartTime(order.Time) : null
     const isBuy = order.Side === 'BUY'
     const isClose = order.Status === 'Close'
 
@@ -232,7 +230,7 @@ async function loadData() {
     if (!Array.isArray(raw) || raw.length === 0) return
 
     const candleData: CandlestickData[] = raw.map((item: any) => ({
-      time: Math.floor(new Date(item.Time).getTime() / 1000) as Time,
+      time: toChartTime(item.Time),
       open: item.Open,
       high: item.High,
       low: item.Low,
@@ -260,7 +258,10 @@ async function loadData() {
       createSeriesMarkers(candleSeries, markers)
     }
 
-    chart.timeScale().fitContent()
+    // scrollToRealTime вместо fitContent: последний укладывает ВСЮ историю в
+    // область графика (свечи схлопываются в кашу при большом диапазоне),
+    // а нам нужен вид на последние бары - как в обычном торговом терминале.
+    chart.timeScale().scrollToRealTime()
 
     attachCrosshair()
   } catch (err) {
@@ -268,6 +269,10 @@ async function loadData() {
   } finally {
     hideSpinner()
   }
+}
+
+function scrollToLatest() {
+  chart?.timeScale().scrollToRealTime()
 }
 
 async function initialize() {
@@ -359,6 +364,15 @@ onBeforeUnmount(() => {
         severity="secondary"
         :outlined="activeFrame !== f"
         @click="activeFrame = f"
+      />
+      <Button
+        label="К последним"
+        icon="pi pi-angle-double-right"
+        size="small"
+        severity="secondary"
+        text
+        style="margin-left: auto"
+        @click="scrollToLatest"
       />
     </div>
     <div ref="chartContainer" class="chart-container">

@@ -8,6 +8,7 @@ import { useUIStore } from '../../stores/ui'
 import { useMarketStore } from '../../stores/market'
 import { useFiltersStore } from '../../stores/filters'
 import { useScrollToPair, ROW_HEIGHT } from '../../composables/useScrollToPair'
+import { compareByField } from '../../utils/tableSort'
 import DataPanelToolbar from './DataPanelToolbar.vue'
 
 interface VolumeData {
@@ -57,9 +58,24 @@ const displayData = computed(() => {
     })
   }
 
-  result.sort((a, b) => b.volume - a.volume)
-
   return result
+})
+
+// Сортировка ведётся здесь (а не отдана целиком PrimeVue), чтобы orderedPairs
+// ниже точно совпадал с порядком отрисованных строк - иначе useScrollToPair
+// центрирует не ту строку после клика по заголовку столбца. Пока пользователь
+// не кликнул по заголовку - сохраняем прежний дефолт: по убыванию объёма.
+const sortField = ref<string | undefined>(undefined)
+const sortOrder = ref<number>(1)
+
+const sortedData = computed(() => {
+  const list = [...displayData.value]
+  if (sortField.value && sortOrder.value) {
+    const field = sortField.value
+    const order = sortOrder.value
+    return list.sort((a, b) => compareByField(a, b, field, order))
+  }
+  return list.sort((a, b) => b.volume - a.volume)
 })
 
 function toggleFavorite(pairShort: string) {
@@ -76,7 +92,7 @@ const getRowClass = (data: VolumeData) => ({
   'table-row-active': ui.currentPair === data.pair + 'USDT'
 })
 
-const orderedPairs = computed(() => displayData.value.map(d => d.pair + 'USDT'))
+const orderedPairs = computed(() => sortedData.value.map(d => d.pair + 'USDT'))
 
 const { scrollToPair } = useScrollToPair(tableContainerRef, orderedPairs, 'volume')
 
@@ -125,7 +141,9 @@ onMounted(async () => {
       class="table-container"
     >
       <DataTable
-        :value="displayData"
+        :value="sortedData"
+        v-model:sortField="sortField"
+        v-model:sortOrder="sortOrder"
         :loading="market.isDeltaLoading"
         :scrollable="true"
         scrollHeight="flex"

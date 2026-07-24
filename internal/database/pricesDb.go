@@ -115,8 +115,14 @@ func (r *pricesDb) SelectDeltaPeriod(pair string, period string) ([]model.Change
 	start := time.Now()
 	var candles []model.ChangeDeltaForCandle
 
+	// GetDeltaPeriod (см. internal/prices/prices.go) идёт по этому срезу
+	// последовательно вперёд и заполняет пропуски по времени - без ORDER BY
+	// MySQL возвращает строки в порядке PK/вставки, который после бэкофилла
+	// расходится с хронологическим, и lightweight-charts падает с "data must
+	// be asc ordered by time".
 	err := r.db.Table(fmt.Sprintf("%s%s", candlesTables, period)).
 		Where("pair = ?", pair).
+		Order("time ASC").
 		Find(&candles).Error
 	duration := time.Since(start).Seconds()
 
