@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-export type ActiveChart = 'price' | 'volume' | 'trade-smart' | 'orders'
+export type ActiveChart = 'price' | 'volume' | 'trade-smart' | 'orders' | 'depth'
 export type ActiveOrdersTab = 'active' | 'history'
 export type ActiveDataPanel = 'price' | 'volume'
 export type FilterMode = 'all' | 'favorites'

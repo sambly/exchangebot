@@ -76,6 +76,7 @@ func (app *Web) routes() *http.ServeMux {
 	mux.HandleFunc("/trade/api/getChPrice", app.basicAuth(instrumentedHandler("/trade/api/getChPrice", app.getChPrice)))
 	mux.HandleFunc("/trade/api/getChDelta", app.basicAuth(instrumentedHandler("/trade/api/getChDelta", app.getChDelta)))
 	mux.HandleFunc("/trade/api/getChangeDelta", app.basicAuth(instrumentedHandler("/trade/api/getChangeDelta", app.getDeltaFast)))
+	mux.HandleFunc("/trade/api/getDepth", app.basicAuth(instrumentedHandler("/trade/api/getDepth", app.getDepth)))
 
 	// Сделки
 	mux.HandleFunc("/trade/api/openDeal", app.basicAuth(instrumentedHandler("/trade/api/openDeal", app.openDeal)))

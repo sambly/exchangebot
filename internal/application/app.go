@@ -11,6 +11,7 @@ import (
 	"github.com/sambly/exchangebot/internal/account"
 	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sambly/exchangebot/internal/database"
+	"github.com/sambly/exchangebot/internal/depth"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/notification"
@@ -33,6 +34,7 @@ type Application struct {
 
 	Account      *account.Account
 	AssetsPrices *prices.AssetsPrices
+	AssetsDepth  *depth.AssetsDepth
 
 	OrderController    *order.OrderService
 	PaperWallet        *paperwallet.PaperWallet
@@ -62,6 +64,8 @@ func NewApp(
 	if err != nil {
 		return nil, err
 	}
+	assetsDepth := depth.NewAssetsDepth(depthPairs(cfg, settings.Pairs))
+
 	account, err := account.NewAccount(exch, assetsPrices)
 	if err != nil {
 		return nil, err
@@ -86,6 +90,7 @@ func NewApp(
 		Notification: notification,
 
 		AssetsPrices:       assetsPrices,
+		AssetsDepth:        assetsDepth,
 		Account:            account,
 		OrderController:    orderController,
 		PaperWallet:        paperWallet,
@@ -94,6 +99,34 @@ func NewApp(
 	}
 
 	return app, nil
+}
+
+// depthPairs решает, по каким парам держать L2-стакан: либо все настроенные
+// пары (cfg.Depth.AllPairs), либо явный список из cfg.Depth.Pairs. Список
+// фильтруется по settings.Pairs, чтобы опечатка в конфиге не пыталась
+// подписаться на пару, которую бот вообще не отслеживает.
+func depthPairs(cfg *config.Config, allPairs []string) []string {
+	if cfg.Depth.AllPairs {
+		return allPairs
+	}
+	if len(cfg.Depth.Pairs) == 0 {
+		return nil
+	}
+
+	known := make(map[string]bool, len(allPairs))
+	for _, pair := range allPairs {
+		known[pair] = true
+	}
+
+	pairs := make([]string, 0, len(cfg.Depth.Pairs))
+	for _, pair := range cfg.Depth.Pairs {
+		if known[pair] {
+			pairs = append(pairs, pair)
+		} else {
+			appLogger.Warnf("depth: пара %q из конфига не найдена среди отслеживаемых пар, пропущена", pair)
+		}
+	}
+	return pairs
 }
 
 func (app *Application) Run(ctx context.Context) error {
@@ -148,6 +181,22 @@ func (app *Application) Run(ctx context.Context) error {
 	g.Go(func() error {
 		return app.dataFeed.StartMarketsStatFeeder(gCtx, "exchangebot")
 	})
+
+	// Depth-подписка - только по парам из app.AssetsDepth.Pairs (см. depthPairs):
+	// по умолчанию список пуст, и StartDepthFeeder на пустом наборе пар сразу
+	// вернул бы ошибку "all depth-feeder subscription ended", уронив весь g.Wait().
+	if len(app.AssetsDepth.Pairs) > 0 {
+		for _, pair := range app.AssetsDepth.Pairs {
+			app.dataFeed.SubscribeDepth(pair)
+			if err := app.dataFeed.SubscribeObserverDepth(gCtx, "exchangebot", pair, app.AssetsDepth.OnDepth); err != nil {
+				appLogger.Error(err)
+			}
+		}
+
+		g.Go(func() error {
+			return app.dataFeed.StartDepthFeeder(gCtx, "exchangebot")
+		})
+	}
 
 	g.Go(func() error {
 		return app.ControllerStrategy.StartAll(gCtx)

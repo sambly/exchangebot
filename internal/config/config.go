@@ -81,6 +81,18 @@ type Notification struct {
 	Enable bool `mapstructure:"enable" yaml:"enable"`
 }
 
+// Depth - по каким парам держать L2-стакан (internal/depth.AssetsDepth).
+//
+// По умолчанию список пуст: depth-поток заметно тяжелее тикеров/трейдов
+// (полный стакан, частые диффы), и включать его сразу на все торгуемые пары
+// (их бывает несколько сотен) значило бы молча взвинтить нагрузку на
+// exchange_service и объём памяти под стаканы. AllPairs включает его для всех
+// пар из settings.Pairs - как и в internal/strategy/anomaly.Config.
+type Depth struct {
+	AllPairs bool     `mapstructure:"all-pairs" yaml:"all-pairs"`
+	Pairs    []string `mapstructure:"pairs" yaml:"pairs"`
+}
+
 type Config struct {
 	App          `mapstructure:"app" yaml:"app"`
 	Web          `mapstructure:"web" yaml:"web"`
@@ -91,6 +103,7 @@ type Config struct {
 	GRPC         `mapstructure:"grpc" yaml:"grpc"`
 	Tracer       `mapstructure:"tracer" yaml:"tracer"`
 	Notification `mapstructure:"notification" yaml:"notification"`
+	Depth        `mapstructure:"depth" yaml:"depth"`
 }
 
 func PrintConfig(v interface{}, indent string) {

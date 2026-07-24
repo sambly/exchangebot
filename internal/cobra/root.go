@@ -207,6 +207,10 @@ func run(cmd *cobra.Command, args []string) error {
 		exchange.WithDataFeedLogger(logadapter.NewLogrusAdapter(logger.AddFieldsEmpty())),
 		exchange.WithDataFeedTracer(telemetry.Tracer),
 		exchange.WithMarketsFeed(),
+		// WithDepthFeed лишь заводит карту DepthFeed - сама подписка на
+		// конкретные пары решается в application.Run() по cfg.Depth
+		// (internal/application/app.go: depthPairs).
+		exchange.WithDepthFeed(),
 	)
 	if err != nil {
 		mainLogger.Fatalf("failed to initialize data feed: %v", err)

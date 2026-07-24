@@ -57,3 +57,9 @@ tracer:
     enable-open-telemetry: false
     otel-exporter-otlp-endpoint: ""
     otel-service-name: ""
+depth:
+    # По каким парам держать L2-стакан (internal/depth.AssetsDepth). Пусто по
+    # умолчанию - фича готова, но выключена: подписка на глубину заметно
+    # тяжелее тикеров, включать сразу на все пары не стоит без явного решения.
+    all-pairs: false
+    pairs: []

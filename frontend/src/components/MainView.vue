@@ -15,6 +15,7 @@ import TradingView  from './TradeViewPanel/TradingViewChart.vue'
 import ChartVolume  from './TradeViewPanel/ChartVolume.vue'
 import SmartTrade from './TradeViewPanel/SmartTrade.vue'
 import OrdersChart from './TradeViewPanel/OrdersChart.vue'
+import DepthChart from './TradeViewPanel/DepthChart.vue'
 import OrdersActive from './OrdersPanel/OrdersActive.vue'
 import OrdersHistory from './OrdersPanel/OrdersHistory.vue'
 
@@ -128,6 +129,13 @@ onMounted(() => {
               :outlined="ui.activeChart !== 'orders'"
               @click="ui.activeChart = 'orders'"
             />
+            <Button
+              label="Стакан"
+              size="small"
+              severity="secondary"
+              :outlined="ui.activeChart !== 'depth'"
+              @click="ui.activeChart = 'depth'"
+            />
           </div>
 
           <div class="trading-workspace-content">
@@ -146,6 +154,10 @@ onMounted(() => {
 
             <div v-if="ui.activeChart === 'orders'" class="trading-workspace-slot">
               <OrdersChart :pair="ui.currentPair" :dark-mode="ui.darkMode" :visible="true" />
+            </div>
+
+            <div v-if="ui.activeChart === 'depth'" class="trading-workspace-slot">
+              <DepthChart :pair="ui.currentPair" :dark-mode="ui.darkMode" />
             </div>
 
           </div>

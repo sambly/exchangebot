@@ -227,6 +227,35 @@ func (web *Web) getChDelta(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+// depthLevelsLimit - сколько уровней стакана с каждой стороны отдавать на
+// cumulative depth chart. У ликвидных пар в стакане могут быть тысячи
+// уровней - график столько всё равно не покажет читаемо, а JSON на каждый
+// запрос раздувается зря.
+const depthLevelsLimit = 200
+
+func (web *Web) getDepth(w http.ResponseWriter, r *http.Request) {
+
+	data := map[string]string{}
+
+	bodyByte, _ := io.ReadAll(r.Body)
+	if err := json.Unmarshal(bodyByte, &data); err != nil {
+		appWebLogger.Errorf("error json unmarshal: %v", err)
+	}
+
+	bids, asks, ready := web.App.AssetsDepth.GetTopLevels(data["Pair"], depthLevelsLimit)
+
+	maps := map[string]interface{}{
+		"Ready": ready,
+		"Bids":  bids,
+		"Asks":  asks,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(maps); err != nil {
+		appWebLogger.Errorf("error json encoder: %v", err)
+	}
+}
+
 func (web *Web) getOrders(w http.ResponseWriter, _ *http.Request) {
 
 	maps := map[string]interface{}{
