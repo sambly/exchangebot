@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { MarketsStat, ChangePrices, DeltaFast, FeedStatus } from '../types'
+import type { MarketsStat, ChangePrices, DeltaFast, FeedStatus, ImbalanceData } from '../types'
 
 export const useMarketStore = defineStore('market', () => {
   const marketsStat = ref<MarketsStat>({})
   const changePrices = ref<ChangePrices>({})
   const deltaFast = ref<DeltaFast>({})
   const feedStatus = ref<FeedStatus>({})
+  const imbalance = ref<ImbalanceData>({})
 
   const isDeltaLoading = ref(false)
   const deltaError = ref<string | null>(null)
@@ -42,14 +43,31 @@ export const useMarketStore = defineStore('market', () => {
     }
   }
 
+  async function fetchImbalance() {
+    try {
+      const response = await fetch('/trade/api/getDepthImbalance', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+
+      const data = await response.json()
+      imbalance.value = data.Imbalance || {}
+    } catch (err) {
+      console.error('Error loading imbalance data:', err)
+    }
+  }
+
   return {
     marketsStat,
     changePrices,
     deltaFast,
     feedStatus,
+    imbalance,
     isDeltaLoading,
     deltaError,
     setMarketData,
     fetchDelta,
+    fetchImbalance,
   }
 })

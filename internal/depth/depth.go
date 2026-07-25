@@ -10,9 +10,42 @@ import (
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/logger"
+	"github.com/sambly/exchangebot/internal/stat"
 )
 
 var depthLogger = logger.AddFieldsEmpty()
+
+// Параметры z-score имбаланса стакана (см. book.imbalanceHistory).
+//
+// Сырой имбаланс сам по себе плохо интерпретируется: у низколиквидной пары
+// книга может быть почти всегда перекошена в одну сторону, и 0.6 для неё -
+// норма, а не сигнал. Z-score (та же робастная медиана+MAD, что использует
+// internal/strategy/anomaly - см. internal/stat) отвечает на вопрос "необычно
+// ли ЭТО значение ДЛЯ ЭТОЙ ПАРЫ", а не "перевешивают ли биды прямо сейчас".
+const (
+	// imbalanceLevels - сколько лучших уровней с каждой стороны участвует в
+	// расчёте имбаланса. Слишком мало - шумно от одной случайной заявки;
+	// слишком много - учитывает уровни, до которых реальная сделка никогда
+	// не доберётся.
+	imbalanceLevels = 20
+
+	// imbalanceSampleInterval - как часто новое значение имбаланса попадает в
+	// историю для z-score. Апдейты стакана летят много раз в секунду - копить
+	// историю с этой частотой означало бы, что все точки почти идентичны
+	// (окно не успевает измениться), и разброс (MAD) занижается - та же
+	// проблема автокорреляции, что и в anomaly (см. PeriodState.nextSampleAt
+	// там).
+	imbalanceSampleInterval = 10 * time.Second
+
+	// imbalanceWindowSize samples * imbalanceSampleInterval = ~15 минут истории.
+	imbalanceWindowSize = 90
+	// imbalanceMinSamples - до накопления этого числа выборок (~3.3 минуты)
+	// z-score не считается вообще, см. stat.MetricRecord.
+	imbalanceMinSamples = 20
+	// imbalanceScaleFloor - имбаланс лежит в [-1,1]; ниже этого разброс не
+	// считается значимым (гасит шум у пар, где книга почти не шевелится).
+	imbalanceScaleFloor = 0.02
+)
 
 // Level - один уровень стакана: цена и суммарное количество на ней.
 type Level struct {
@@ -41,13 +74,58 @@ type book struct {
 	time         time.Time
 	lastUpdateID int64
 	ready        bool
+
+	// imbalanceHistory - скользящее окно сэмплов имбаланса для z-score.
+	// Не сбрасывается в clear(): пересинк книги - это разрыв в сырых
+	// уровнях, а не повод забыть статистическое поведение пары.
+	imbalanceHistory      *stat.MetricRecord
+	nextImbalanceSampleAt time.Time
 }
 
 func newBook() *book {
 	return &book{
-		bids: make(map[float64]float64),
-		asks: make(map[float64]float64),
+		bids:             make(map[float64]float64),
+		asks:             make(map[float64]float64),
+		imbalanceHistory: stat.NewMetricRecord(imbalanceWindowSize, imbalanceMinSamples, imbalanceScaleFloor),
 	}
+}
+
+// imbalance - соотношение объёма топ-N уровней бидов и асков:
+// (bidVol-askVol)/(bidVol+askVol), диапазон [-1,1]. Положительное - перевес
+// покупателей, отрицательное - продавцов. Вызывающий код обязан уже держать
+// нужный лок AssetsDepth.mu.
+func (b *book) imbalance(levels int) (float64, bool) {
+	bidPrices := make([]float64, 0, len(b.bids))
+	for price := range b.bids {
+		bidPrices = append(bidPrices, price)
+	}
+	sort.Sort(sort.Reverse(sort.Float64Slice(bidPrices)))
+	if levels > 0 && len(bidPrices) > levels {
+		bidPrices = bidPrices[:levels]
+	}
+	bidVol := 0.0
+	for _, price := range bidPrices {
+		bidVol += b.bids[price]
+	}
+
+	askPrices := make([]float64, 0, len(b.asks))
+	for price := range b.asks {
+		askPrices = append(askPrices, price)
+	}
+	sort.Float64s(askPrices)
+	if levels > 0 && len(askPrices) > levels {
+		askPrices = askPrices[:levels]
+	}
+	askVol := 0.0
+	for _, price := range askPrices {
+		askVol += b.asks[price]
+	}
+
+	total := bidVol + askVol
+	if total == 0 {
+		return 0, false
+	}
+	return (bidVol - askVol) / total, true
 }
 
 func (b *book) apply(update exModel.DepthUpdate) {
@@ -129,6 +207,14 @@ func (ad *AssetsDepth) applyUpdate(update exModel.DepthUpdate) {
 	// апдейта, а не по приходу DepthState (setReady остаётся на случай перехода
 	// на Combined-подписку в будущем).
 	b.ready = true
+
+	now := time.Now()
+	if !now.Before(b.nextImbalanceSampleAt) {
+		if value, ok := b.imbalance(imbalanceLevels); ok {
+			b.imbalanceHistory.Add(value)
+		}
+		b.nextImbalanceSampleAt = now.Add(imbalanceSampleInterval)
+	}
 }
 
 func (ad *AssetsDepth) setReady(pair string, ready bool) {
@@ -241,6 +327,67 @@ func (ad *AssetsDepth) GetTopLevels(pair string, n int) (bids, asks []Level, rea
 	}
 
 	return bids, asks, true
+}
+
+// GetImbalanceZScore - текущий имбаланс топ-N уровней стакана (см.
+// imbalanceLevels) и его z-score относительно недавней истории самой этой
+// пары. imbalance лежит в [-1,1]: положительный - перевес покупателей,
+// отрицательный - продавцов. zScore==0 до накопления imbalanceMinSamples
+// выборок (см. stat.MetricRecord) - за это время imbalance уже осмыслен, а
+// zScore ещё нет.
+func (ad *AssetsDepth) GetImbalanceZScore(pair string) (imbalance, zScore float64, ready bool) {
+	ad.mu.RLock()
+	defer ad.mu.RUnlock()
+
+	b, ok := ad.books[pair]
+	if !ok || !b.ready {
+		return 0, 0, false
+	}
+
+	value, ok := b.imbalance(imbalanceLevels)
+	if !ok {
+		return 0, 0, false
+	}
+
+	return value, b.imbalanceHistory.ZScore(value), true
+}
+
+// ImbalanceStat - имбаланс и его z-score для одной пары, для таблицы
+// "по всем парам сразу" (см. GetAllImbalanceZScore). Ready=false - пара не
+// готова (нет апдейтов ещё) или книга сейчас пуста с одной из сторон.
+type ImbalanceStat struct {
+	Imbalance float64
+	ZScore    float64
+	Ready     bool
+}
+
+// GetAllImbalanceZScore - то же самое, что GetImbalanceZScore, но сразу по
+// всем отслеживаемым парам одним проходом под одним локом - для таблицы
+// имбаланса по рынку целиком (аналог GetAllChPrice/GetAllChDelta в prices).
+func (ad *AssetsDepth) GetAllImbalanceZScore() map[string]ImbalanceStat {
+	ad.mu.RLock()
+	defer ad.mu.RUnlock()
+
+	result := make(map[string]ImbalanceStat, len(ad.books))
+	for pair, b := range ad.books {
+		if !b.ready {
+			result[pair] = ImbalanceStat{}
+			continue
+		}
+
+		value, ok := b.imbalance(imbalanceLevels)
+		if !ok {
+			result[pair] = ImbalanceStat{}
+			continue
+		}
+
+		result[pair] = ImbalanceStat{
+			Imbalance: value,
+			ZScore:    b.imbalanceHistory.ZScore(value),
+			Ready:     true,
+		}
+	}
+	return result
 }
 
 // IsReady - пришёл ли по паре хотя бы один снапшот/апдейт стакана.

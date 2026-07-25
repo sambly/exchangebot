@@ -23,6 +23,8 @@ interface DepthResponse {
   Ready: boolean
   Bids: DepthLevel[] | null
   Asks: DepthLevel[] | null
+  Imbalance: number
+  ImbalanceZScore: number
 }
 
 // У lightweight-charts нет оси "по цене" - ось X всегда Time. Стандартный
@@ -44,6 +46,18 @@ function formatPrice(time: Time): string {
 
 const chartContainer = ref<HTMLDivElement | null>(null)
 const hasData = ref(false)
+const imbalance = ref<number | null>(null)
+const imbalanceZ = ref<number | null>(null)
+
+// z-score - робастная оценка "необычно ли это ДЛЯ ЭТОЙ ПАРЫ" (см.
+// internal/depth.GetImbalanceZScore), а не просто "перевешивают ли биды".
+// |z| >= 2 - заметное отклонение от типичного поведения пары, красим.
+const IMBALANCE_Z_THRESHOLD = 2
+
+function imbalanceColor(z: number | null): string {
+  if (z === null || Math.abs(z) < IMBALANCE_Z_THRESHOLD) return 'inherit'
+  return (imbalance.value ?? 0) > 0 ? '#22c55e' : '#ef4444'
+}
 
 let chart: IChartApi | null = null
 let bidSeries: ISeriesApi<'Area'> | null = null
@@ -212,7 +226,14 @@ async function refresh() {
     const wasEmpty = !hasData.value
     hasData.value = !!data.Ready && !!((data.Bids?.length ?? 0) || (data.Asks?.length ?? 0))
 
-    if (!hasData.value) return
+    if (!hasData.value) {
+      imbalance.value = null
+      imbalanceZ.value = null
+      return
+    }
+
+    imbalance.value = data.Imbalance
+    imbalanceZ.value = data.ImbalanceZScore
 
     ensureChart()
     if (!bidSeries || !askSeries || !chart) return
@@ -302,6 +323,20 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="depth-chart-wrapper">
+    <div v-if="hasData" class="depth-toolbar">
+      <span class="stat">
+        Имбаланс:
+        <strong :style="{ color: imbalanceColor(imbalanceZ) }">
+          {{ imbalance !== null ? (imbalance > 0 ? '+' : '') + imbalance.toFixed(2) : '—' }}
+        </strong>
+      </span>
+      <span class="stat">
+        z-score:
+        <strong :style="{ color: imbalanceColor(imbalanceZ) }">
+          {{ imbalanceZ !== null ? imbalanceZ.toFixed(2) : '—' }}
+        </strong>
+      </span>
+    </div>
     <div ref="chartContainer" class="chart-container">
       <div v-if="!hasData" class="no-depth-placeholder">
         Глубина не отслеживается для пары {{ pair }} (настраивается в config.yaml: depth.pairs)
@@ -317,6 +352,18 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   min-height: 0;
+}
+
+.depth-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  gap: 1rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.stat strong {
+  margin-left: 0.25rem;
 }
 
 .chart-container {

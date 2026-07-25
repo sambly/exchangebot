@@ -1,6 +1,7 @@
 package depth
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -211,6 +212,123 @@ func TestAssetsDepthGetTopLevels(t *testing.T) {
 		if asks[i] != want {
 			t.Fatalf("asks[%d]: ожидали %+v, получили %+v", i, want, asks[i])
 		}
+	}
+}
+
+// Сырой имбаланс должен корректно отражать перекос топ-уровней: больше
+// объёма на бидах - положительное значение, больше на асках - отрицательное.
+func TestAssetsDepthImbalanceSign(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 90}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 10}},
+	})
+
+	imbalance, _, ready := ad.GetImbalanceZScore("BTCUSDT")
+	if !ready {
+		t.Fatal("GetImbalanceZScore: ожидался ready=true")
+	}
+	want := (90.0 - 10.0) / (90.0 + 10.0)
+	if math.Abs(imbalance-want) > 1e-9 {
+		t.Fatalf("imbalance: ожидали %.4f, получили %.4f", want, imbalance)
+	}
+}
+
+// Пока история имбаланса не набрала imbalanceMinSamples выборок, z-score
+// должен быть 0 - как и у stat.MetricRecord, на котором это построено.
+func TestAssetsDepthImbalanceZScoreZeroBeforeMinSamples(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 90}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 10}},
+	})
+
+	_, zScore, ready := ad.GetImbalanceZScore("BTCUSDT")
+	if !ready {
+		t.Fatal("GetImbalanceZScore: ожидался ready=true")
+	}
+	if zScore != 0 {
+		t.Fatalf("zScore до накопления истории должен быть 0, получено %v", zScore)
+	}
+}
+
+// Резкий перекос книги относительно её же обычного (сбалансированного)
+// поведения должен давать большой z-score - в этом весь смысл: судить не по
+// сырому имбалансу, а по отклонению от нормы для конкретной пары.
+func TestAssetsDepthImbalanceZScoreDetectsSkew(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	// Бутстрап: нейтральная книга, чтобы пара стала ready.
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 10}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 10}},
+	})
+
+	b := ad.books["BTCUSDT"]
+
+	// Замораживаем окно сэмплирования в истории (иначе следующий апдейт сам
+	// допишет в неё значение и смажет чистоту сравнения) и набиваем историю
+	// "типичным" для пары нейтральным имбалансом - без этого пришлось бы
+	// реально ждать imbalanceSampleInterval между апдейтами.
+	b.nextImbalanceSampleAt = time.Now().Add(time.Hour)
+	for i := 0; i < imbalanceMinSamples; i++ {
+		b.imbalanceHistory.Add(0)
+	}
+
+	// Теперь резко перекашиваем книгу в сторону бидов.
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 100}},
+	})
+
+	imbalance, zScore, ready := ad.GetImbalanceZScore("BTCUSDT")
+	if !ready {
+		t.Fatal("GetImbalanceZScore: ожидался ready=true")
+	}
+	if imbalance <= 0.5 {
+		t.Fatalf("после перекоса книги ожидался явно положительный имбаланс, получено %.4f", imbalance)
+	}
+	if zScore < 3 {
+		t.Fatalf("резкий перекос относительно нейтральной истории должен давать большой z-score, получено %.2f", zScore)
+	}
+}
+
+// GetAllImbalanceZScore должен отдавать по каждой отслеживаемой паре свой
+// результат, включая Ready=false для пар, по которым апдейтов ещё не было -
+// а не пропускать их из карты молча.
+func TestAssetsDepthGetAllImbalanceZScore(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT", "ETHUSDT"})
+
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 90}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 10}},
+	})
+
+	all := ad.GetAllImbalanceZScore()
+	if len(all) != 2 {
+		t.Fatalf("ожидались обе пары в результате, получено %d: %+v", len(all), all)
+	}
+
+	btc, ok := all["BTCUSDT"]
+	if !ok || !btc.Ready {
+		t.Fatalf("BTCUSDT: ожидался Ready=true, получено %+v (ok=%v)", btc, ok)
+	}
+	if btc.Imbalance <= 0.5 {
+		t.Fatalf("BTCUSDT: ожидался явно положительный имбаланс, получено %.4f", btc.Imbalance)
+	}
+
+	eth, ok := all["ETHUSDT"]
+	if !ok {
+		t.Fatal("ETHUSDT: пара должна присутствовать в результате даже без апдейтов")
+	}
+	if eth.Ready {
+		t.Fatalf("ETHUSDT: ожидался Ready=false (апдейтов не было), получено %+v", eth)
 	}
 }
 

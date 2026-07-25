@@ -3,7 +3,7 @@ import { ref } from 'vue'
 
 export type ActiveChart = 'price' | 'volume' | 'trade-smart' | 'orders' | 'depth'
 export type ActiveOrdersTab = 'active' | 'history'
-export type ActiveDataPanel = 'price' | 'volume'
+export type ActiveDataPanel = 'price' | 'volume' | 'imbalance'
 export type FilterMode = 'all' | 'favorites'
 export type OrdersBarSize = 'compact' | 'large'
 

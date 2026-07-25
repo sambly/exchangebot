@@ -58,7 +58,7 @@ const refreshData = async () => {
   isRefreshing.value = true
   try {
     filters.loadFilters()
-    await Promise.all([fetchData(), market.fetchDelta(), refreshOrders()])
+    await Promise.all([fetchData(), market.fetchDelta(), market.fetchImbalance(), refreshOrders()])
     toast.add({ severity: 'success', summary: 'Готово', detail: 'Данные обновлены', life: 2000 })
   } finally {
     isRefreshing.value = false
@@ -141,7 +141,7 @@ onMounted(() => {
           <div class="trading-workspace-content">
 
             <div v-show="ui.activeChart === 'price'" class="trading-workspace-slot">
-              <TradingView :pair="ui.currentPair" :dark-mode="ui.darkMode" />
+              <TradingView :pair="ui.currentPair" :dark-mode="ui.darkMode" :visible="ui.activeChart === 'price'" />
             </div>
 
             <div v-if="ui.activeChart === 'volume'" class="trading-workspace-slot">

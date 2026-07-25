@@ -170,10 +170,12 @@ onMounted(async () => {
         <!-- Pair -->
         <Column
           field="pair"
-          header="Пара"
           :sortable="true"
           style="min-width: 80px"
         >
+          <template #header>
+            <span title="Торговая пара">Пара</span>
+          </template>
           <template #body="{ data }">
             <span class="pair-name">
               {{ data.pair }}
@@ -184,20 +186,26 @@ onMounted(async () => {
         <!-- Volume -->
         <Column
           field="volume"
-          header="Volume"
           :sortable="true"
           style="min-width: 90px"
         >
+          <template #header>
+            <span class="header-hint" title="Изменение суммарного объёма сделок (%) за последнюю половину выбранного окна относительно предыдущей половины. Это дельта, а не абсолютный объём: большое число здесь не значит 'ликвидная пара', а значит 'объём сильно вырос/упал только что'.">
+              Volume
+            </span>
+          </template>
           <template #body="{ data }">
             {{ fmt(data.volume) }}
           </template>
         </Column>
 
         <!-- Volume Buy -->
-        <Column
-          header="Volume Buy"
-          style="min-width: 100px"
-        >
+        <Column style="min-width: 100px">
+          <template #header>
+            <span class="header-hint" title="То же самое, что Volume, но только по объёму тейкер-покупок (сделки, инициированные покупателем).">
+              Volume Buy
+            </span>
+          </template>
           <template #body="{ data }">
             <span class="delta-positive">
               {{ fmt(data.volumeBuy) }}
@@ -206,10 +214,12 @@ onMounted(async () => {
         </Column>
 
         <!-- Volume Ask -->
-        <Column
-          header="Volume Ask"
-          style="min-width: 100px"
-        >
+        <Column style="min-width: 100px">
+          <template #header>
+            <span class="header-hint" title="То же самое, что Volume, но только по объёму тейкер-продаж (сделки, инициированные продавцом).">
+              Volume Ask
+            </span>
+          </template>
           <template #body="{ data }">
             <span class="delta-negative">
               {{ fmt(data.volumeAsk) }}
@@ -220,20 +230,26 @@ onMounted(async () => {
         <!-- Trades -->
         <Column
           field="trades"
-          header="Trades"
           :sortable="true"
           style="min-width: 80px"
         >
+          <template #header>
+            <span class="header-hint" title="Изменение числа сделок (%) за последнюю половину выбранного окна относительно предыдущей половины - как Volume, но по количеству транзакций, а не по объёму.">
+              Trades
+            </span>
+          </template>
           <template #body="{ data }">
             {{ fmt(data.trades) }}
           </template>
         </Column>
 
         <!-- Trades Buy -->
-        <Column
-          header="Trades Buy"
-          style="min-width: 100px"
-        >
+        <Column style="min-width: 100px">
+          <template #header>
+            <span class="header-hint" title="То же самое, что Trades, но только по числу тейкер-покупок.">
+              Trades Buy
+            </span>
+          </template>
           <template #body="{ data }">
             <span class="delta-positive">
               {{ fmt(data.tradesBuy) }}
@@ -242,10 +258,12 @@ onMounted(async () => {
         </Column>
 
         <!-- Trades Ask -->
-        <Column
-          header="Trades Ask"
-          style="min-width: 100px"
-        >
+        <Column style="min-width: 100px">
+          <template #header>
+            <span class="header-hint" title="То же самое, что Trades, но только по числу тейкер-продаж.">
+              Trades Ask
+            </span>
+          </template>
           <template #body="{ data }">
             <span class="delta-negative">
               {{ fmt(data.tradesAsk) }}
@@ -368,6 +386,11 @@ onMounted(async () => {
 
 .pair-name {
   font-weight: 500;
+}
+
+.header-hint {
+  cursor: help;
+  border-bottom: 1px dotted var(--p-text-muted-color, #999);
 }
 
 .delta-positive {

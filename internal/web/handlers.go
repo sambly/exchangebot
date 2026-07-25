@@ -227,6 +227,20 @@ func (web *Web) getChDelta(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+// getDepthImbalance отдаёт имбаланс стакана и его z-score сразу по всем
+// отслеживаемым парам - для таблицы "по рынку целиком", в отличие от
+// getDepth (полный стакан + имбаланс одной пары для графика глубины).
+func (web *Web) getDepthImbalance(w http.ResponseWriter, _ *http.Request) {
+
+	maps := map[string]interface{}{
+		"Imbalance": web.App.AssetsDepth.GetAllImbalanceZScore(),
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(maps); err != nil {
+		appWebLogger.Errorf("error json encoder: %v", err)
+	}
+}
+
 // depthLevelsLimit - сколько уровней стакана с каждой стороны отдавать на
 // cumulative depth chart. У ликвидных пар в стакане могут быть тысячи
 // уровней - график столько всё равно не покажет читаемо, а JSON на каждый
@@ -243,11 +257,14 @@ func (web *Web) getDepth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bids, asks, ready := web.App.AssetsDepth.GetTopLevels(data["Pair"], depthLevelsLimit)
+	imbalance, imbalanceZ, _ := web.App.AssetsDepth.GetImbalanceZScore(data["Pair"])
 
 	maps := map[string]interface{}{
-		"Ready": ready,
-		"Bids":  bids,
-		"Asks":  asks,
+		"Ready":           ready,
+		"Bids":            bids,
+		"Asks":            asks,
+		"Imbalance":       imbalance,
+		"ImbalanceZScore": imbalanceZ,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

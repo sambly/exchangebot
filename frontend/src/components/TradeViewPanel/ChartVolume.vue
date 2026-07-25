@@ -96,6 +96,17 @@ const colors = [
   '#23605f'
 ]
 
+// Volume/VolumeBuy/VolumeAsk - объём в котируемой валюте (тысячи-миллионы),
+// Trades* - штуки сделок (десятки-сотни). Общая линейная шкала для обоих
+// была бы бессмысленна: она целиком определяется бОльшими числами объёма, и
+// Trades превращался бы в плоскую линию у нуля вне зависимости от того, как
+// он на самом деле меняется - поэтому у Trades своя шкала.
+function scaleIdFor(delta: string): 'price' | 'delta' | 'trades' {
+  if (delta === 'Price') return 'price'
+  if (delta.startsWith('Trades')) return 'trades'
+  return 'delta'
+}
+
 let chart: IChartApi | null = null
 
 const seriesMap = new Map<string, ISeriesApi<'Line'>>()
@@ -344,12 +355,12 @@ async function createChartView() {
     createTooltip()
 
     let colorIndex = 0
-    let hasPrice = false
-    let hasDelta = false
+    const scalesUsed = new Set<string>()
 
     for (const delta of selectedDeltas.value) {
       const isPrice = delta === 'Price'
       const fieldName = isPrice ? 'Close' : delta
+      const scaleId = scaleIdFor(delta)
 
       const seriesColor = isPrice
         ? getPriceColor()
@@ -360,15 +371,13 @@ async function createChartView() {
         {
           color: seriesColor,
           lineWidth: 2,
-          priceScaleId: isPrice ? 'price' : 'delta',
+          priceScaleId: scaleId,
           lastValueVisible: true
         }
       )
 
-      if (isPrice) {
-        hasPrice = true
-      } else {
-        hasDelta = true
+      scalesUsed.add(scaleId)
+      if (!isPrice) {
         colorIndex++
       }
 
@@ -383,24 +392,26 @@ async function createChartView() {
       seriesColorMap.set(delta, seriesColor)
     }
 
-    // Configure price scales only if they exist
-    if (hasPrice) {
-      chart.priceScale('price').applyOptions({
-        scaleMargins: {
-          top: 0.01,
-          bottom: hasDelta ? 0.4 : 0.1
-        }
-      })
-    }
+    // Делим высоту графика поровну между реально используемыми шкалами,
+    // сверху вниз: price, затем delta (объём), затем trades (число сделок).
+    //
+    // Trades раньше сидел на одной шкале с Volume ('delta') - но это разные
+    // единицы (объём в котируемой валюте против штук сделок), и на одном
+    // линейном масштабе Trades визуально превращался в плоскую линию у нуля,
+    // хотя сами цифры менялись: масштаб просто целиком определялся Volume,
+    // который на порядки больше.
+    const scaleOrder = (['price', 'delta', 'trades'] as const).filter(id => scalesUsed.has(id))
+    const margin = 0.02
+    const slice = scaleOrder.length > 0 ? (1 - margin * 2) / scaleOrder.length : 0
 
-    if (hasDelta) {
-      chart.priceScale('delta').applyOptions({
+    scaleOrder.forEach((scaleId, index) => {
+      chart!.priceScale(scaleId).applyOptions({
         scaleMargins: {
-          top: hasPrice ? 0.4 : 0.1,
-          bottom: 0.1
+          top: margin + slice * index,
+          bottom: margin + slice * (scaleOrder.length - index - 1)
         }
       })
-    }
+    })
 
     chart.timeScale().fitContent()
 

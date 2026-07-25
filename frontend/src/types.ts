@@ -59,3 +59,18 @@ export interface DeltaFast {
 export interface GetChDeltaResponse {
   DeltaFast: DeltaFast
 }
+
+// Ответ от /trade/api/getDepthImbalance
+export interface ImbalanceEntry {
+  Imbalance: number
+  ZScore: number
+  Ready: boolean
+}
+
+export interface ImbalanceData {
+  [pair: string]: ImbalanceEntry
+}
+
+export interface GetDepthImbalanceResponse {
+  Imbalance: ImbalanceData
+}
