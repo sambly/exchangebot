@@ -14,6 +14,11 @@ import (
 type stubRepo struct {
 	batches [][]exModel.Candle
 	calls   int
+
+	// periodCandles - что отдавать на SelectCandlesFromPeriod (сидирование
+	// волатильности и истории anomaly). Пусто по умолчанию - большинству
+	// тестов сидирование не нужно и не должно ничего находить.
+	periodCandles []exModel.Candle
 }
 
 func (r *stubRepo) SelectMarketStateTimev2(time.Time) ([]exModel.Candle, error) {
@@ -30,7 +35,7 @@ func (r *stubRepo) SelectDeltaPeriod(string, string) ([]model.ChangeDeltaForCand
 }
 
 func (r *stubRepo) SelectCandlesFromPeriod(string, time.Time) ([]exModel.Candle, error) {
-	return nil, nil
+	return r.periodCandles, nil
 }
 
 func newTestPrices(t *testing.T, pairs []string, periods map[string]time.Duration, repo Repository) *AssetsPrices {

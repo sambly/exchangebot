@@ -74,3 +74,64 @@ export interface ImbalanceData {
 export interface GetDepthImbalanceResponse {
   Imbalance: ImbalanceData
 }
+
+// Ответ от /trade/api/getEntryQuality
+//
+// Score - во сколько раз дальняя стена стакана дальше ближней; НЕ зависит от
+// периода (см. Go-комментарий у entrysetup.Quality) - берётся из любого
+// доступного периода записи. StopDistanceSigma/TakeDistanceSigma - те же
+// дистанции в единицах волатильности пары ЗА КОНКРЕТНЫЙ период, ими периоды
+// уже различаются.
+export interface QualityEntry {
+  Side: 'BUY' | 'SELL'
+  StopDistancePercent: number
+  TakeDistancePercent: number
+  Score: number
+  StopDistanceSigma: number
+  TakeDistanceSigma: number
+  HasVolatility: boolean
+}
+
+export interface QualityData {
+  [pair: string]: {
+    [period: string]: QualityEntry
+  }
+}
+
+// PriceLevel/PriceLevels - уровни поддержки/сопротивления ПО ИСТОРИИ ЦЕНЫ
+// (swing high/low за последние ~100 свечей периода), в отличие от Quality -
+// это не стакан, устойчивее к спуфингу, но запаздывает относительно текущего
+// момента.
+export interface PriceLevel {
+  Price: number
+  Time: string
+  DistancePercent: number
+}
+
+export interface PriceLevelsEntry {
+  Support: PriceLevel
+  HasSupport: boolean
+  Resistance: PriceLevel
+  HasResistance: boolean
+}
+
+export interface PriceLevelsData {
+  [pair: string]: {
+    [period: string]: PriceLevelsEntry
+  }
+}
+
+// VolatilityRegimeData - отношение недавней волатильности к типичной за тот
+// же период. <1 - сжатие (часто предшествует выносу), >1 - расширение
+// (уже разогналось). См. Go-комментарий у AssetsPrices.GetVolatilityRegime.
+export interface VolatilityRegimeData {
+  [pair: string]: {
+    [period: string]: number
+  }
+}
+
+export interface GetEntryQualityResponse {
+  Quality: QualityData
+  PriceLevels: PriceLevelsData
+  VolatilityRegime: VolatilityRegimeData
+}

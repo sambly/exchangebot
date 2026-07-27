@@ -75,6 +75,11 @@ type AssetsPrices struct {
 	ChangeDeltaMu      sync.RWMutex
 	ChangeDelta        map[string]map[string]*ChangeDelta
 	ChangeDeltaDataset map[string]map[string]*ChangeDeltaDataset
+
+	// volatility - грубая история изменения цены для GetVolatility, отдельно
+	// от ChangePrices: та же математика (медиана+MAD), но своя, не завязанная
+	// на детектор аномалий история (см. volatility.go).
+	volatility map[string]map[string]*volatilityState
 }
 
 var pricesLogger = logger.AddFieldsEmpty()
@@ -123,6 +128,7 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 	assetsPrices.UpdateTime = timeRounding
 	assetsPrices.initChangePrices()
 	assetsPrices.initChangeDelta()
+	assetsPrices.initVolatility()
 
 	return assetsPrices, nil
 }
@@ -361,6 +367,7 @@ func (ap *AssetsPrices) updateChangePrices() {
 			// начале окна, то есть period минут назад.
 			if data.Fill {
 				changePrices.ChangePercent = checkValuesDividing(stat.Price, changePrices.LastPrice)
+				ap.recordVolatility(pair, period, changePrices.ChangePercent, timeStart)
 			}
 
 			data.pushNewest(DatasetChangePrices{Price: stat.Price, Time: stat.Time})

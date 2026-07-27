@@ -69,6 +69,52 @@ func TestSideForSignal(t *testing.T) {
 	}
 }
 
+// Разные периоды сигнала могут требовать разного направления входа: бэктест
+// показал, что на 15m/1h выгоднее fade (шорт против импульса), а на 4h -
+// momentum. Periods переопределяет глобальный OnUp/OnDown только для своего
+// периода, остальные периоды используют глобальное значение.
+func TestSideForPeriodOverride(t *testing.T) {
+	cfg := &Config{
+		OnUp: "buy", OnDown: "sell", MinLevel: 2,
+		Periods: map[string]PeriodDirection{
+			"15m": {OnUp: "sell", OnDown: "buy"},
+		},
+	}
+
+	overridden := signal.Signal{Period: "15m", Level: 2, Direction: signal.DirectionUp}
+	if side, _, ok := cfg.SideFor(overridden); !ok || side != order.SideTypeSell {
+		t.Fatalf("15m должен использовать переопределение (fade): получено (%v, %v)", side, ok)
+	}
+
+	fallback := signal.Signal{Period: "1h", Level: 2, Direction: signal.DirectionUp}
+	if side, _, ok := cfg.SideFor(fallback); !ok || side != order.SideTypeBuy {
+		t.Fatalf("1h без переопределения должен использовать глобальный OnUp: получено (%v, %v)", side, ok)
+	}
+
+	// Переопределён только OnUp - OnDown у 15m должен остаться из своего же
+	// переопределения (buy), а не провалиться в глобальный.
+	down := signal.Signal{Period: "15m", Level: 2, Direction: signal.DirectionDown}
+	if side, _, ok := cfg.SideFor(down); !ok || side != order.SideTypeBuy {
+		t.Fatalf("15m DOWN должен давать BUY по переопределению: получено (%v, %v)", side, ok)
+	}
+}
+
+// SkipDivergent отсекает сигналы "пустого стакана" (цена сходила при
+// активности ниже обычной) ещё до определения стороны сделки.
+func TestSideForSkipsDivergent(t *testing.T) {
+	cfg := &Config{OnUp: "buy", OnDown: "sell", MinLevel: 2, SkipDivergent: true}
+
+	divergent := signal.Signal{Level: 2, Direction: signal.DirectionUp, Divergent: true}
+	if _, reject, ok := cfg.SideFor(divergent); ok || reject.Code != "divergent" {
+		t.Fatalf("Divergent-сигнал при SkipDivergent должен отсекаться, получено ok=%v code=%q", ok, reject.Code)
+	}
+
+	normal := signal.Signal{Level: 2, Direction: signal.DirectionUp, Divergent: false}
+	if _, _, ok := cfg.SideFor(normal); !ok {
+		t.Fatal("не-Divergent сигнал не должен отсекаться SkipDivergent")
+	}
+}
+
 // Стратегия в ордере - это ИСТОЧНИК СИГНАЛА (почему вошли), а не имя исполнителя.
 // Раньше во все сделки писалось "simplebuy" - но это механизм покупки, а не причина.
 func TestDealCarriesSignalSourceAsStrategy(t *testing.T) {

@@ -241,6 +241,28 @@ func (web *Web) getDepthImbalance(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+// getEntryQuality отдаёт все показатели удобства входа сразу по всем
+// отслеживаемым парам и периодам - для таблицы "по рынку целиком", тот же
+// принцип, что и getDepthImbalance:
+//   - Quality        - стены стакана + волатильность (см. entrysetup.Walls)
+//   - PriceLevels     - уровни поддержки/сопротивления по истории цены
+//   - VolatilityRegime - сжатие/расширение волатильности относительно нормы
+//
+// Пара/период без данных просто отсутствует в соответствующей карте - это не
+// ошибка, "прямо сейчас тут ничего интересного".
+func (web *Web) getEntryQuality(w http.ResponseWriter, _ *http.Request) {
+
+	maps := map[string]interface{}{
+		"Quality":          web.App.AssetsSetup.GetAllQuality(),
+		"PriceLevels":      web.App.AssetsSetup.GetAllPriceLevels(),
+		"VolatilityRegime": web.App.AssetsSetup.GetAllVolatilityRegime(),
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(maps); err != nil {
+		appWebLogger.Errorf("error json encoder: %v", err)
+	}
+}
+
 // depthLevelsLimit - сколько уровней стакана с каждой стороны отдавать на
 // cumulative depth chart. У ликвидных пар в стакане могут быть тысячи
 // уровней - график столько всё равно не покажет читаемо, а JSON на каждый

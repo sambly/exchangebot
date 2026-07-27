@@ -23,6 +23,7 @@ type Config struct {
 	Auto bool `yaml:"auto"`
 
 	// OnUp / OnDown - ЧТО ДЕЛАТЬ с сигналом каждого направления: buy, sell, skip.
+	// Глобальный дефолт; конкретный период может его переопределить через Periods.
 	//
 	// Раньше здесь был один флаг direction, и он решал только "торговать ли",
 	// а сторона сделки всегда была BUY. Получалось, что на аномальное ПАДЕНИЕ
@@ -36,6 +37,20 @@ type Config struct {
 	//   skip         - сигналы этого направления не торгуем
 	OnUp   string `yaml:"onUp"`
 	OnDown string `yaml:"onDown"`
+
+	// Periods - переопределение OnUp/OnDown для конкретного сигнального периода.
+	// Пусто в самом переопределении - берётся глобальное значение выше.
+	//
+	// Бэктест anomaly (см. cmd backtest) показал, что momentum и mean-reversion
+	// работают на разных периодах по-разному: на 15m/1h цена после аномалии в
+	// среднем откатывается (fade выгоднее), на 4h слабо, но продолжает (momentum
+	// выгоднее). Один OnUp/OnDown на все периоды сразу игнорирует эту разницу.
+	Periods map[string]PeriodDirection `yaml:"periods"`
+
+	// SkipDivergent - не входить в сигналы с Divergent=true: движение цены
+	// прошло при активности НИЖЕ обычной ("пустой стакан"), такие движения
+	// чаще откатываются, чем продолжаются (см. AnomalyResult.Divergent).
+	SkipDivergent bool `yaml:"skipDivergent"`
 
 	// MinLevel - минимальная сила сигнала для входа (у anomaly это уровень 1..3)
 	MinLevel int `yaml:"minLevel"`
@@ -53,6 +68,13 @@ type Config struct {
 	// PairCooldownMinutes - сколько ждать после закрытия позиции по паре,
 	// прежде чем открывать по ней новую. Защита от "лестницы" по одной паре.
 	PairCooldownMinutes int `yaml:"pairCooldownMinutes"`
+}
+
+// PeriodDirection - переопределение OnUp/OnDown для одного периода.
+// Пустая строка в поле означает "не переопределять", берётся глобальное значение.
+type PeriodDirection struct {
+	OnUp   string `yaml:"onUp"`
+	OnDown string `yaml:"onDown"`
 }
 
 // Reject - почему сигнал не стал сделкой.
@@ -84,10 +106,11 @@ func (c *Config) SideFor(sig signal.Signal) (order.SideType, Reject, bool) {
 		return "", routine("source-filter", "источник %s не в списке sources", sig.Source), false
 	}
 
-	action := c.OnUp
-	if sig.Direction == signal.DirectionDown {
-		action = c.OnDown
+	if c.SkipDivergent && sig.Divergent {
+		return "", routine("divergent", "движение по пустому стакану (activity ниже обычной) - пропуск"), false
 	}
+
+	action := c.actionFor(sig)
 
 	switch strings.ToLower(strings.TrimSpace(action)) {
 	case "buy":
@@ -97,6 +120,26 @@ func (c *Config) SideFor(sig signal.Signal) (order.SideType, Reject, bool) {
 	default: // skip и всё непонятное
 		return "", routine("direction-skip", "направление %s не торгуем (действие %q)", sig.Direction, action), false
 	}
+}
+
+// actionFor - buy/sell/skip для направления сигнала с учётом переопределения
+// по периоду (Periods): период важнее глобального OnUp/OnDown, если задан.
+func (c *Config) actionFor(sig signal.Signal) string {
+	onUp, onDown := c.OnUp, c.OnDown
+
+	if pd, ok := c.Periods[sig.Period]; ok {
+		if pd.OnUp != "" {
+			onUp = pd.OnUp
+		}
+		if pd.OnDown != "" {
+			onDown = pd.OnDown
+		}
+	}
+
+	if sig.Direction == signal.DirectionDown {
+		return onDown
+	}
+	return onUp
 }
 
 // containsFold - есть ли значение в списке, без учёта регистра

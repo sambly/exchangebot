@@ -131,14 +131,27 @@ func (mr *MetricRecord) ZScore(value float64) float64 {
 
 // scaleLocked - робастная оценка разброса: MAD, приведённый к шкале сигмы.
 func (mr *MetricRecord) scaleLocked() float64 {
-	med := median(mr.values)
+	_, scale := medianAndScale(mr.values, mr.scaleFloor)
+	return scale
+}
 
-	deviations := make([]float64, len(mr.values))
-	for i, v := range mr.values {
+// medianAndScale - медиана и робастный разброс (MAD, приведённый к шкале
+// сигмы) ОДНОМОМЕНТНОГО среза значений. Та же математика, что у
+// MetricRecord.scaleLocked, но без истории по времени - для случаев, где
+// сравнивать нужно значения внутри одного снапшота (например, объёмы уровней
+// стакана прямо сейчас), а не текущее значение против прошлого.
+func medianAndScale(values []float64, scaleFloor float64) (med, scale float64) {
+	med = median(values)
+	if len(values) == 0 {
+		return 0, 0
+	}
+
+	deviations := make([]float64, len(values))
+	for i, v := range values {
 		deviations[i] = math.Abs(v - med)
 	}
 
-	scale := median(deviations) * madToSigma
+	scale = median(deviations) * madToSigma
 
 	// MAD вырождается в 0, если больше половины значений одинаковы (например,
 	// объём стабильно нулевой). Тогда падаем на среднее абсолютное отклонение,
@@ -151,8 +164,15 @@ func (mr *MetricRecord) scaleLocked() float64 {
 		scale = (sum / float64(len(deviations))) * meanADToSigma
 	}
 
-	if scale < mr.scaleFloor {
-		scale = mr.scaleFloor
+	if scale < scaleFloor {
+		scale = scaleFloor
 	}
-	return scale
+	return med, scale
+}
+
+// MedianAndScale - экспортированная версия medianAndScale, для пакетов без
+// истории по времени, которым нужна робастная медиана+разброс одного среза
+// значений (см. internal/entrysetup - объёмы уровней стакана в снапшоте).
+func MedianAndScale(values []float64, scaleFloor float64) (med, scale float64) {
+	return medianAndScale(values, scaleFloor)
 }

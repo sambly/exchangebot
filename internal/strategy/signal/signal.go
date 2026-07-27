@@ -11,9 +11,9 @@ import "time"
 type Direction string
 
 const (
-	// DirectionUp - цена аномально выросла (игра на продолжение движения)
+	// DirectionUp - цена аномально выросла
 	DirectionUp Direction = "UP"
-	// DirectionDown - цена аномально упала (игра на отскок)
+	// DirectionDown - цена аномально упала
 	DirectionDown Direction = "DOWN"
 )
 
@@ -41,4 +41,9 @@ type Signal struct {
 
 	// Reason - человекочитаемое объяснение, попадает в комментарий к ордеру
 	Reason string
+
+	// Divergent - движение цены прошло при АКТИВНОСТИ НИЖЕ обычной ("пустой
+	// стакан"). Такие движения чаще откатываются, чем продолжаются - см.
+	// AnomalyResult.Divergent в пакете anomaly, откуда это поле копируется.
+	Divergent bool
 }

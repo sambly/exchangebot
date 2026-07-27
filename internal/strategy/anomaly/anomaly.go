@@ -244,6 +244,7 @@ func (s *AnomalyStrategy) signalFrom(result *AnomalyResult) signal.Signal {
 		Strength:      result.CompositeZ,
 		ChangePercent: result.PriceChange,
 		Volatility:    s.priceVolatility(result.Pair, result.Period),
+		Divergent:     result.Divergent,
 		Reason: fmt.Sprintf("%s %s z=%.1f level=%d",
 			s.Config.IDName, result.Period, result.CompositeZ, result.Level),
 	}

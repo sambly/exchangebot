@@ -12,6 +12,7 @@ import (
 	"github.com/sambly/exchangebot/internal/config"
 	"github.com/sambly/exchangebot/internal/database"
 	"github.com/sambly/exchangebot/internal/depth"
+	"github.com/sambly/exchangebot/internal/entrysetup"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/notification"
@@ -35,6 +36,7 @@ type Application struct {
 	Account      *account.Account
 	AssetsPrices *prices.AssetsPrices
 	AssetsDepth  *depth.AssetsDepth
+	AssetsSetup  *entrysetup.AssetsSetup
 
 	OrderController    *order.OrderService
 	PaperWallet        *paperwallet.PaperWallet
@@ -65,6 +67,7 @@ func NewApp(
 		return nil, err
 	}
 	assetsDepth := depth.NewAssetsDepth(depthPairs(cfg, settings.Pairs))
+	assetsSetup := entrysetup.NewAssetsSetup(assetsPrices, assetsDepth)
 
 	account, err := account.NewAccount(exch, assetsPrices)
 	if err != nil {
@@ -91,6 +94,7 @@ func NewApp(
 
 		AssetsPrices:       assetsPrices,
 		AssetsDepth:        assetsDepth,
+		AssetsSetup:        assetsSetup,
 		Account:            account,
 		OrderController:    orderController,
 		PaperWallet:        paperWallet,

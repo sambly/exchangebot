@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { MarketsStat, ChangePrices, DeltaFast, FeedStatus, ImbalanceData } from '../types'
+import type { MarketsStat, ChangePrices, DeltaFast, FeedStatus, ImbalanceData, QualityData, PriceLevelsData, VolatilityRegimeData } from '../types'
 
 export const useMarketStore = defineStore('market', () => {
   const marketsStat = ref<MarketsStat>({})
@@ -8,6 +8,9 @@ export const useMarketStore = defineStore('market', () => {
   const deltaFast = ref<DeltaFast>({})
   const feedStatus = ref<FeedStatus>({})
   const imbalance = ref<ImbalanceData>({})
+  const quality = ref<QualityData>({})
+  const priceLevels = ref<PriceLevelsData>({})
+  const volatilityRegime = ref<VolatilityRegimeData>({})
 
   const isDeltaLoading = ref(false)
   const deltaError = ref<string | null>(null)
@@ -58,16 +61,39 @@ export const useMarketStore = defineStore('market', () => {
     }
   }
 
+  // Один запрос отдаёт все три показателя удобства входа сразу (Quality,
+  // PriceLevels, VolatilityRegime) - см. Go-комментарий у getEntryQuality.
+  async function fetchQuality() {
+    try {
+      const response = await fetch('/trade/api/getEntryQuality', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+
+      const data = await response.json()
+      quality.value = data.Quality || {}
+      priceLevels.value = data.PriceLevels || {}
+      volatilityRegime.value = data.VolatilityRegime || {}
+    } catch (err) {
+      console.error('Error loading entry quality data:', err)
+    }
+  }
+
   return {
     marketsStat,
     changePrices,
     deltaFast,
     feedStatus,
     imbalance,
+    quality,
+    priceLevels,
+    volatilityRegime,
     isDeltaLoading,
     deltaError,
     setMarketData,
     fetchDelta,
     fetchImbalance,
+    fetchQuality,
   }
 })
