@@ -187,7 +187,12 @@ async function handleDeleteAll() {
           <span :style="{ color: colorSide(data.Side), fontWeight: 600 }">{{ data.Side }}</span>
         </template>
       </Column>
-      <Column field="Pair" header="Пара" :sortable="true" style="min-width: 100px" />
+      <Column field="Pair" header="Пара" :sortable="true" style="min-width: 100px">
+        <template #body="{ data }">
+          <div>{{ data.Pair }}</div>
+          <div style="font-size:0.8em; opacity:0.7">#{{ data.ID }}</div>
+        </template>
+      </Column>
       <Column header="Цена" style="min-width: 100px">
         <template #body="{ data }">
           <div>{{ data.PriceCreated || '-' }}</div>
@@ -200,7 +205,7 @@ async function handleDeleteAll() {
           <div style="font-size:0.8em; opacity:0.7">{{ formatTime(data.Time) }}</div>
         </template>
       </Column>
-      <Column header="Профит" :sortable="true" style="min-width: 80px">
+      <Column field="Profit" header="Профит" :sortable="true" style="min-width: 80px">
         <template #body="{ data }">
           <span :style="{ color: colorProfit(data.Profit) }">{{ formatProfit(data.Profit) }}</span>
         </template>
