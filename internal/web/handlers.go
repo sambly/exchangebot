@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/sambly/exchangebot/internal/order"
@@ -252,10 +253,49 @@ func (web *Web) getDepthImbalance(w http.ResponseWriter, _ *http.Request) {
 // ошибка, "прямо сейчас тут ничего интересного".
 func (web *Web) getEntryQuality(w http.ResponseWriter, _ *http.Request) {
 
+	// Разбивка по времени на каждый под-расчёт - Quality/VolatilityRegime
+	// читают только память и должны быть мгновенными, а PriceLevels ходит в
+	// БД (см. entrysetup.GetAllPriceLevels) и оттуда и приходит вся
+	// длительность запроса, если она вообще заметна.
+	start := time.Now()
+	quality := web.App.AssetsSetup.GetAllQuality()
+	qualityDuration := time.Since(start)
+
+	start = time.Now()
+	priceLevels := web.App.AssetsSetup.GetAllPriceLevels()
+	priceLevelsDuration := time.Since(start)
+
+	start = time.Now()
+	volatilityRegime := web.App.AssetsSetup.GetAllVolatilityRegime()
+	volatilityRegimeDuration := time.Since(start)
+
+	appWebLogger.Infof("getEntryQuality: quality=%v priceLevels=%v volatilityRegime=%v",
+		qualityDuration, priceLevelsDuration, volatilityRegimeDuration)
+
 	maps := map[string]interface{}{
-		"Quality":          web.App.AssetsSetup.GetAllQuality(),
-		"PriceLevels":      web.App.AssetsSetup.GetAllPriceLevels(),
-		"VolatilityRegime": web.App.AssetsSetup.GetAllVolatilityRegime(),
+		"Quality":          quality,
+		"PriceLevels":      priceLevels,
+		"VolatilityRegime": volatilityRegime,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(maps); err != nil {
+		appWebLogger.Errorf("error json encoder: %v", err)
+	}
+}
+
+// getStrength отдаёт сырые составляющие "скрытой силы" (см.
+// entrysetup.StrengthComponents) сразу по всем отслеживаемым парам и
+// периодам - для таблицы-скринера. Композит из этих компонентов и то, какие
+// из них учитывать, считает фронт (чекбоксы), не бэкенд - тот же принцип, что
+// у getEntryQuality: сырое наблюдение отдельно от решения.
+func (web *Web) getStrength(w http.ResponseWriter, _ *http.Request) {
+
+	start := time.Now()
+	strength := web.App.AssetsSetup.GetAllStrengthComponents()
+	appWebLogger.Infof("getStrength: %v", time.Since(start))
+
+	maps := map[string]interface{}{
+		"Strength": strength,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(maps); err != nil {

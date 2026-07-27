@@ -80,6 +80,10 @@ type AssetsPrices struct {
 	// от ChangePrices: та же математика (медиана+MAD), но своя, не завязанная
 	// на детектор аномалий история (см. volatility.go).
 	volatility map[string]map[string]*volatilityState
+
+	// activity - история buy-side активности для GetBuyActivityZScore, тем же
+	// принципом изоляции, что и volatility (см. activity.go).
+	activity map[string]map[string]*activityState
 }
 
 var pricesLogger = logger.AddFieldsEmpty()
@@ -129,6 +133,7 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 	assetsPrices.initChangePrices()
 	assetsPrices.initChangeDelta()
 	assetsPrices.initVolatility()
+	assetsPrices.initActivity()
 
 	return assetsPrices, nil
 }
@@ -427,6 +432,7 @@ func (ap *AssetsPrices) updateChangeDelta() error {
 			}
 
 			ap.recalcDelta(candle.Pair, period, data)
+			ap.recordActivity(candle.Pair, period, *ap.ChangeDelta[candle.Pair][period], timeStart)
 		}
 	}
 

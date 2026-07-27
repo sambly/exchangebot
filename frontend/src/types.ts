@@ -135,3 +135,36 @@ export interface GetEntryQualityResponse {
   PriceLevels: PriceLevelsData
   VolatilityRegime: VolatilityRegimeData
 }
+
+// Ответ от /trade/api/getStrength - сырые составляющие "скрытой силы" пары,
+// каждая со своим Has-флагом (сигнал сейчас недоступен - не ноль, а "нет
+// данных"). Композит из них и то, какие компоненты учитывать, считает фронт
+// (чекбоксы в DataStrength.vue) - см. Go-комментарий у entrysetup.StrengthComponents.
+export interface StrengthEntry {
+  HasImbalance: boolean
+  ImbalanceZScore: number
+
+  HasWalls: boolean
+  WallsSide: 'BUY' | 'SELL'
+  WallsScore: number
+
+  HasLevels: boolean
+  LevelsSide: 'BUY' | 'SELL'
+  LevelsScore: number
+
+  HasRegime: boolean
+  Regime: number
+
+  HasActivity: boolean
+  ActivityZScore: number
+}
+
+export interface StrengthData {
+  [pair: string]: {
+    [period: string]: StrengthEntry
+  }
+}
+
+export interface GetStrengthResponse {
+  Strength: StrengthData
+}

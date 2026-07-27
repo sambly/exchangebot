@@ -7,6 +7,7 @@ import { useMarketStore } from '../stores/market'
 import { useFiltersStore } from '../stores/filters'
 import { useUIStore } from '../stores/ui'
 import { useOrders } from '../composables/useOrders.ts'
+import { timed } from '../utils/timing'
 
 import DataPanel from './DataPanel/DataPanel.vue'
 import HeaderInfo from './Layout/HeaderInfo.vue'
@@ -56,9 +57,20 @@ const fetchData = async () => {
 const refreshData = async () => {
   if (isRefreshing.value) return
   isRefreshing.value = true
+  const start = performance.now()
   try {
     filters.loadFilters()
-    await Promise.all([fetchData(), market.fetchDelta(), market.fetchImbalance(), refreshOrders()])
+    // Каждый запрос замерян отдельно (console.log, [timing]) - Promise.all
+    // ждёт САМЫЙ медленный из них, и без разбивки по запросам непонятно, кто
+    // именно тормозит кнопку "Обновить".
+    await Promise.all([
+      timed('getChPrice', fetchData),
+      timed('fetchDelta', () => market.fetchDelta()),
+      timed('fetchImbalance', () => market.fetchImbalance()),
+      timed('fetchQuality', () => market.fetchQuality()),
+      timed('refreshOrders', () => refreshOrders()),
+    ])
+    console.log(`[timing] Обновить (итого): ${(performance.now() - start).toFixed(0)}ms`)
     toast.add({ severity: 'success', summary: 'Готово', detail: 'Данные обновлены', life: 2000 })
   } finally {
     isRefreshing.value = false

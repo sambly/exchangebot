@@ -176,3 +176,21 @@ func medianAndScale(values []float64, scaleFloor float64) (med, scale float64) {
 func MedianAndScale(values []float64, scaleFloor float64) (med, scale float64) {
 	return medianAndScale(values, scaleFloor)
 }
+
+// LogRatio симметризует процентное изменение вида "новое/старое*100-100"
+// (диапазон [-100, +Inf), сильно скошенный вправо) в логарифм отношения
+// (диапазон (-Inf, +Inf), симметричный): рост вдвое (+100%) и падение вдвое
+// (-50%) дают +0.69 и -0.69 - одинаковые по силе противоположные события,
+// вместо +100 и -50 в исходной шкале. На несимметричной шкале z-score
+// систематически завышает положительные выбросы и занижает отрицательные.
+//
+// percentChange<=-100 (ratio<=0) отдаёт 0 - на практике не встречается
+// (checkValuesDividing/аналоги отдают 0 в этом случае раньше), но log(<=0)
+// даёт -Inf, поэтому подстраховка нужна.
+func LogRatio(percentChange float64) float64 {
+	ratio := 1 + percentChange/100
+	if ratio <= 0 {
+		return 0
+	}
+	return math.Log(ratio)
+}

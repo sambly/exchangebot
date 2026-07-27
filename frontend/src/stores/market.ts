@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { MarketsStat, ChangePrices, DeltaFast, FeedStatus, ImbalanceData, QualityData, PriceLevelsData, VolatilityRegimeData } from '../types'
+import type { MarketsStat, ChangePrices, DeltaFast, FeedStatus, ImbalanceData, QualityData, PriceLevelsData, VolatilityRegimeData, StrengthData } from '../types'
 
 export const useMarketStore = defineStore('market', () => {
   const marketsStat = ref<MarketsStat>({})
@@ -11,6 +11,7 @@ export const useMarketStore = defineStore('market', () => {
   const quality = ref<QualityData>({})
   const priceLevels = ref<PriceLevelsData>({})
   const volatilityRegime = ref<VolatilityRegimeData>({})
+  const strength = ref<StrengthData>({})
 
   const isDeltaLoading = ref(false)
   const deltaError = ref<string | null>(null)
@@ -80,6 +81,25 @@ export const useMarketStore = defineStore('market', () => {
     }
   }
 
+  // strength - сырые составляющие "скрытой силы" сразу по всем парам и
+  // периодам (см. entrysetup.StrengthComponents). Композит считает
+  // DataStrength.vue на основе выбранных пользователем чекбоксов - здесь
+  // только сырые данные, как у quality/priceLevels/volatilityRegime.
+  async function fetchStrength() {
+    try {
+      const response = await fetch('/trade/api/getStrength', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+
+      const data = await response.json()
+      strength.value = data.Strength || {}
+    } catch (err) {
+      console.error('Error loading strength data:', err)
+    }
+  }
+
   return {
     marketsStat,
     changePrices,
@@ -89,11 +109,13 @@ export const useMarketStore = defineStore('market', () => {
     quality,
     priceLevels,
     volatilityRegime,
+    strength,
     isDeltaLoading,
     deltaError,
     setMarketData,
     fetchDelta,
     fetchImbalance,
     fetchQuality,
+    fetchStrength,
   }
 })

@@ -19,6 +19,17 @@ const (
 	// levelsSwingWindow соседей С КАЖДОЙ стороны. Больше - меньше уровней, но
 	// каждый значимее; меньше - уровней больше, но часть - шум одной свечи.
 	levelsSwingWindow = 5
+
+	// priceLevelsCacheTTL - на сколько кэшируется результат
+	// computeAllPriceLevels (см. GetAllPriceLevels). Уровни считаются по
+	// последним ~100 свечам периода - внутри одной свечи самого короткого
+	// периода (1m) они физически не могут измениться, а БД под этим запросом
+	// (SelectCandlesFromPeriod по всем парам, без ограничения по паре)
+	// оказалась ощутимо небыстрой (секунды, см. отладочные логи
+	// getEntryQuality/getStrength) - гонять её на каждый poll обеих таблиц
+	// (getEntryQuality по кнопке, getStrength каждые 10с из вкладки
+	// "Потенциал") смысла нет.
+	priceLevelsCacheTTL = 30 * time.Second
 )
 
 // PriceLevel - разворотная точка на графике цены (swing high/low).
@@ -72,7 +83,32 @@ func (s *AssetsSetup) GetPriceLevels(pair, period string) (PriceLevels, bool) {
 }
 
 // GetAllPriceLevels - GetPriceLevels сразу по всем отслеживаемым парам и
-// периодам, для таблицы "по рынку целиком".
+// периодам, для таблицы "по рынку целиком" - и для entrysetup.GetAllStrength-
+// Components (см. strength.go), которая берёт этот же кэш вместо второго
+// похода в БД.
+//
+// Результат кэшируется на priceLevelsCacheTTL: сам расчёт ходит в БД (см.
+// computeAllPriceLevels) и оказался не мгновенным, а два независимых
+// потребителя (веб-таблицы "Стены/Уровни" и "Потенциал", вторая ещё и
+// опрашивается раз в 10с) без кэша дублировали бы этот поход впустую.
+func (s *AssetsSetup) GetAllPriceLevels() map[string]map[string]PriceLevels {
+	if s.prices == nil {
+		return make(map[string]map[string]PriceLevels)
+	}
+
+	s.priceLevelsCacheMu.Lock()
+	defer s.priceLevelsCacheMu.Unlock()
+
+	if s.priceLevelsCache != nil && time.Since(s.priceLevelsCacheAt) < priceLevelsCacheTTL {
+		return s.priceLevelsCache
+	}
+
+	s.priceLevelsCache = s.computeAllPriceLevels()
+	s.priceLevelsCacheAt = time.Now()
+	return s.priceLevelsCache
+}
+
+// computeAllPriceLevels - собственно расчёт GetAllPriceLevels, без кэша.
 //
 // В отличие от GetAllQuality, свечи запрашиваются ОДИН РАЗ НА ПЕРИОД (не на
 // пару): GetPeriodCandles и так возвращает свечи всех пар сразу, и запрашивать
@@ -81,11 +117,7 @@ func (s *AssetsSetup) GetPriceLevels(pair, period string) (PriceLevels, bool) {
 //
 // PriceLevels, в отличие от Walls/Quality, не зависит от стакана - поэтому
 // здесь пары берутся из prices.Pairs, а не из depth.Pairs.
-func (s *AssetsSetup) GetAllPriceLevels() map[string]map[string]PriceLevels {
-	if s.prices == nil {
-		return make(map[string]map[string]PriceLevels)
-	}
-
+func (s *AssetsSetup) computeAllPriceLevels() map[string]map[string]PriceLevels {
 	result := make(map[string]map[string]PriceLevels, len(s.prices.Pairs))
 	for _, pair := range s.prices.Pairs {
 		result[pair] = make(map[string]PriceLevels, len(s.prices.Periods))

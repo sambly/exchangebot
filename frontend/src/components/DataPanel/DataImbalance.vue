@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import { useMarketStore } from '../../stores/market'
@@ -158,14 +158,50 @@ const orderedPairs = computed(() => sortedRows.value.map(r => r.pair + 'USDT'))
 
 useScrollToPair(tableContainerRef, orderedPairs, 'imbalance')
 
-onMounted(async () => {
-  if (!Object.keys(market.imbalance).length) {
-    await market.fetchImbalance()
+// В отличие от MarketsStat/ChangePrices (пуш через /trade/ws), у имбаланса и
+// Quality/PriceLevels/Regime нет вебсокет-канала - только REST. Раньше эти
+// данные забирались один раз при первом монтировании и потом замораживались
+// навсегда (DataPanel.vue держит все вкладки смонтированными через v-show,
+// так что повторного onMounted при переключении вкладок не происходит).
+// Опрашиваем сами, пока вкладка "Имбаланс" реально видна - и не молотим API
+// впустую, пока пользователь смотрит другую вкладку.
+const IMBALANCE_POLL_INTERVAL_MS = 10000
+
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+async function refreshImbalanceData() {
+  await Promise.all([market.fetchImbalance(), market.fetchQuality()])
+}
+
+function startPolling() {
+  if (pollTimer) return
+  pollTimer = setInterval(refreshImbalanceData, IMBALANCE_POLL_INTERVAL_MS)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
   }
-  if (!Object.keys(market.quality).length) {
-    await market.fetchQuality()
+}
+
+watch(() => ui.activeDataPanel, panel => {
+  if (panel === 'imbalance') {
+    refreshImbalanceData()
+    startPolling()
+  } else {
+    stopPolling()
   }
 })
+
+onMounted(() => {
+  if (ui.activeDataPanel === 'imbalance') {
+    refreshImbalanceData()
+    startPolling()
+  }
+})
+
+onBeforeUnmount(stopPolling)
 </script>
 
 <template>

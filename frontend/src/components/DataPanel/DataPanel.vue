@@ -3,6 +3,7 @@
 import DataChangePrice from '../DataPanel/DataChangePrice.vue'
 import DataVolumeDelta from '../DataPanel/DataVolumeDelta.vue'
 import DataImbalance from '../DataPanel/DataImbalance.vue'
+import DataStrength from '../DataPanel/DataStrength.vue'
 import { useUIStore } from '../../stores/ui'
 
 const ui = useUIStore()
@@ -18,6 +19,9 @@ const ui = useUIStore()
     </div>
     <div v-show="ui.activeDataPanel === 'imbalance'" class="panel-content">
       <DataImbalance />
+    </div>
+    <div v-show="ui.activeDataPanel === 'strength'" class="panel-content">
+      <DataStrength />
     </div>
 
 </template>

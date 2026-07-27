@@ -12,6 +12,9 @@
 package entrysetup
 
 import (
+	"sync"
+	"time"
+
 	"github.com/sambly/exchangebot/internal/depth"
 	"github.com/sambly/exchangebot/internal/prices"
 )
@@ -24,6 +27,15 @@ import (
 type AssetsSetup struct {
 	prices *prices.AssetsPrices
 	depth  *depth.AssetsDepth
+
+	// priceLevelsCache - см. levels.go. PriceLevels - единственный из
+	// показателей этого пакета, который ходит в БД (Walls/Quality/Regime/
+	// Activity читают только уже накопленную в памяти историю), и этот поход
+	// одинаков что для getEntryQuality, что для getStrength - кэш на
+	// priceLevelsCacheTTL экономит его обоим сразу, а не только одному.
+	priceLevelsCacheMu sync.Mutex
+	priceLevelsCacheAt time.Time
+	priceLevelsCache   map[string]map[string]PriceLevels
 }
 
 // NewAssetsSetup - prices и depth должны быть уже инициализированы вызывающим

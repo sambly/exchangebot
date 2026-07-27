@@ -36,6 +36,13 @@ const ui = useUIStore()
       :outlined="ui.activeDataPanel !== 'imbalance'"
       @click="ui.activeDataPanel = 'imbalance'"
     />
+    <Button
+      label="Потенциал"
+      severity="secondary"
+      size="small"
+      :outlined="ui.activeDataPanel !== 'strength'"
+      @click="ui.activeDataPanel = 'strength'"
+    />
   </div>
 </template>
 
