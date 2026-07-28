@@ -151,7 +151,6 @@ onMounted(async () => {
 .tradingview-container {
   width: 100%;
   height: 100%;
-  min-height: 420px;
   position: relative;
 }
 </style>

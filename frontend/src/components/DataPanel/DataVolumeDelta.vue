@@ -109,21 +109,19 @@ onMounted(async () => {
 
     <!-- Header -->
     <div class="table-header">
-
       <DataPanelToolbar />
+    </div>
 
-      <div class="frame-buttons">
-        <Button
-          v-for="f in frames"
-          :key="f"
-          :label="f"
-          size="small"
-          severity="secondary"
-          :outlined="activeFrame !== f"
-          @click="activeFrame = f"
-        />
-      </div>
-
+    <div class="frame-buttons">
+      <Button
+        v-for="f in frames"
+        :key="f"
+        :label="f"
+        size="small"
+        severity="secondary"
+        :outlined="activeFrame !== f"
+        @click="activeFrame = f"
+      />
     </div>
 
     <!-- Error -->
@@ -304,8 +302,12 @@ onMounted(async () => {
 }
 
 .frame-buttons {
+  flex-shrink: 0;
+
   display: flex;
   gap: 0.15rem;
+
+  padding: 0.4rem 0;
 }
 
 .error-msg {

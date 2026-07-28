@@ -7,9 +7,12 @@ import {
   ColorType,
   type IChartApi,
   type ISeriesApi,
-  type CandlestickData
+  type ISeriesMarkersPluginApi,
+  type CandlestickData,
+  type Time
 } from 'lightweight-charts'
 import { useOrdersStore } from '../../stores/orders'
+import { useUIStore } from '../../stores/ui'
 import Button from 'primevue/button'
 import { toChartTime } from '../../utils/chartTime'
 
@@ -23,6 +26,7 @@ let isInitializing = false
 let isDisposed = false
 
 const store = useOrdersStore()
+const ui = useUIStore()
 
 const ordersForPair = computed(() =>
   [...store.active, ...store.history].filter(o => o.Pair === props.pair)
@@ -36,6 +40,7 @@ const activeFrame = ref<string>('15m')
 
 let chart: IChartApi | null = null
 let candleSeries: ISeriesApi<'Candlestick'> | null = null
+let markersPrimitive: ISeriesMarkersPluginApi<Time> | null = null
 let resizeObserver: ResizeObserver | null = null
 let isInitialized = false
 let tooltip: HTMLDivElement | null = null
@@ -93,35 +98,55 @@ async function fetchCandles(pair: string, frame: string) {
   return await res.json()
 }
 
+// Акцентный цвет/размер для ордера, выбранного кликом по строке в
+// OrdersActive/OrdersHistory (ui.selectedOrderId) - иначе среди десятков
+// одинаковых зелёных/красных стрелок на графике невозможно найти именно ТУ
+// сделку, ради которой сюда перешли.
+const SELECTED_COLOR = '#f59e0b'
+
 function buildMarkers(): any[] {
   const markers: any[] = []
+  const selectedId = ui.selectedOrderId
 
   for (const order of ordersForPair.value) {
     const tOpen = toChartTime(order.TimeCreated)
     const tClose = order.Time ? toChartTime(order.Time) : null
     const isBuy = order.Side === 'BUY'
     const isClose = order.Status === 'Close'
+    const isSelected = order.ID === selectedId
 
     markers.push({
       time: tOpen,
       position: isBuy ? 'belowBar' : 'aboveBar',
-      color: '#22c55e',
+      color: isSelected ? SELECTED_COLOR : '#22c55e',
       shape: isBuy ? 'arrowUp' : 'arrowDown',
-      text: `${isBuy ? 'long' : 'short'} #${order.ID}`
+      text: `${isBuy ? 'long' : 'short'} #${order.ID}`,
+      size: isSelected ? 2 : 1
     })
 
     if (isClose && tClose) {
       markers.push({
         time: tClose,
         position: isBuy ? 'aboveBar' : 'belowBar',
-        color: '#ef4444',
+        color: isSelected ? SELECTED_COLOR : '#ef4444',
         shape: isBuy ? 'arrowDown' : 'arrowUp',
-        text: `close #${order.ID}`
+        text: `close #${order.ID}`,
+        size: isSelected ? 2 : 1
       })
     }
   }
 
   return markers.sort((a, b) => (a.time as number) - (b.time as number))
+}
+
+function refreshMarkers() {
+  if (!candleSeries) return
+  const markers = buildMarkers()
+  if (markersPrimitive) {
+    markersPrimitive.setMarkers(markers)
+  } else if (markers.length > 0) {
+    markersPrimitive = createSeriesMarkers(candleSeries, markers)
+  }
 }
 
 function initChart() {
@@ -240,6 +265,7 @@ async function loadData() {
     if (candleSeries) {
       chart.removeSeries(candleSeries)
       candleSeries = null
+      markersPrimitive = null
     }
 
     candleSeries = chart.addSeries(CandlestickSeries, {
@@ -253,10 +279,7 @@ async function loadData() {
 
     candleSeries.setData(candleData)
 
-    const markers = buildMarkers()
-    if (markers.length > 0) {
-      createSeriesMarkers(candleSeries, markers)
-    }
+    refreshMarkers()
 
     // scrollToRealTime вместо fitContent: последний укладывает ВСЮ историю в
     // область графика (свечи схлопываются в кашу при большом диапазоне),
@@ -313,6 +336,10 @@ watch([() => props.pair, activeFrame], async () => {
   }
 })
 
+watch(() => ui.selectedOrderId, () => {
+  refreshMarkers()
+})
+
 watch(() => props.darkMode, () => {
   if (!chart) return
   chart.applyOptions({
@@ -347,6 +374,8 @@ onBeforeUnmount(() => {
   if (chart) {
     chart.remove()
     chart = null
+    candleSeries = null
+    markersPrimitive = null
   }
   tooltip?.remove()
   hideSpinner()

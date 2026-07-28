@@ -37,7 +37,9 @@ function formatTime(timestamp?: string) {
 }
 
 function onRowClick(event: DataTableRowClickEvent) {
-  ui.selectPair((event.data as Order).Pair)
+  const order = event.data as Order
+  ui.selectPair(order.Pair)
+  ui.selectedOrderId = order.ID
   ui.activeChart = 'orders'
 }
 
@@ -180,6 +182,14 @@ async function handleCloseAll() {
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
+
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.orders-header > * {
+  flex-shrink: 0;
 }
 
 .divider {

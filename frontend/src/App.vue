@@ -37,4 +37,22 @@ watch(
   min-width: 0;
   overflow: visible;
 }
+
+/* Sidebar на мобильных превращается из вертикальной колонки в горизонтальную
+   полосу сверху (см. Sidebar.vue) - переключаем сам app-layout в колонку и
+   фиксируем высоту, иначе получим 100vh сайдбара + 100vh контента = скролл
+   всей страницы вместо скролла внутри MainView. */
+@media (max-width: 768px) {
+  .app-layout {
+    flex-direction: column;
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .main-container-wrapper {
+    min-height: 0;
+    overflow: hidden;
+  }
+}
 </style>

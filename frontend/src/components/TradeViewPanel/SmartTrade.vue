@@ -17,6 +17,7 @@
       </div>
     </div>
 
+
     <Divider />
 
     <!-- Strategy -->
@@ -53,6 +54,7 @@
       <Button
         label="Покупка"
         severity="success"
+        size="small"
         class="deal-button"
         :loading="loadingBuy"
         :disabled="loadingSell"
@@ -61,6 +63,7 @@
       <Button
         label="Продажа"
         severity="danger"
+        size="small"
         class="deal-button"
         :loading="loadingSell"
         :disabled="loadingBuy"
@@ -178,9 +181,9 @@ onMounted(() => {
 
 .trade-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
 }
 
 .current-pair {
@@ -193,6 +196,15 @@ onMounted(() => {
 .btn-group {
   display: flex;
   gap: 0.25rem;
+
+  max-width: 100%;
+  overflow-x: auto;
+
+  padding-bottom: 0.15rem;
+}
+
+.btn-group :deep(.p-button) {
+  flex-shrink: 0;
 }
 
 .field {

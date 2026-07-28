@@ -69,4 +69,22 @@ const ui = useUIStore()
   width: 1.1rem;
   height: 1.1rem;
 }
+
+/* На мобильных боковая колонка иконок неудобна (крадёт ширину у и так узкого
+   экрана) - разворачиваем в горизонтальную полосу сверху, тот же брейкпоинт,
+   что и у мобильной раскладки в MainView.vue. */
+@media (max-width: 768px) {
+  .sidebar {
+    flex-direction: row;
+    width: 100%;
+    padding: 0.3rem 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .sidebar-buttons {
+    flex-direction: row;
+    width: 100%;
+    justify-content: center;
+  }
+}
 </style>

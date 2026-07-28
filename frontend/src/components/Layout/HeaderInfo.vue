@@ -122,7 +122,8 @@ const feedStatusTitle = computed(() => {
 .header-info-left {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
 }
 
 .pair-selector {

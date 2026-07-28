@@ -283,44 +283,46 @@ onBeforeUnmount(stopPolling)
 
     <div class="settings-bar">
 
-      <div class="period-buttons">
-        <Button
-          v-for="p in availablePeriods"
-          :key="p"
-          :label="p"
-          size="small"
-          severity="secondary"
-          :outlined="activePeriod !== p"
-          @click="activePeriod = p"
-        />
+      <div class="settings-row">
+        <div class="period-buttons">
+          <Button
+            v-for="p in availablePeriods"
+            :key="p"
+            :label="p"
+            size="small"
+            severity="secondary"
+            :outlined="activePeriod !== p"
+            @click="activePeriod = p"
+          />
+        </div>
+
+        <div class="divider" />
+
+        <div class="topn-control">
+          <span>Топ</span>
+          <InputNumber
+            v-model="topN"
+            :min="0"
+            :max="500"
+            :useGrouping="false"
+            size="small"
+            placeholder="все"
+          />
+        </div>
       </div>
 
-      <div class="divider" />
-
-      <div class="component-toggles">
-        <label
-          v-for="c in COMPONENTS"
-          :key="c.key"
-          class="toggle-label"
-          :title="c.hint"
-        >
-          <Checkbox v-model="enabled[c.key]" :binary="true" size="small" />
-          <span>{{ c.label }}</span>
-        </label>
-      </div>
-
-      <div class="divider" />
-
-      <div class="topn-control">
-        <span>Топ</span>
-        <InputNumber
-          v-model="topN"
-          :min="0"
-          :max="500"
-          :useGrouping="false"
-          size="small"
-          placeholder="все"
-        />
+      <div class="settings-row">
+        <div class="component-toggles">
+          <label
+            v-for="c in COMPONENTS"
+            :key="c.key"
+            class="toggle-label"
+            :title="c.hint"
+          >
+            <Checkbox v-model="enabled[c.key]" :binary="true" size="small" />
+            <span>{{ c.label }}</span>
+          </label>
+        </div>
       </div>
 
     </div>
@@ -522,18 +524,25 @@ onBeforeUnmount(stopPolling)
   flex-shrink: 0;
 
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
 
-  gap: 0.6rem;
+  gap: 0.4rem;
 
   padding: 0.4rem 0;
 
   overflow-x: auto;
 
-  white-space: nowrap;
-
   -webkit-overflow-scrolling: touch;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+
+  gap: 0.6rem;
+
+  white-space: nowrap;
 }
 
 .period-buttons {
