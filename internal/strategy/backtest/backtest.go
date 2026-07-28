@@ -87,10 +87,29 @@ func New(detector Detector, entry *executor.Config, exits sales.Sales, opt Optio
 	return &Engine{detector: detector, entry: entry, exits: exits, opt: opt}
 }
 
-// simPosition - открытая позиция симуляции
+// simPosition - открытая позиция симуляции.
 type simPosition struct {
 	position sales.Position
 	openTime time.Time
+
+	// remainingFraction - доля ОТ ПЕРВОНАЧАЛЬНОГО объёма, ещё не закрытая
+	// частичными тейками (см. tryPartialTakeProfit). 1.0, пока частичных
+	// тейков не было - тогда весь финальный расчёт в closeTrade сводится
+	// ровно к тому, что было и раньше.
+	remainingFraction float64
+	// realizedGross/realizedNet - взвешенный (по доле, закрытой на каждом
+	// частичном срабатывании) вклад уже закрытых частей в итоговый % сделки.
+	// Складывается с результатом финального закрытия в closeTrade, чтобы вся
+	// позиция - даже закрытая в несколько приёмов - попала в отчёт ОДНОЙ
+	// записью Trade (см. Report: "все проценты на сделку", а не на кусок
+	// сделки - иначе partial+final считались бы как два разных "трейда" и
+	// искажали winrate/среднюю сделку).
+	realizedGross, realizedNet float64
+	// partialFills - сколько раз уже сработал частичный тейк для этой
+	// позиции. sales.Sales.PartialTakeProfit сама не хранит "уже сработало" -
+	// это состояние здесь, и pos.partialFills>0 останавливает повторные
+	// срабатывания (один уровень - максимум одно срабатывание на позицию).
+	partialFills int
 }
 
 // limitOrder - лимитная заявка на вход в откат: сигнал уже был, входа ещё нет
@@ -186,7 +205,7 @@ func (e *Engine) tryFill(
 		position.Deadline = bar.Time.Add(hold)
 	}
 
-	open[pair] = &simPosition{position: position, openTime: bar.Time}
+	open[pair] = &simPosition{position: position, openTime: bar.Time, remainingFraction: 1.0}
 	report.LimitFilled++
 }
 
@@ -253,6 +272,13 @@ func (e *Engine) Run(candles []exModel.Candle) *Report {
 			// Выходы: позиция живёт по правилам политики выхода независимо
 			// от того, что детектор думает про эту свечу.
 			if pos, ok := open[pair]; ok && bar.Time.After(pos.openTime) {
+				// Частичный тейк - ДО полного выхода: если бар зацепил и
+				// частичный уровень, и полный тейк/стоп, сначала фиксируем
+				// часть по своей цене, потом уже проверяем финальный выход -
+				// та же логика, что цена внутри бара идёт от частичного
+				// уровня дальше, а не наоборот.
+				e.tryPartialTakeProfit(pos, bar, report)
+
 				if trade, closed := e.tryExit(pos, bar); closed {
 					report.addTrade(trade)
 					delete(open, pair)
@@ -381,7 +407,7 @@ func (e *Engine) openPosition(sig signal.Signal, side order.SideType, bar exMode
 		position.Deadline = bar.Time.Add(hold)
 	}
 
-	return &simPosition{position: position, openTime: bar.Time}
+	return &simPosition{position: position, openTime: bar.Time, remainingFraction: 1.0}
 }
 
 // tryExit проверяет позицию на баре через боевой ShouldExit.
@@ -412,6 +438,72 @@ func (e *Engine) tryExit(pos *simPosition, bar exModel.Candle) (Trade, bool) {
 	return Trade{}, false
 }
 
+// partialTakeProfitPrice переводит дистанцию из sales.Sales.PartialTakeProfit
+// (% от входа) в абсолютную цену - симметрично stopPrice/takePrice.
+func (e *Engine) partialTakeProfitPrice(pos *simPosition) (price, fraction float64, ok bool) {
+	distancePercent, fraction, ok := e.exits.PartialTakeProfit(pos.position)
+	if !ok {
+		return 0, 0, false
+	}
+
+	entry := pos.position.Order.PriceCreated
+	if pos.position.Order.Side == order.SideTypeSell {
+		return entry * (1 - distancePercent/100), fraction, true
+	}
+	return entry * (1 + distancePercent/100), fraction, true
+}
+
+// tryPartialTakeProfit проверяет и, если пора, фиксирует частичное закрытие
+// позиции - ОДИН раз за всю её жизнь (pos.partialFills>0 останавливает
+// повторные срабатывания; у самого sales.Sales.PartialTakeProfit состояния
+// нет, оно здесь). Не убирает позицию из open - в отличие от tryExit, здесь
+// нет понятия "закрыта", только "стала меньше".
+func (e *Engine) tryPartialTakeProfit(pos *simPosition, bar exModel.Candle, report *Report) {
+	if pos.partialFills > 0 {
+		return
+	}
+
+	price, fraction, ok := e.partialTakeProfitPrice(pos)
+	if !ok || fraction <= 0 || fraction >= 1 {
+		return
+	}
+
+	best := bar.High
+	touched := best >= price
+	if pos.position.Order.Side == order.SideTypeSell {
+		best = bar.Low
+		touched = best <= price
+	}
+	if !touched {
+		return
+	}
+
+	entry := pos.position.Order.PriceCreated
+	exitPrice := price
+	if pos.position.Order.Side == order.SideTypeBuy {
+		exitPrice *= 1 - e.opt.SlippagePercent/100
+	} else {
+		exitPrice *= 1 + e.opt.SlippagePercent/100
+	}
+
+	gross := 0.0
+	if entry > 0 {
+		gross = (exitPrice/entry)*100 - 100
+		if pos.position.Order.Side == order.SideTypeSell {
+			gross = -gross
+		}
+	}
+	net := gross - 2*e.opt.FeePercent
+
+	// Взвешиваем ПО ЗАКРЫВАЕМОЙ доле - складывается с финальным куском в
+	// closeTrade (см. её комментарий).
+	pos.realizedGross += gross * fraction
+	pos.realizedNet += net * fraction
+	pos.remainingFraction -= fraction
+	pos.partialFills++
+	report.PartialFills++
+}
+
 func (e *Engine) stopPrice(pos *simPosition) float64 {
 	entry := pos.position.Order.PriceCreated
 	if pos.position.Order.Side == order.SideTypeSell {
@@ -428,6 +520,14 @@ func (e *Engine) takePrice(pos *simPosition) float64 {
 	return entry * (1 + pos.position.TakeProfitPercent/100)
 }
 
+// closeTrade закрывает ОСТАВШУЮСЯ долю позиции и сворачивает весь её путь
+// (возможно, с 1+ частичными тейками до этого - см. tryPartialTakeProfit) в
+// ОДНУ запись Trade. Финальный кусок взвешивается по pos.remainingFraction
+// (1.0, если частичных тейков не было вовсе - тогда результат ровно такой
+// же, как до появления частичных тейков), и складывается с уже реализованным
+// раньше - иначе одна логическая позиция превратилась бы в отчёте в
+// несколько "сделок" и искажала бы winrate/среднюю сделку (см. Report:
+// "все проценты на сделку", а не на кусок сделки).
 func (e *Engine) closeTrade(pos *simPosition, exitPrice float64, at time.Time, reason string) Trade {
 	entry := pos.position.Order.PriceCreated
 
@@ -445,6 +545,10 @@ func (e *Engine) closeTrade(pos *simPosition, exitPrice float64, at time.Time, r
 			gross = -gross
 		}
 	}
+	net := gross - 2*e.opt.FeePercent
+
+	totalGross := pos.realizedGross + gross*pos.remainingFraction
+	totalNet := pos.realizedNet + net*pos.remainingFraction
 
 	return Trade{
 		Pair:      pos.position.Order.Pair,
@@ -454,9 +558,8 @@ func (e *Engine) closeTrade(pos *simPosition, exitPrice float64, at time.Time, r
 		OpenTime:  pos.openTime,
 		CloseTime: at,
 		Reason:    reason,
-		GrossPct:  gross,
-		// Комиссия начисляется за обе стороны сделки
-		NetPct: gross - 2*e.opt.FeePercent,
+		GrossPct:  totalGross,
+		NetPct:    totalNet,
 	}
 }
 

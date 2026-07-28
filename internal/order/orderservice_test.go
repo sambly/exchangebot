@@ -28,6 +28,7 @@ func (stubPricesRepo) SelectCandlesFromPeriod(string, time.Time) ([]exModel.Cand
 type stubOrderRepo struct {
 	mu         sync.Mutex
 	closed     int
+	reduced    int
 	deleted    []int64
 	deletedAll int
 }
@@ -38,6 +39,12 @@ func (r *stubOrderRepo) ClosePosition(int64, *order.Order) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.closed++
+	return nil
+}
+func (r *stubOrderRepo) ReducePosition(int64, *order.Order) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.reduced++
 	return nil
 }
 func (*stubOrderRepo) CreateInfo(*order.OrderInfo) error     { return nil }

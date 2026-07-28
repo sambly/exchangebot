@@ -6,6 +6,7 @@ import (
 	"time"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/order"
 )
 
 // До первого апдейта пара не готова, и снапшот/best bid-ask её не отдают -
@@ -330,6 +331,91 @@ func TestAssetsDepthGetAllImbalanceZScore(t *testing.T) {
 	if eth.Ready {
 		t.Fatalf("ETHUSDT: ожидался Ready=false (апдейтов не было), получено %+v", eth)
 	}
+}
+
+// Один резкий перекос не должен считаться "подтверждённым" сразу - нужно,
+// чтобы он держался imbalanceConfirmMinStreak сэмплов подряд. Это и есть
+// защита от спуфинга/шума одной заявки, ради которой счётчик заводился.
+func TestAssetsDepthImbalanceConfirmedSideRequiresStreak(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 10}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 10}},
+	})
+
+	b := ad.books["BTCUSDT"]
+	b.nextImbalanceSampleAt = time.Now().Add(time.Hour)
+	for i := 0; i < imbalanceMinSamples; i++ {
+		b.imbalanceHistory.Add(0)
+	}
+
+	// Один сэмпл с резким перекосом бидов - сторона ещё не должна считаться
+	// подтверждённой, стрик только начался.
+	sampleSkewedBook(ad, b)
+	if _, confirmed := ad.GetImbalanceConfirmedSide("BTCUSDT"); confirmed {
+		t.Fatal("после одного сэмпла сторона не должна считаться подтверждённой")
+	}
+
+	// Ещё два сэмпла того же перекоса подряд - теперь стрик достиг порога.
+	sampleSkewedBook(ad, b)
+	sampleSkewedBook(ad, b)
+
+	side, confirmed := ad.GetImbalanceConfirmedSide("BTCUSDT")
+	if !confirmed || side != order.SideTypeBuy {
+		t.Fatalf("после %d сэмплов подряд ожидался Confirmed=BUY, получено side=%v confirmed=%v", imbalanceConfirmMinStreak, side, confirmed)
+	}
+}
+
+// Разворот перекоса в другую сторону должен сбрасывать стрик - подтверждение
+// не должно "унаследоваться" от предыдущей, уже неактуальной стороны.
+func TestAssetsDepthImbalanceConfirmedSideResetsOnFlip(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 10}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 10}},
+	})
+
+	b := ad.books["BTCUSDT"]
+	b.nextImbalanceSampleAt = time.Now().Add(time.Hour)
+	for i := 0; i < imbalanceMinSamples; i++ {
+		b.imbalanceHistory.Add(0)
+	}
+
+	for i := 0; i < imbalanceConfirmMinStreak; i++ {
+		sampleSkewedBook(ad, b)
+	}
+	if _, confirmed := ad.GetImbalanceConfirmedSide("BTCUSDT"); !confirmed {
+		t.Fatal("ожидался Confirmed=BUY перед проверкой сброса")
+	}
+
+	// Резкий перекос в противоположную сторону - один сэмпл, сброс стрика.
+	b.nextImbalanceSampleAt = time.Now().Add(-time.Second)
+	ad.applyUpdate(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 1}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 100}},
+	})
+
+	if _, confirmed := ad.GetImbalanceConfirmedSide("BTCUSDT"); confirmed {
+		t.Fatal("после разворота в другую сторону подтверждение должно сброситься, а не остаться от BUY")
+	}
+}
+
+// sampleSkewedBook - один "тик" резко перекошенного в сторону бидов стакана,
+// с разморозкой троттлинга сэмплирования перед апдейтом (иначе имбаланс
+// посчитается, но в историю/счётчик устойчивости не попадёт - см.
+// nextImbalanceSampleAt).
+func sampleSkewedBook(ad *AssetsDepth, b *book) {
+	b.nextImbalanceSampleAt = time.Now().Add(-time.Second)
+	ad.applyUpdate(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 100}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 10}},
+	})
 }
 
 // Неизвестный тип payload (не DepthUpdate/DepthState) должен игнорироваться,

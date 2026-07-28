@@ -6,6 +6,7 @@ import (
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/strategy/executor"
+	"github.com/sambly/exchangebot/internal/strategy/sales"
 	"github.com/sambly/exchangebot/internal/strategy/sales/simplesale"
 	"github.com/sambly/exchangebot/internal/strategy/signal"
 )
@@ -333,6 +334,124 @@ func TestRunLimitEntryExpiresWithoutPullback(t *testing.T) {
 	}
 	if len(report.Trades) != 0 {
 		t.Fatalf("без исполнения заявки сделок быть не должно, получено %d", len(report.Trades))
+	}
+}
+
+// --- частичный тейк-профит ---
+
+// stubExitsWithPartial - минимальная реализация sales.Sales с ОДНИМ уровнем
+// частичного тейка. Не переиспользует structsale специально: тест должен
+// проверять только взвешивание partial+final в самом бэктестере, не
+// смешиваясь с трейлингом/структурными уровнями structsale.
+type stubExitsWithPartial struct {
+	takeProfit, stopLoss               float64
+	partialAtFraction, partialFraction float64
+}
+
+func (s stubExitsWithPartial) Name() string { return "stub-partial" }
+
+func (s stubExitsWithPartial) Plan(sig signal.Signal) (float64, float64, time.Duration) {
+	return s.takeProfit, s.stopLoss, 0
+}
+
+func (s stubExitsWithPartial) ShouldExit(price float64, at time.Time, position sales.Position) (sales.ExitReason, bool) {
+	entry := position.Order.PriceCreated
+	profit := price/entry*100 - 100
+	if profit >= position.TakeProfitPercent {
+		return sales.ExitTakeProfit, true
+	}
+	if profit <= -position.StopLossPercent {
+		return sales.ExitStopLoss, true
+	}
+	return "", false
+}
+
+func (s stubExitsWithPartial) Execute(ms exModel.MarketsStat, position sales.Position) bool {
+	return false
+}
+
+func (s stubExitsWithPartial) PartialTakeProfit(position sales.Position) (float64, float64, bool) {
+	if s.partialAtFraction <= 0 {
+		return 0, 0, false
+	}
+	return position.TakeProfitPercent * s.partialAtFraction, s.partialFraction, true
+}
+
+// Частичное закрытие на полпути к тейку, потом полный тейк по остатку -
+// должно свернуться в ОДНУ сделку со взвешенным результатом, а не в две.
+func TestRunPartialTakeProfitWeightsSingleTrade(t *testing.T) {
+	exits := stubExitsWithPartial{takeProfit: 10.0, stopLoss: 8.0, partialAtFraction: 0.5, partialFraction: 0.5}
+
+	engine := New(stubDetector{risePercent: 3.0, level: 2}, testEntry(), exits, Options{
+		Period:         "15m",
+		PeriodDuration: 15 * time.Minute,
+		Periods:        map[string]time.Duration{"15m": 15 * time.Minute},
+	})
+
+	candles := []exModel.Candle{
+		bar("BTCUSDT", at(0), 100),
+		bar("BTCUSDT", at(1), 100),
+		bar("BTCUSDT", at(2), 104), // вход по 104; тейк 10% = 114.4, частичный уровень 5% = 109.2
+		// Достаёт частичный уровень (109.2), но не полный тейк (114.4)
+		{Pair: "BTCUSDT", Time: at(3), Open: 104, Close: 108, High: 110, Low: 104},
+		// Достаёт полный тейк
+		{Pair: "BTCUSDT", Time: at(4), Open: 108, Close: 114, High: 115, Low: 108},
+	}
+
+	report := engine.Run(candles)
+
+	if report.PartialFills != 1 {
+		t.Fatalf("ожидалось 1 частичное срабатывание, получено %d", report.PartialFills)
+	}
+	if len(report.Trades) != 1 {
+		t.Fatalf("частичное+финальное закрытие должны свернуться в ОДНУ сделку, получено %d", len(report.Trades))
+	}
+
+	trade := report.Trades[0]
+	if trade.Reason != "take-profit" {
+		t.Fatalf("причина финального закрытия %q, ожидался take-profit", trade.Reason)
+	}
+
+	// Частичный кусок: 50% объёма по +5.0% (109.2/104-1). Финальный: 50% по
+	// +10.0% (114.4/104-1, статичный уровень тейка). Взвешенно: 0.5*5+0.5*10=7.5%.
+	want := 7.5
+	if trade.GrossPct < want-0.05 || trade.GrossPct > want+0.05 {
+		t.Fatalf("gross %+.3f%%, ожидалось ~%.1f%% (взвешенно: половина по 5%%, половина по 10%%)", trade.GrossPct, want)
+	}
+}
+
+// Без настроенного частичного тейка (partialAtFraction=0) поведение должно
+// быть ровно таким же, как без этой фичи вообще - никакого скрытого влияния
+// на обычные сделки.
+func TestRunNoPartialTakeProfitWhenDisabled(t *testing.T) {
+	exits := stubExitsWithPartial{takeProfit: 10.0, stopLoss: 8.0} // partialAtFraction=0 - выключено
+
+	engine := New(stubDetector{risePercent: 3.0, level: 2}, testEntry(), exits, Options{
+		Period:         "15m",
+		PeriodDuration: 15 * time.Minute,
+		Periods:        map[string]time.Duration{"15m": 15 * time.Minute},
+	})
+
+	candles := []exModel.Candle{
+		bar("BTCUSDT", at(0), 100),
+		bar("BTCUSDT", at(1), 100),
+		bar("BTCUSDT", at(2), 104),
+		{Pair: "BTCUSDT", Time: at(3), Open: 104, Close: 108, High: 110, Low: 104},
+		{Pair: "BTCUSDT", Time: at(4), Open: 108, Close: 114, High: 115, Low: 108},
+	}
+
+	report := engine.Run(candles)
+
+	if report.PartialFills != 0 {
+		t.Fatalf("частичный тейк выключен, ожидалось 0 срабатываний, получено %d", report.PartialFills)
+	}
+	if len(report.Trades) != 1 {
+		t.Fatalf("ожидалась 1 сделка, получено %d", len(report.Trades))
+	}
+	// Без частичного тейка - обычный полный тейк по 10% от входа 104.
+	want := 10.0
+	if report.Trades[0].GrossPct < want-0.05 || report.Trades[0].GrossPct > want+0.05 {
+		t.Fatalf("gross %+.3f%%, ожидалось ~%.1f%%", report.Trades[0].GrossPct, want)
 	}
 }
 

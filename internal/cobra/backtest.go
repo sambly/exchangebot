@@ -11,16 +11,20 @@ import (
 	"github.com/sambly/exchangebot/internal/strategy/anomaly"
 	"github.com/sambly/exchangebot/internal/strategy/backtest"
 	"github.com/sambly/exchangebot/internal/strategy/executor"
+	"github.com/sambly/exchangebot/internal/strategy/sales"
 	"github.com/sambly/exchangebot/internal/strategy/sales/simplesale"
+	"github.com/sambly/exchangebot/internal/strategy/sales/structsale"
 	"github.com/spf13/cobra"
 )
 
 // backtestCmd - прогон стратегии по историческим свечам из БД.
 //
 // Использует ТЕ ЖЕ боевые компоненты и ТЕ ЖЕ config.yaml, что и торговля:
-// детекцию anomaly, правила входа executor, политику выхода simplesale.
-// Единственное, чего бэктест не воспроизводит, - минутную гранулярность
-// проверок (confirmChecks) и рыночную метрику: он видит одну точку на период.
+// детекцию anomaly, правила входа executor, политику выхода - simplesale по
+// умолчанию, либо structsale через --sale-policy (сравнить их бэктестом,
+// прежде чем менять боевую политику в application/app.go). Единственное,
+// чего бэктест не воспроизводит, - минутную гранулярность проверок
+// (confirmChecks) и рыночную метрику: он видит одну точку на период.
 var backtestCmd = &cobra.Command{
 	Use:    "backtest",
 	Short:  "Прогон стратегии anomaly по историческим свечам из БД",
@@ -37,6 +41,7 @@ var (
 	backtestEntryOffset float64
 	backtestEntryTTL    int
 	backtestMaxShare    float64
+	backtestSalePolicy  string
 )
 
 func init() {
@@ -48,6 +53,7 @@ func init() {
 	backtestCmd.Flags().Float64Var(&backtestEntryOffset, "entry-offset", 0, "лимитный вход: отступ от закрытия в волатильностях пары (0 - вход по рынку)")
 	backtestCmd.Flags().IntVar(&backtestEntryTTL, "entry-ttl", 4, "лимитный вход: сколько баров живёт заявка")
 	backtestCmd.Flags().Float64Var(&backtestMaxShare, "max-anomalous-share", 0, "фильтр режима: макс. доля аномальных пар за такт (0.05 = 5%; 0 - выключен)")
+	backtestCmd.Flags().StringVar(&backtestSalePolicy, "sale-policy", "simplesale", "политика выхода: simplesale (текущая боевая) или structsale (трейлинг-стоп + масштабирование по силе сигнала)")
 
 	RootCmd.AddCommand(backtestCmd)
 }
@@ -102,7 +108,7 @@ func runBacktest(cmd *cobra.Command, args []string) error {
 
 	// Политике выхода OrderController нужен только для боевого Execute;
 	// бэктест зовёт чистый ShouldExit.
-	exits, err := simplesale.NewStrategy(nil)
+	exits, err := salePolicyFor(backtestSalePolicy)
 	if err != nil {
 		return fmt.Errorf("политика выхода: %w", err)
 	}
@@ -141,6 +147,23 @@ func filterPairs(candles []exModel.Candle, csv string) []exModel.Candle {
 		}
 	}
 	return filtered
+}
+
+// salePolicyFor создаёт политику выхода для бэктеста по имени из --sale-policy.
+// OrderController нигде не нужен - бэктест зовёт чистый ShouldExit, никогда
+// Execute.
+func salePolicyFor(name string) (sales.Sales, error) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "simplesale":
+		return simplesale.NewStrategy(nil)
+	case "structsale":
+		// entrySetup=nil - у бэктеста нет истории стакана, структурный
+		// стоп/тейк (см. structsale.structuralPlan) в этом случае никогда не
+		// применяется, Plan откатывается на волатильность.
+		return structsale.NewStrategy(nil, nil)
+	default:
+		return nil, fmt.Errorf("неизвестная политика выхода %q (ожидались simplesale, structsale)", name)
+	}
 }
 
 func distinctPairs(candles []exModel.Candle) []string {

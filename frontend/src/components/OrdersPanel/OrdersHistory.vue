@@ -78,6 +78,7 @@ function colorProfit(profit?: number) {
 const EXIT_REASON_LABELS: Record<string, string> = {
   'take-profit': 'Тейк',
   'stop-loss': 'Стоп',
+  'trailing-stop': 'Трейлинг',
   timeout: 'Таймаут',
   manual: 'Вручную'
 }
@@ -87,6 +88,7 @@ function exitReasonLabel(reason?: string) {
 }
 function colorExitReason(reason?: string) {
   if (reason === 'take-profit') return 'var(--p-green-500)'
+  if (reason === 'trailing-stop') return 'var(--p-blue-500)'
   if (reason === 'stop-loss') return 'var(--p-red-500)'
   return 'inherit'
 }

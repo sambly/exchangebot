@@ -45,9 +45,11 @@ interface StrengthRow {
   total: number
   hasImbalance: boolean
   imbalanceZ: number
+  imbalanceConfirmed: boolean
   hasWalls: boolean
   wallsSide: Side | null
   wallsScore: number
+  wallsConfirmed: boolean
   hasLevels: boolean
   levelsSide: Side | null
   levelsScore: number
@@ -98,13 +100,20 @@ function ratioContribution(side: Side, score: number): number {
 function buildRow(pair: string, entry: StrengthEntry | undefined): StrengthRow {
   const contributions: number[] = []
 
-  if (enabled.imbalance && entry?.HasImbalance) {
+  // Имбаланс и стены - живые снимки стакана, могут флипнуться от одной
+  // перевыставленной/снятой заявки (спуфинг или просто шум). В композит
+  // идут, только если сторона уже подтвердилась (см. Go-комментарий у
+  // depth.GetImbalanceConfirmedSide) - иначе "Потенциал" мигал бы на каждый
+  // секундный дёрг стакана вместо того, чтобы отражать реально держащийся
+  // перекос. Сами значения в колонках при этом показываются всегда - это
+  // только фильтр для композита, не сокрытие данных.
+  if (enabled.imbalance && entry?.HasImbalance && entry.ImbalanceConfirmed) {
     contributions.push(entry.ImbalanceZScore)
   }
   if (enabled.activity && entry?.HasActivity) {
     contributions.push(entry.ActivityZScore)
   }
-  if (enabled.walls && entry?.HasWalls) {
+  if (enabled.walls && entry?.HasWalls && entry.WallsConfirmed) {
     contributions.push(ratioContribution(entry.WallsSide, entry.WallsScore))
   }
   if (enabled.levels && entry?.HasLevels) {
@@ -135,9 +144,11 @@ function buildRow(pair: string, entry: StrengthEntry | undefined): StrengthRow {
     total: contributions.length,
     hasImbalance: entry?.HasImbalance ?? false,
     imbalanceZ: entry?.ImbalanceZScore ?? 0,
+    imbalanceConfirmed: entry?.ImbalanceConfirmed ?? false,
     hasWalls: entry?.HasWalls ?? false,
     wallsSide: entry?.HasWalls ? entry.WallsSide : null,
     wallsScore: entry?.WallsScore ?? 0,
+    wallsConfirmed: entry?.WallsConfirmed ?? false,
     hasLevels: entry?.HasLevels ?? false,
     levelsSide: entry?.HasLevels ? entry.LevelsSide : null,
     levelsScore: entry?.LevelsScore ?? 0,
@@ -203,6 +214,16 @@ function fmt(value: number) {
 function sideColor(side: Side | null) {
   if (!side) return 'inherit'
   return side === 'BUY' ? 'var(--p-green-500)' : 'var(--p-red-500)'
+}
+
+// liveSideColor - для колонок "Имбаланс"/"Стены": значение показывается
+// всегда, но красится только когда сторона подтвердилась (см. buildRow) -
+// пока подтверждения нет, это может быть секундный дёрг стакана, а не
+// реальный сигнал, и приглушённый цвет об этом сообщает без скрытия числа.
+function liveSideColor(has: boolean, confirmed: boolean, side: Side | null) {
+  if (!has) return 'inherit'
+  if (!confirmed) return 'var(--p-text-muted-color, #999)'
+  return sideColor(side)
 }
 
 const REGIME_SQUEEZE = 0.5
@@ -386,10 +407,13 @@ onBeforeUnmount(stopPolling)
           style="min-width: 100px"
         >
           <template #header>
-            <span class="header-hint" title="Book-имбаланс, z-score (см. таблицу «Имбаланс»).">Имбаланс</span>
+            <span class="header-hint" title="Book-имбаланс, z-score (см. таблицу «Имбаланс»). Серым - сторона ещё не подтвердилась (держится меньше нескольких опросов подряд) и в «Потенциал» пока не засчитывается.">Имбаланс</span>
           </template>
           <template #body="{ data }">
-            <span :style="{ color: data.hasImbalance ? sideColor(data.imbalanceZ > 0 ? 'BUY' : 'SELL') : 'inherit' }">
+            <span
+              :style="{ color: liveSideColor(data.hasImbalance, data.imbalanceConfirmed, data.imbalanceZ > 0 ? 'BUY' : 'SELL') }"
+              :title="data.hasImbalance && !data.imbalanceConfirmed ? 'Сторона ещё не подтвердилась - в композит «Потенциал» пока не входит' : ''"
+            >
               {{ data.hasImbalance ? fmt(data.imbalanceZ) : '—' }}
             </span>
           </template>
@@ -402,10 +426,13 @@ onBeforeUnmount(stopPolling)
           style="min-width: 100px"
         >
           <template #header>
-            <span class="header-hint" title="Стены стакана: сторона + во сколько раз дальняя стена дальше ближней.">Стены</span>
+            <span class="header-hint" title="Стены стакана: сторона + во сколько раз дальняя стена дальше ближней. Серым - сторона ещё не подтвердилась (держится меньше нескольких опросов подряд) и в «Потенциал» пока не засчитывается.">Стены</span>
           </template>
           <template #body="{ data }">
-            <span :style="{ color: sideColor(data.wallsSide) }">
+            <span
+              :style="{ color: liveSideColor(data.hasWalls, data.wallsConfirmed, data.wallsSide) }"
+              :title="data.hasWalls && !data.wallsConfirmed ? 'Сторона ещё не подтвердилась - в композит «Потенциал» пока не входит' : ''"
+            >
               {{ data.hasWalls ? `${data.wallsSide} ×${data.wallsScore.toFixed(2)}` : '—' }}
             </span>
           </template>

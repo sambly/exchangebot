@@ -6,9 +6,9 @@ idName: anomaly
 description: Обнаружение аномалий цены, объема и трейдов на основе z-score с уровнями
 
 # Включение стратегии
-strategyEnable: true
+strategyEnable: false
 # Включение уведомлений в Telegram
-notificationEnable: true
+notificationEnable: false
 
 # Писать аномалии в лог (в дополнение к Telegram).
 # В лог попадают ВСЕ обнаруженные аномалии - в том числе подавленные cooldown'ом
@@ -16,7 +16,7 @@ notificationEnable: true
 # так что потом видно, почему в чате было пусто, а движение - было.
 # Формат плоский и грепаемый:
 #   anomaly pair=SXTUSDT period=15m level=2 z=7.50 notified=true metrics=[price +6.08%]
-logAnomalies: true
+logAnomalies: false
 
 # Проверить все доступные пары
 allPairs: true

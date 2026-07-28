@@ -16,11 +16,20 @@ type StrengthComponents struct {
 	// сторону: положительный - перевес покупателей.
 	HasImbalance    bool
 	ImbalanceZScore float64
+	// ImbalanceConfirmed - см. depth.GetImbalanceConfirmedSide: сторона
+	// имбаланса держится уже некоторое время, а не мелькнула на одном сэмпле.
+	// Проверяется, что подтверждённая сторона совпадает с ТЕКУЩИМ знаком
+	// ImbalanceZScore - если сторона только что развернулась, подтверждение
+	// от предыдущей стороны не засчитывается (см. GetAllStrengthComponents).
+	ImbalanceConfirmed bool
 
 	// HasWalls/WallsSide/WallsScore - см. Quality (стены стакана).
 	HasWalls   bool
 	WallsSide  order.SideType
 	WallsScore float64
+	// WallsConfirmed - см. GetWallsConfirmedSide, та же логика сверки со
+	// стороной, что и у ImbalanceConfirmed.
+	WallsConfirmed bool
 
 	// HasLevels/LevelsSide/LevelsScore - тот же принцип, что у Quality, но по
 	// PriceLevels (свечным разворотам) вместо стакана.
@@ -80,26 +89,45 @@ func (s *AssetsSetup) GetAllStrengthComponents() map[string]map[string]StrengthC
 	for _, pair := range s.prices.Pairs {
 		hasImbalance := false
 		imbalanceZ := 0.0
+		imbalanceConfirmed := false
 		if s.depth != nil {
 			if _, z, ok := s.depth.GetImbalanceZScore(pair); ok {
 				hasImbalance, imbalanceZ = true, z
 			}
+			// Подтверждённая сторона должна совпадать с ТЕКУЩИМ знаком
+			// имбаланса: сэмплирование в depth троттлится (см.
+			// imbalanceSampleInterval), и если сторона только что
+			// развернулась, GetImbalanceConfirmedSide ещё может отдавать
+			// стрик от ПРЕДЫДУЩЕЙ, уже неактуальной стороны - без сверки
+			// композит принял бы устаревшее подтверждение за актуальное.
+			if confirmedSide, ok := s.depth.GetImbalanceConfirmedSide(pair); ok {
+				currentSide := order.SideTypeBuy
+				if imbalanceZ < 0 {
+					currentSide = order.SideTypeSell
+				}
+				imbalanceConfirmed = confirmedSide == currentSide
+			}
 		}
 
 		walls, hasWalls := s.GetWalls(pair)
+		s.sampleWallsConfirm(pair, walls)
 
 		byPeriod := make(map[string]StrengthComponents, len(s.prices.Periods))
 		for period := range s.prices.Periods {
 			c := StrengthComponents{
-				Pair:            pair,
-				Period:          period,
-				HasImbalance:    hasImbalance,
-				ImbalanceZScore: imbalanceZ,
+				Pair:               pair,
+				Period:             period,
+				HasImbalance:       hasImbalance,
+				ImbalanceZScore:    imbalanceZ,
+				ImbalanceConfirmed: imbalanceConfirmed,
 			}
 
 			if hasWalls {
 				if q, ok := s.qualityFromWalls(pair, period, walls); ok {
 					c.HasWalls, c.WallsSide, c.WallsScore = true, q.Side, q.Score
+					if confirmedSide, ok := s.GetWallsConfirmedSide(pair); ok {
+						c.WallsConfirmed = confirmedSide == q.Side
+					}
 				}
 			}
 

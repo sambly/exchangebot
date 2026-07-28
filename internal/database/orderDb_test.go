@@ -128,6 +128,68 @@ func TestOrderDbClosePositionPersistsZeroValueFields(t *testing.T) {
 	}
 }
 
+// ReducePosition должен обновить Quantity/RealizedProfit, не меняя Status:
+// позиция остаётся активной, в отличие от ClosePosition.
+func TestOrderDbReducePosition(t *testing.T) {
+	r := newTestDB(t)
+
+	created := time.Now()
+	o := &order.Order{
+		TimeCreated:      created,
+		Time:             created,
+		Pair:             "BTCUSDT",
+		Status:           order.OrderStatusTypeActive,
+		PriceCreated:     100,
+		Price:            100,
+		Quantity:         1.0,
+		OriginalQuantity: 1.0,
+	}
+	if err := r.Create(o); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	reduceTime := created.Add(time.Minute)
+	update := &order.Order{
+		Time:           reduceTime,
+		Quantity:       0.5,
+		RealizedProfit: 2.5,
+	}
+	if err := r.ReducePosition(o.ID, update); err != nil {
+		t.Fatalf("ReducePosition: %v", err)
+	}
+
+	orders, err := r.GetAll()
+	if err != nil {
+		t.Fatalf("GetAll: %v", err)
+	}
+	if len(orders) != 1 {
+		t.Fatalf("ожидался 1 ордер, получено %d", len(orders))
+	}
+	got := orders[0]
+
+	if got.Status != order.OrderStatusTypeActive {
+		t.Fatalf("Status: ожидался %q (позиция остаётся активной), получено %q", order.OrderStatusTypeActive, got.Status)
+	}
+	if got.Quantity != 0.5 {
+		t.Fatalf("Quantity: ожидалось 0.5, получено %v", got.Quantity)
+	}
+	if got.RealizedProfit != 2.5 {
+		t.Fatalf("RealizedProfit: ожидалось 2.5, получено %v", got.RealizedProfit)
+	}
+	if !got.Time.Equal(reduceTime) {
+		t.Fatalf("Time: ожидалось %v, получено %v", reduceTime, got.Time)
+	}
+}
+
+// ReducePosition несуществующего id - ошибка.
+func TestOrderDbReducePositionNotFound(t *testing.T) {
+	r := newTestDB(t)
+
+	if err := r.ReducePosition(999, &order.Order{}); err == nil {
+		t.Fatal("ожидалась ошибка при частичном закрытии несуществующего ордера")
+	}
+}
+
 // Delete несуществующего id - ошибка, ничего не удаляется по чужим строкам.
 func TestOrderDbDeleteNotFound(t *testing.T) {
 	r := newTestDB(t)

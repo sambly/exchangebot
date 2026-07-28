@@ -10,6 +10,7 @@ import (
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/logger"
+	"github.com/sambly/exchangebot/internal/order"
 	"github.com/sambly/exchangebot/internal/stat"
 )
 
@@ -45,6 +46,22 @@ const (
 	// imbalanceScaleFloor - имбаланс лежит в [-1,1]; ниже этого разброс не
 	// считается значимым (гасит шум у пар, где книга почти не шевелится).
 	imbalanceScaleFloor = 0.02
+
+	// imbalanceConfirmZThreshold - порог |z-score|, начиная с которого сэмпл
+	// считается "имбаланс явно перевешивает в одну сторону" для счётчика
+	// устойчивости (см. book.imbalanceSideConfirm). Тот же порог, что уже
+	// используется на фронте для подсветки (Z_THRESHOLD в DataImbalance.vue/
+	// DepthChart.vue) - ниже него сэмпл и так не считается заметным нигде
+	// больше, незачем заводить для устойчивости отдельную планку.
+	imbalanceConfirmZThreshold = 2.0
+
+	// imbalanceConfirmMinStreak - сколько сэмплов подряд (см.
+	// imbalanceSampleInterval, т.е. ~imbalanceConfirmMinStreak*10 секунд)
+	// сторона должна держаться, чтобы считаться подтверждённой, а не
+	// секундным шумом/спуфингом. Меньше - подтверждение почти сразу теряет
+	// смысл (одна заявка = "подтверждено"); больше - реальный, но короткий
+	// перекос никогда не успеет подтвердиться.
+	imbalanceConfirmMinStreak = 3
 )
 
 // Level - один уровень стакана: цена и суммарное количество на ней.
@@ -80,6 +97,12 @@ type book struct {
 	// уровнях, а не повод забыть статистическое поведение пары.
 	imbalanceHistory      *stat.MetricRecord
 	nextImbalanceSampleAt time.Time
+
+	// imbalanceSideConfirm - счётчик устойчивости стороны имбаланса (см.
+	// GetImbalanceConfirmedSide), обновляется на том же тике, что и
+	// imbalanceHistory - реже, чем реальные апдейты книги, специально, чтобы
+	// счётчик не набивался за доли секунды на одном и том же шумном тике.
+	imbalanceSideConfirm stat.SideConfirm
 }
 
 func newBook() *book {
@@ -211,10 +234,26 @@ func (ad *AssetsDepth) applyUpdate(update exModel.DepthUpdate) {
 	now := time.Now()
 	if !now.Before(b.nextImbalanceSampleAt) {
 		if value, ok := b.imbalance(imbalanceLevels); ok {
+			// z-score ДО Add (см. комментарий у MetricRecord.ZScore) - иначе
+			// сэмпл занижает свой же z относительно самого себя.
+			z := b.imbalanceHistory.ZScore(value)
 			b.imbalanceHistory.Add(value)
+			b.imbalanceSideConfirm.Update(sideFromZScore(z))
 		}
 		b.nextImbalanceSampleAt = now.Add(imbalanceSampleInterval)
 	}
+}
+
+// sideFromZScore - сторона имбаланса для счётчика устойчивости: "" (нет явной
+// стороны), пока |z| не превысил imbalanceConfirmZThreshold.
+func sideFromZScore(z float64) string {
+	if z >= imbalanceConfirmZThreshold {
+		return string(order.SideTypeBuy)
+	}
+	if z <= -imbalanceConfirmZThreshold {
+		return string(order.SideTypeSell)
+	}
+	return ""
 }
 
 func (ad *AssetsDepth) setReady(pair string, ready bool) {
@@ -350,6 +389,29 @@ func (ad *AssetsDepth) GetImbalanceZScore(pair string) (imbalance, zScore float6
 	}
 
 	return value, b.imbalanceHistory.ZScore(value), true
+}
+
+// GetImbalanceConfirmedSide - сторона имбаланса (BUY/SELL), если |z-score|
+// держится выше imbalanceConfirmZThreshold минимум imbalanceConfirmMinStreak
+// сэмплов подряд (см. book.imbalanceSideConfirm). confirmed=false - либо
+// сторона ещё не набрала нужный стрик, либо сейчас имбаланс не выражен
+// вовсе. В отличие от GetImbalanceZScore, это не "сколько сейчас", а "держится
+// ли это уже какое-то время" - для решений, которым важна не мгновенная
+// картина, а устойчивый перекос (см. entrysetup.GetAllStrengthComponents).
+func (ad *AssetsDepth) GetImbalanceConfirmedSide(pair string) (side order.SideType, confirmed bool) {
+	ad.mu.RLock()
+	defer ad.mu.RUnlock()
+
+	b, ok := ad.books[pair]
+	if !ok {
+		return "", false
+	}
+
+	s, ok := b.imbalanceSideConfirm.Confirmed(imbalanceConfirmMinStreak)
+	if !ok {
+		return "", false
+	}
+	return order.SideType(s), true
 }
 
 // ImbalanceStat - имбаланс и его z-score для одной пары, для таблицы

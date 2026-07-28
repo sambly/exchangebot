@@ -79,7 +79,7 @@ func NewApp(
 		return nil, err
 	}
 
-	controllerStrategy, err := strategy.NewControllerStrategy(cfg, assetsPrices, settings.ChangePeriods, settings.Pairs, notification, orderController)
+	controllerStrategy, err := strategy.NewControllerStrategy(cfg, assetsPrices, settings.ChangePeriods, settings.Pairs, notification, orderController, assetsSetup)
 	if err != nil {
 		return nil, err
 	}

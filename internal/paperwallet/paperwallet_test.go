@@ -213,6 +213,112 @@ func TestCalculatePNL(t *testing.T) {
 	}
 }
 
+// ReducePosition должен закрыть только часть позиции: списать долю профита в
+// RealizedProfit, уменьшить Quantity и оставить ордер активным.
+func TestReducePosition(t *testing.T) {
+	pw := newTestWallet(t, 100)
+
+	created, err := pw.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 2.0, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket: %v", err)
+	}
+
+	pw.assetsPrices.OnMarket(exModel.MarketsStat{Pair: "BTCUSDT", Price: 110, Time: time.Now()}) // +10%
+
+	reduced, err := pw.ReducePosition(created.ID, 0.5, order.Deal{Strategy: "structsale"})
+	if err != nil {
+		t.Fatalf("ReducePosition: %v", err)
+	}
+
+	if reduced.Quantity != 1.0 {
+		t.Fatalf("Quantity: ожидалось 1.0 (половина от 2.0), получено %v", reduced.Quantity)
+	}
+	want := 0.5 * (10.0 - 2*FeePercent)
+	if reduced.RealizedProfit < want-0.01 || reduced.RealizedProfit > want+0.01 {
+		t.Fatalf("RealizedProfit: ожидалось ~%.3f, получено %v", want, reduced.RealizedProfit)
+	}
+
+	// Позиция должна остаться активной, а не переехать в историю.
+	active := pw.GetActiveOrdersBySymbol("BTCUSDT")
+	if len(active) != 1 {
+		t.Fatalf("ожидалась 1 активная позиция после частичного закрытия, получено %d", len(active))
+	}
+}
+
+// Финальное закрытие после частичного должно взвесить обе части в ОДИН
+// Profit, а не потерять уже реализованную часть и не задвоить её.
+func TestClosePositionAfterPartialReduce(t *testing.T) {
+	pw := newTestWallet(t, 100)
+
+	created, err := pw.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 2.0, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket: %v", err)
+	}
+
+	// Половина закрывается по +10%.
+	pw.assetsPrices.OnMarket(exModel.MarketsStat{Pair: "BTCUSDT", Price: 110, Time: time.Now()})
+	if _, err := pw.ReducePosition(created.ID, 0.5, order.Deal{Strategy: "structsale"}); err != nil {
+		t.Fatalf("ReducePosition: %v", err)
+	}
+
+	// Остаток закрывается по +20%.
+	pw.assetsPrices.OnMarket(exModel.MarketsStat{Pair: "BTCUSDT", Price: 120, Time: time.Now()})
+	closed, err := pw.ClosePosition(created.ID, order.Deal{Strategy: "structsale", ExitReason: "take-profit"})
+	if err != nil {
+		t.Fatalf("ClosePosition: %v", err)
+	}
+
+	// Взвешенно: 0.5*(10%-fee) + 0.5*(20%-fee) = 0.5*9.8 + 0.5*19.8 = 14.8
+	want := 0.5*(10.0-2*FeePercent) + 0.5*(20.0-2*FeePercent)
+	if closed.Profit < want-0.01 || closed.Profit > want+0.01 {
+		t.Fatalf("Profit: ожидалось ~%.3f (взвешенно 50%%@10%% + 50%%@20%%), получено %v", want, closed.Profit)
+	}
+
+	if active := pw.GetActiveOrdersBySymbol("BTCUSDT"); len(active) != 0 {
+		t.Fatalf("после полного закрытия активных позиций быть не должно, получено %d", len(active))
+	}
+}
+
+// Без частичных закрытий ClosePosition должен вести себя ровно так же, как
+// до появления этой фичи - RealizedProfit=0, вся позиция закрывается по
+// текущему профиту.
+func TestClosePositionWithoutPartialUnaffected(t *testing.T) {
+	pw := newTestWallet(t, 100)
+
+	created, err := pw.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 1, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket: %v", err)
+	}
+
+	pw.assetsPrices.OnMarket(exModel.MarketsStat{Pair: "BTCUSDT", Price: 150, Time: time.Now()})
+	closed, err := pw.ClosePosition(created.ID, order.Deal{Strategy: "test"})
+	if err != nil {
+		t.Fatalf("ClosePosition: %v", err)
+	}
+
+	want := 50.0 - 2*FeePercent
+	if closed.Profit < want-0.1 || closed.Profit > want+0.1 {
+		t.Fatalf("Profit = %+.2f%%, ожидалось %+.2f%%", closed.Profit, want)
+	}
+}
+
+// Доля вне (0,1) должна отклоняться - 0/100%+ - это не частичное закрытие.
+func TestReducePositionRejectsInvalidFraction(t *testing.T) {
+	pw := newTestWallet(t, 100)
+
+	created, err := pw.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 1, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket: %v", err)
+	}
+
+	if _, err := pw.ReducePosition(created.ID, 0, order.Deal{}); err == nil {
+		t.Fatal("ожидалась ошибка при fraction=0")
+	}
+	if _, err := pw.ReducePosition(created.ID, 1.0, order.Deal{}); err == nil {
+		t.Fatal("ожидалась ошибка при fraction=1.0 (это уже полное закрытие)")
+	}
+}
+
 // Комиссия списывается за обе стороны сделки и на закрытии, и в текущем профите
 // открытой позиции. Шорт - симметрично лонгу.
 func TestFeesAppliedToProfit(t *testing.T) {

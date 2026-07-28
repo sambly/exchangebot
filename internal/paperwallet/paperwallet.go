@@ -206,25 +206,36 @@ func (p *PaperWallet) CreateOrderMarket(deal order.Deal) (*order.Order, error) {
 	order := order.Order{
 		// Время СОЗДАНИЯ - это момент сделки по нашим часам, а не время события
 		// на бирже: последнее относится к цене, а не к ордеру.
-		TimeCreated:  now,
-		Time:         now,
-		Pair:         pair,
-		Side:         side,
-		Type:         order.OrderTypeMarket,
-		Status:       order.OrderStatusTypeActive,
+		TimeCreated: now,
+		Time:        now,
+		Pair:        pair,
+		Side:        side,
+		Type:        order.OrderTypeMarket,
+		Status:      order.OrderStatusTypeActive,
+
 		PriceCreated: marketStat.Price,
 		Price:        marketStat.Price,
-		Quantity:     size,
-		Profit:       0,
-		StrategyBuy:  strategy,
-		StrategySell: deal.SalePolicy,
-		Executor:     deal.Executor,
+		// OriginalQuantity - фиксируется здесь и больше не меняется: это
+		// знаменатель для веса частичных закрытий (см. ReducePosition).
+		Quantity:         size,
+		OriginalQuantity: size,
+		Profit:           0,
+		StrategyBuy:      strategy,
+		StrategySell:     deal.SalePolicy,
+		Executor:         deal.Executor,
 	}
 
 	p.addOrderActive(&order)
 	return &order, nil
 }
 
+// ClosePosition закрывает позицию целиком: если до этого были частичные
+// закрытия (см. ReducePosition), Profit взвешивается по фактически ещё
+// открытой доле (o.Quantity/o.OriginalQuantity) и складывается с уже
+// реализованным ими профитом - вся позиция, даже закрытая в несколько
+// приёмов, остаётся ОДНОЙ строкой истории с честным итоговым результатом.
+// Если частичных закрытий не было, RealizedProfit=0 и остаточная доля=1 -
+// результат ровно такой же, каким был бы без этой фичи вообще.
 func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, error) {
 	p.Lock()
 	defer p.Unlock()
@@ -244,12 +255,21 @@ func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, er
 				o.Time = marketStat.Time
 				o.Status = order.OrderStatusTypeClose
 				o.Price = marketStat.Price
+
+				gross := 0.0
 				if o.Side == order.SideTypeBuy {
-					o.Profit = netProfit((o.Price / o.PriceCreated * 100) - 100)
+					gross = (o.Price / o.PriceCreated * 100) - 100
 				}
 				if o.Side == order.SideTypeSell {
-					o.Profit = netProfit((o.PriceCreated / o.Price * 100) - 100)
+					gross = (o.PriceCreated / o.Price * 100) - 100
 				}
+
+				remainingFraction := 1.0
+				if o.OriginalQuantity > 0 {
+					remainingFraction = o.Quantity / o.OriginalQuantity
+				}
+				o.Profit = o.RealizedProfit + remainingFraction*netProfit(gross)
+
 				o.StrategySell = deal.Strategy
 				o.ExitReason = deal.ExitReason
 				p.addOrderHistory(o)
@@ -262,6 +282,58 @@ func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, er
 
 	// Раньше здесь возвращалось (nil, nil) - "ошибки нет, но и ордера нет".
 	// Вызывающий код это принимал за успех и разыменовывал nil.
+	return nil, fmt.Errorf("активный ордер id=%d не найден", id)
+}
+
+// ReducePosition закрывает ЧАСТЬ активной позиции (см. sales.Sales.
+// PartialTakeProfit): fraction (0..1) - доля ОТ ПЕРВОНАЧАЛЬНОГО объёма
+// (o.OriginalQuantity, не текущего o.Quantity - он уже мог быть уменьшен
+// предыдущим частичным закрытием). Взвешенный вклад копится в
+// o.RealizedProfit, Quantity уменьшается, позиция остаётся активной - в
+// отличие от ClosePosition, здесь нет "уже закрыта, id не найден" после
+// первого вызова.
+func (p *PaperWallet) ReducePosition(id int64, fraction float64, deal order.Deal) (*order.Order, error) {
+	p.Lock()
+	defer p.Unlock()
+
+	if fraction <= 0 || fraction >= 1 {
+		return nil, fmt.Errorf("некорректная доля частичного закрытия %v", fraction)
+	}
+
+	for pair, orders := range p.ordersActive {
+		for _, o := range orders {
+			if o.ID != id {
+				continue
+			}
+
+			marketStat, err := p.assetsPrices.GetMarketsStatForPair(pair)
+			if err != nil {
+				return nil, err
+			}
+			if marketStat.Price == 0 || o.PriceCreated == 0 {
+				return nil, fmt.Errorf("error цена пары равна 0")
+			}
+			if o.OriginalQuantity == 0 {
+				return nil, fmt.Errorf("у ордера id=%d не задан исходный объём", id)
+			}
+
+			gross := 0.0
+			if o.Side == order.SideTypeBuy {
+				gross = (marketStat.Price / o.PriceCreated * 100) - 100
+			}
+			if o.Side == order.SideTypeSell {
+				gross = (o.PriceCreated / marketStat.Price * 100) - 100
+			}
+
+			o.Time = marketStat.Time
+			o.RealizedProfit += fraction * netProfit(gross)
+			o.Quantity -= fraction * o.OriginalQuantity
+
+			updated := *o
+			return &updated, nil
+		}
+	}
+
 	return nil, fmt.Errorf("активный ордер id=%d не найден", id)
 }
 

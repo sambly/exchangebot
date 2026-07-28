@@ -61,6 +61,12 @@ type Executor struct {
 	// lastClose - когда по паре последний раз закрывали позицию (cooldown)
 	lastClose map[string]time.Time
 
+	// partialTaken - по каким Order.ID уже сработал частичный тейк (см.
+	// tryPartialTakeProfit). У sales.Sales.PartialTakeProfit самого по себе
+	// нет состояния "уже сработало" - оно здесь, под тем же мьютексом, что и
+	// positions. Чистится в removePositions вместе с самой позицией.
+	partialTaken map[int64]bool
+
 	Sale sales.Sales
 }
 
@@ -83,6 +89,7 @@ func New(
 		Enabled:         toggle.New(cfg.StrategyEnable),
 		positions:       make(map[string][]sales.Position),
 		lastClose:       make(map[string]time.Time),
+		partialTaken:    make(map[int64]bool),
 	}
 
 	orderController.AddOrdersDependencies(exec.onOrderUpdated)
@@ -336,10 +343,16 @@ func (s *Executor) checkPositions(ms exModel.MarketsStat) {
 		return
 	}
 
-	// Execute ходит в БД, поэтому зовём его БЕЗ мьютекса. Закрытые убираем по
-	// id из актуального списка, а не перезаписываем список снимком.
+	// Execute/ReducePosition ходят в БД, поэтому зовём их БЕЗ мьютекса.
+	// Закрытые убираем по id из актуального списка, а не перезаписываем
+	// список снимком.
 	closed := make(map[int64]bool)
 	for _, position := range open {
+		// Частичный тейк - ДО полного выхода: позиция может и подрезаться, и
+		// в тот же тик закрыться целиком (например, следом сработал стоп по
+		// оставшейся части) - тот же порядок, что в backtest.Engine.Run.
+		s.tryPartialTakeProfit(ms, position)
+
 		if s.Sale.Execute(ms, position) {
 			closed[position.Order.ID] = true
 		}
@@ -351,6 +364,54 @@ func (s *Executor) checkPositions(ms exModel.MarketsStat) {
 	s.removePositions(ms.Pair, closed)
 }
 
+// tryPartialTakeProfit - см. sales.Sales.PartialTakeProfit. Срабатывает
+// МАКСИМУМ один раз на позицию (partialTaken.ID) - у самого
+// PartialTakeProfit состояния нет, "уже сработало" помнит только Executor.
+func (s *Executor) tryPartialTakeProfit(ms exModel.MarketsStat, position sales.Position) {
+	id := position.Order.ID
+
+	s.positionsMu.Lock()
+	already := s.partialTaken[id]
+	s.positionsMu.Unlock()
+	if already {
+		return
+	}
+
+	distancePercent, fraction, ok := s.Sale.PartialTakeProfit(position)
+	if !ok || fraction <= 0 || fraction >= 1 {
+		return
+	}
+
+	entry := position.Order.PriceCreated
+	if entry == 0 || ms.Price == 0 {
+		return
+	}
+
+	profit := (ms.Price/entry)*100 - 100
+	if position.Order.Side == order.SideTypeSell {
+		profit = -profit
+	}
+	if profit < distancePercent {
+		return
+	}
+
+	deal := order.Deal{Strategy: s.saleName(), Comment: "partial-take-profit"}
+	if err := s.OrderController.ReducePosition(id, fraction, deal); err != nil {
+		execLogger.Errorf("не удалось частично закрыть позицию id=%d: %v", id, err)
+		return
+	}
+
+	s.positionsMu.Lock()
+	if s.partialTaken == nil {
+		s.partialTaken = make(map[int64]bool)
+	}
+	s.partialTaken[id] = true
+	s.positionsMu.Unlock()
+
+	execLogger.Infof("partial take-profit pair=%s id=%d fraction=%.0f%% profit=%+.2f%%",
+		position.Order.Pair, id, fraction*100, profit)
+}
+
 func (s *Executor) removePositions(pair string, closed map[int64]bool) {
 	s.positionsMu.Lock()
 	defer s.positionsMu.Unlock()
@@ -360,6 +421,8 @@ func (s *Executor) removePositions(pair string, closed map[int64]bool) {
 	for _, position := range current {
 		if !closed[position.Order.ID] {
 			remaining = append(remaining, position)
+		} else {
+			delete(s.partialTaken, position.Order.ID)
 		}
 	}
 	s.positions[pair] = remaining

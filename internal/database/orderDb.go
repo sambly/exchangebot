@@ -109,6 +109,43 @@ func (r *OrderDb) ClosePosition(id int64, updateData *order.Order) error {
 	return nil
 }
 
+// ReducePosition персистит частичное закрытие: Quantity и RealizedProfit,
+// без смены Status - позиция остаётся активной. Та же защита от молчаливого
+// пропуска zero-value через Updates(struct), что и у ClosePosition: явная
+// map с колонками.
+func (r *OrderDb) ReducePosition(id int64, updateData *order.Order) error {
+	start := time.Now()
+
+	result := r.db.Model(&order.Order{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"time":            updateData.Time,
+			"quantity":        updateData.Quantity,
+			"realized_profit": updateData.RealizedProfit,
+		})
+	duration := time.Since(start).Seconds()
+
+	status := "success"
+	if result.Error != nil {
+		status = "error"
+	}
+	if result.RowsAffected == 0 && result.Error == nil {
+		status = "not_found"
+	}
+
+	dbOperationDuration.WithLabelValues("reduce_position", status).Observe(duration)
+	dbOperationTotal.WithLabelValues("reduce_position", status).Inc()
+
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("order with id %d not found", id)
+	}
+
+	return nil
+}
+
 func (r *OrderDb) ClearSalePolicyForActiveOrders() error {
 	start := time.Now()
 	err := r.db.Model(&order.Order{}).

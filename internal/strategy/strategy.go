@@ -8,6 +8,7 @@ import (
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/config"
+	"github.com/sambly/exchangebot/internal/entrysetup"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
@@ -15,7 +16,7 @@ import (
 	"github.com/sambly/exchangebot/internal/strategy/anomaly"
 	"github.com/sambly/exchangebot/internal/strategy/base"
 	"github.com/sambly/exchangebot/internal/strategy/executor"
-	"github.com/sambly/exchangebot/internal/strategy/sales/simplesale"
+	"github.com/sambly/exchangebot/internal/strategy/sales/structsale"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
 
@@ -35,6 +36,7 @@ type ControllerStrategy struct {
 	Pairs           []string
 	AssetsPrices    *prices.AssetsPrices
 	OrderController *order.OrderService
+	AssetsSetup     *entrysetup.AssetsSetup
 }
 
 var strategyLogger = logger.AddFields(map[string]interface{}{
@@ -48,6 +50,7 @@ func NewControllerStrategy(
 	pairs []string,
 	notify *notification.Notification,
 	orderController *order.OrderService,
+	assetsSetup *entrysetup.AssetsSetup,
 	options ...Option) (*ControllerStrategy, error) {
 
 	ctrlStr := &ControllerStrategy{
@@ -109,7 +112,7 @@ func (cs *ControllerStrategy) build() error {
 		tradeExecutor.WithTelegramMenu()
 	}
 
-	exitPolicy, err := simplesale.NewStrategy(cs.OrderController)
+	exitPolicy, err := structsale.NewStrategy(cs.OrderController, cs.AssetsSetup)
 	if err != nil {
 		return err
 	}

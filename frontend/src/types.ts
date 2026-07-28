@@ -143,10 +143,17 @@ export interface GetEntryQualityResponse {
 export interface StrengthEntry {
   HasImbalance: boolean
   ImbalanceZScore: number
+  // ImbalanceConfirmed - сторона имбаланса держится несколько сэмплов подряд
+  // (см. Go-комментарий у depth.GetImbalanceConfirmedSide), а не мелькнула на
+  // одном снимке стакана. Раздельно от Has* - значение показываем всегда,
+  // подтверждение решает, учитывать ли его в композите "Потенциала".
+  ImbalanceConfirmed: boolean
 
   HasWalls: boolean
   WallsSide: 'BUY' | 'SELL'
   WallsScore: number
+  // WallsConfirmed - см. ImbalanceConfirmed, но для стен.
+  WallsConfirmed: boolean
 
   HasLevels: boolean
   LevelsSide: 'BUY' | 'SELL'

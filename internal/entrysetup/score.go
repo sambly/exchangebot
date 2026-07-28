@@ -52,6 +52,22 @@ type Quality struct {
 	HasVolatility     bool
 }
 
+// wallsSide - какая сторона ближе к цене: Support ближе - BUY (тесный стоп
+// снизу), Resistance ближе - SELL. false, если хотя бы одной из стен сейчас
+// нет - без обеих сторон "ближе"/"дальше" не определить честно. Вынесено
+// отдельно от qualityFromWalls, чтобы тем же правилом мог пользоваться и
+// счётчик устойчивости стены (см. confirm.go) - там нужна только сторона,
+// без остальной арифметики Quality.
+func wallsSide(walls Walls) (order.SideType, bool) {
+	if !walls.HasSupport || !walls.HasResistance {
+		return "", false
+	}
+	if walls.Support.DistancePercent <= walls.Resistance.DistancePercent {
+		return order.SideTypeBuy, true
+	}
+	return order.SideTypeSell, true
+}
+
 // GetQuality сводит Walls к одному числу через сторону, где стена ближе, и
 // добавляет привязку к горизонту сделки через волатильность пары за period.
 // false, если хотя бы одной из стен сейчас нет (см. Walls.HasSupport/
@@ -69,15 +85,14 @@ func (s *AssetsSetup) GetQuality(pair, period string) (Quality, bool) {
 // считает Quality для НЕСКОЛЬКИХ периодов одной пары - без этого разделения
 // каждый период заново пересортировывал бы один и тот же стакан.
 func (s *AssetsSetup) qualityFromWalls(pair, period string, walls Walls) (Quality, bool) {
-	if !walls.HasSupport || !walls.HasResistance {
+	side, ok := wallsSide(walls)
+	if !ok {
 		return Quality{}, false
 	}
 
 	stop, take := walls.Support.DistancePercent, walls.Resistance.DistancePercent
-	side := order.SideTypeBuy
-	if stop > take {
+	if side == order.SideTypeSell {
 		stop, take = take, stop
-		side = order.SideTypeSell
 	}
 
 	if stop <= 0 {

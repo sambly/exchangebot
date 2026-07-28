@@ -117,6 +117,12 @@ func (str *StrategySimpleSale) ShouldExit(price float64, at time.Time, position 
 	return "", false
 }
 
+// PartialTakeProfit - у simplesale частичных тейков нет: одна цель, одно
+// закрытие целиком. См. sales.Sales.PartialTakeProfit.
+func (str *StrategySimpleSale) PartialTakeProfit(position sales.Position) (distancePercent, fraction float64, ok bool) {
+	return 0, 0, false
+}
+
 // profitPercent - прибыль позиции при данной цене, % от входа.
 // У шорта знак обратный: падение цены - это прибыль.
 func profitPercent(price float64, position sales.Position) float64 {

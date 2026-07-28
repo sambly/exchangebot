@@ -20,6 +20,9 @@ type Repository interface {
 	GetAll() ([]*Order, error)
 	Create(o *Order) error
 	ClosePosition(id int64, updateData *Order) error
+	// ReducePosition персистит частичное закрытие (см. TradeState.ReducePosition):
+	// Quantity и RealizedProfit, БЕЗ смены Status - позиция остаётся активной.
+	ReducePosition(id int64, updateData *Order) error
 	CreateInfo(ordersInfo *OrderInfo) error
 	Delete(id int64) error
 	DeleteAllHistory() error
@@ -42,6 +45,17 @@ type TradeState interface {
 	GetOrdersHistoryCopy() (orders map[string][]Order)
 	CreateOrderMarket(deal Deal) (*Order, error)
 	ClosePosition(id int64, deal Deal) (*Order, error)
+	// ReducePosition закрывает ЧАСТЬ активной позиции: fraction (0..1) - доля
+	// ОТ ПЕРВОНАЧАЛЬНОГО объёма (Order.OriginalQuantity, не текущего Quantity -
+	// он уже мог быть уменьшен предыдущим частичным закрытием). В отличие от
+	// ClosePosition, позиция остаётся активной - возвращается копия всё ещё
+	// открытого ордера с уменьшенным Quantity и увеличенным RealizedProfit.
+	//
+	// Состояния "уже частично закрывали для этой позиции" здесь нет - это
+	// решение вызывающего кода (см. Executor.partialTaken): ReducePosition -
+	// чистая операция "уменьшить ещё на fraction", сколько раз её вызвать,
+	// решает не она.
+	ReducePosition(id int64, fraction float64, deal Deal) (*Order, error)
 	RemoveOrderHistory(id int64) (*Order, error)
 	ClearHistory()
 	UpdateOrdersPrice(pair string, price float64) []Order
@@ -228,6 +242,41 @@ func (os *OrderService) ClosePosition(id int64, deal Deal) error {
 	os.updateOrdersDependencies(*order)
 
 	messageOrder, _ := json.Marshal(map[string]interface{}{"orderDelete": order})
+	os.socketsMessage.SendData(messageOrder)
+
+	return nil
+}
+
+// ReducePosition частично закрывает активную позицию (см. sales.Sales.
+// PartialTakeProfit) - тот же паттерн State -> Repo -> обновить os.Orders ->
+// запушить в веб-сокет, что и у ClosePosition, но пуш orderUpdate (позиция
+// изменилась, а не исчезла), и позиция остаётся в активных.
+func (os *OrderService) ReducePosition(id int64, fraction float64, deal Deal) error {
+
+	order, err := os.State.ReducePosition(id, fraction, deal)
+	if err != nil {
+		return err
+	}
+	if order == nil {
+		return fmt.Errorf("reduce position id=%d: ордер не найден", id)
+	}
+
+	if err := os.Repo.ReducePosition(id, order); err != nil {
+		return err
+	}
+
+	os.mtx.Lock()
+	for i, o := range os.Orders {
+		if o.ID == id {
+			os.Orders[i] = order
+			break
+		}
+	}
+	os.mtx.Unlock()
+
+	os.updateOrdersDependencies(*order)
+
+	messageOrder, _ := json.Marshal(map[string]interface{}{"orderUpdate": order})
 	os.socketsMessage.SendData(messageOrder)
 
 	return nil

@@ -38,8 +38,22 @@ type Order struct {
 	Status       OrderStatusType `gorm:"column:status"`
 	PriceCreated float64         `gorm:"column:price_created"`
 	Price        float64         `gorm:"column:price"`
+	// Quantity - ТЕКУЩИЙ, ещё не закрытый объём позиции. Уменьшается частичным
+	// тейком (см. RealizedProfit) - в отличие от OriginalQuantity, не хранит
+	// историю, только "сколько осталось".
 	Quantity float64 `gorm:"column:quantity"`
-	Profit   float64 `gorm:"column:profit"`
+	// OriginalQuantity - объём НА МОМЕНТ ВХОДА, никогда не меняется после
+	// создания. Нужен как знаменатель для веса частичных закрытий (см.
+	// RealizedProfit) - без него, уменьшив Quantity, узнать долю "сколько уже
+	// закрыто от исходного" было бы нечем.
+	OriginalQuantity float64 `gorm:"column:original_quantity"`
+	Profit           float64 `gorm:"column:profit"`
+	// RealizedProfit - взвешенный (по закрытой доле) вклад УЖЕ случившихся
+	// частичных тейков в итоговый профит, в тех же % от входа, что и Profit.
+	// При финальном закрытии Profit = RealizedProfit + вклад оставшейся доли -
+	// так позиция, закрытая в несколько приёмов, остаётся ОДНОЙ строкой в
+	// истории со честным взвешенным результатом, а не занижает/завышает его.
+	RealizedProfit float64 `gorm:"column:realized_profit"`
 
 	// StrategyBuy / StrategySell - ПОЧЕМУ вошли и почему вышли: имя детектора
 	// (anomaly, base) или "manual".

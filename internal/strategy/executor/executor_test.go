@@ -4,7 +4,12 @@ import (
 	"testing"
 	"time"
 
+	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/model"
+	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
+	"github.com/sambly/exchangebot/internal/paperwallet"
+	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy/sales"
 	"github.com/sambly/exchangebot/internal/strategy/signal"
 	"github.com/sambly/exchangebot/internal/toggle"
@@ -220,5 +225,144 @@ func TestSideFor(t *testing.T) {
 	weak := signal.Signal{Level: 1, Direction: signal.DirectionUp}
 	if _, _, ok := cfg.SideFor(weak); ok {
 		t.Fatal("уровень 1 ниже minLevel 2 - торговаться не должен")
+	}
+}
+
+// --- частичный тейк-профит ---
+
+type stubPricesRepo struct{}
+
+func (stubPricesRepo) SelectMarketStateTimev2(time.Time) ([]exModel.Candle, error) { return nil, nil }
+func (stubPricesRepo) SelectDeltaPeriod(string, string) ([]model.ChangeDeltaForCandle, error) {
+	return nil, nil
+}
+func (stubPricesRepo) SelectCandlesFromPeriod(string, time.Time) ([]exModel.Candle, error) {
+	return nil, nil
+}
+
+type stubOrderRepo struct{}
+
+func (stubOrderRepo) GetAll() ([]*order.Order, error)          { return nil, nil }
+func (stubOrderRepo) Create(*order.Order) error                { return nil }
+func (stubOrderRepo) ClosePosition(int64, *order.Order) error  { return nil }
+func (stubOrderRepo) ReducePosition(int64, *order.Order) error { return nil }
+func (stubOrderRepo) CreateInfo(*order.OrderInfo) error        { return nil }
+func (stubOrderRepo) Delete(int64) error                       { return nil }
+func (stubOrderRepo) DeleteAllHistory() error                  { return nil }
+func (stubOrderRepo) ClearSalePolicyForActiveOrders() error     { return nil }
+
+// newTestOrderController - настоящий OrderService поверх настоящего
+// PaperWallet (частичное закрытие меняет реальное состояние ордера, тестировать
+// это стоит на реальной реализации, а не на моке). Возвращает и *prices.
+// AssetsPrices: PaperWallet.ReducePosition/ClosePosition берут ТЕКУЩУЮ цену
+// именно оттуда, не из ms, переданного в Executor.checkPositions - в бою оба
+// обновляются одним и тем же тиком, а в тесте это нужно сделать явно.
+func newTestOrderController(t *testing.T, price float64) (*order.OrderService, *prices.AssetsPrices) {
+	t.Helper()
+
+	periods := map[string]time.Duration{"15m": 15 * time.Minute}
+	ap, err := prices.NewAssetsPrices([]string{"BTCUSDT"}, periods, periods, stubPricesRepo{})
+	if err != nil {
+		t.Fatalf("NewAssetsPrices: %v", err)
+	}
+	ap.OnMarket(exModel.MarketsStat{Pair: "BTCUSDT", Price: price, Time: time.Now()})
+
+	pw := paperwallet.NewPaperWallet(ap)
+	svc, err := order.NewOrderService(stubOrderRepo{}, pw, notification.NewSocketsMessage(), ap)
+	if err != nil {
+		t.Fatalf("NewOrderService: %v", err)
+	}
+	return svc, ap
+}
+
+// stubSalesWithPartial - минимальная sales.Sales с одним уровнем частичного
+// тейка; Execute всегда false - этот тест проверяет ТОЛЬКО частичное
+// закрытие, полный выход здесь не нужен и не тестируется.
+type stubSalesWithPartial struct {
+	partialAtFraction, partialFraction float64
+}
+
+func (s stubSalesWithPartial) Name() string { return "stub-partial" }
+func (s stubSalesWithPartial) Plan(sig signal.Signal) (float64, float64, time.Duration) {
+	return 0, 0, 0
+}
+func (s stubSalesWithPartial) ShouldExit(float64, time.Time, sales.Position) (sales.ExitReason, bool) {
+	return "", false
+}
+func (s stubSalesWithPartial) Execute(exModel.MarketsStat, sales.Position) bool { return false }
+func (s stubSalesWithPartial) PartialTakeProfit(position sales.Position) (float64, float64, bool) {
+	if s.partialAtFraction <= 0 {
+		return 0, 0, false
+	}
+	return position.TakeProfitPercent * s.partialAtFraction, s.partialFraction, true
+}
+
+// Цена достигла частичного уровня - должна списаться доля объёма и вырасти
+// RealizedProfit, а сама позиция - остаться открытой (не уйти из Executor).
+func TestTryPartialTakeProfitReducesPosition(t *testing.T) {
+	oc, ap := newTestOrderController(t, 100)
+
+	created, err := oc.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 2.0, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket: %v", err)
+	}
+
+	exec := testStrategy()
+	exec.OrderController = oc
+	exec.Sale = stubSalesWithPartial{partialAtFraction: 0.5, partialFraction: 0.5}
+
+	position := sales.Position{Order: created, TakeProfitPercent: 10.0, StopLossPercent: 8.0}
+	exec.positions["BTCUSDT"] = []sales.Position{position}
+
+	// +5% - ровно половина дистанции до тейка (10% x 0.5). Обновляем и ap
+	// (откуда PaperWallet реально берёт цену на закрытии), и ms - в бою оба
+	// приходят из одного тика.
+	ap.OnMarket(exModel.MarketsStat{Pair: "BTCUSDT", Price: 105, Time: time.Now()})
+	exec.checkPositions(exModel.MarketsStat{Pair: "BTCUSDT", Price: 105, Time: time.Now()})
+
+	active := oc.State.GetActiveOrdersBySymbol("BTCUSDT")
+	if len(active) != 1 {
+		t.Fatalf("ожидалась 1 активная позиция, получено %d", len(active))
+	}
+	if active[0].Quantity != 1.0 {
+		t.Fatalf("Quantity: ожидалось 1.0 (половина от 2.0), получено %v", active[0].Quantity)
+	}
+	if active[0].RealizedProfit <= 0 {
+		t.Fatalf("RealizedProfit: ожидалось положительное значение, получено %v", active[0].RealizedProfit)
+	}
+
+	if len(exec.positions["BTCUSDT"]) != 1 {
+		t.Fatal("позиция должна остаться в Executor после частичного закрытия, а не пропасть")
+	}
+}
+
+// Повторный тик после срабатывания не должен резать позицию ещё раз - один
+// уровень частичного тейка срабатывает максимум один раз на позицию.
+func TestTryPartialTakeProfitFiresOnce(t *testing.T) {
+	oc, ap := newTestOrderController(t, 100)
+
+	created, err := oc.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 2.0, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket: %v", err)
+	}
+
+	exec := testStrategy()
+	exec.OrderController = oc
+	exec.Sale = stubSalesWithPartial{partialAtFraction: 0.5, partialFraction: 0.5}
+
+	position := sales.Position{Order: created, TakeProfitPercent: 10.0, StopLossPercent: 8.0}
+	exec.positions["BTCUSDT"] = []sales.Position{position}
+
+	for _, price := range []float64{105, 106, 107} {
+		ap.OnMarket(exModel.MarketsStat{Pair: "BTCUSDT", Price: price, Time: time.Now()})
+		exec.checkPositions(exModel.MarketsStat{Pair: "BTCUSDT", Price: price, Time: time.Now()})
+	}
+
+	active := oc.State.GetActiveOrdersBySymbol("BTCUSDT")
+	if len(active) != 1 {
+		t.Fatalf("ожидалась 1 активная позиция, получено %d", len(active))
+	}
+	if active[0].Quantity != 1.0 {
+		t.Fatalf("повторные тики не должны резать позицию снова: Quantity = %v, ожидалось 1.0", active[0].Quantity)
 	}
 }

@@ -17,6 +17,7 @@ import (
 
 	"github.com/sambly/exchangebot/internal/depth"
 	"github.com/sambly/exchangebot/internal/prices"
+	"github.com/sambly/exchangebot/internal/stat"
 )
 
 // AssetsSetup считает показатели удобства входа по парам, опираясь на уже
@@ -36,6 +37,15 @@ type AssetsSetup struct {
 	priceLevelsCacheMu sync.Mutex
 	priceLevelsCacheAt time.Time
 	priceLevelsCache   map[string]map[string]PriceLevels
+
+	// wallsConfirm - см. confirm.go. У стен, в отличие от book-имбаланса
+	// (см. depth.book.imbalanceSideConfirm), нет своего живого тика - стакан
+	// не хранит сюда подписки, Walls считаются по запросу. Поэтому счётчик
+	// устойчивости сэмплируется здесь же, троттлингом по вызову
+	// (wallsConfirmNextSampleAt), а не подпиской на обновления.
+	wallsConfirmMu           sync.Mutex
+	wallsConfirm             map[string]*stat.SideConfirm
+	wallsConfirmNextSampleAt map[string]time.Time
 }
 
 // NewAssetsSetup - prices и depth должны быть уже инициализированы вызывающим

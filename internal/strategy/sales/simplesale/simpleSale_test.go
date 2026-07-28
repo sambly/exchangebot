@@ -139,6 +139,16 @@ func TestShouldExit(t *testing.T) {
 	}
 }
 
+// У simplesale частичных тейков нет вообще - одна цель, одно закрытие целиком.
+func TestPartialTakeProfitAlwaysDisabled(t *testing.T) {
+	str := testSale()
+	pos := position(100, 2.0, 1.5, time.Time{})
+
+	if _, _, ok := str.PartialTakeProfit(pos); ok {
+		t.Fatal("у simplesale PartialTakeProfit должен всегда возвращать ok=false")
+	}
+}
+
 // У шорта прибыль перевёрнута: падение цены - это плюс. Проверяем, что тейк
 // шорта срабатывает на падении, а стоп - на росте.
 func TestShouldExitShortSide(t *testing.T) {

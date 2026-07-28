@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/sambly/exchangebot/internal/order"
@@ -257,20 +256,10 @@ func (web *Web) getEntryQuality(w http.ResponseWriter, _ *http.Request) {
 	// читают только память и должны быть мгновенными, а PriceLevels ходит в
 	// БД (см. entrysetup.GetAllPriceLevels) и оттуда и приходит вся
 	// длительность запроса, если она вообще заметна.
-	start := time.Now()
+
 	quality := web.App.AssetsSetup.GetAllQuality()
-	qualityDuration := time.Since(start)
-
-	start = time.Now()
 	priceLevels := web.App.AssetsSetup.GetAllPriceLevels()
-	priceLevelsDuration := time.Since(start)
-
-	start = time.Now()
 	volatilityRegime := web.App.AssetsSetup.GetAllVolatilityRegime()
-	volatilityRegimeDuration := time.Since(start)
-
-	appWebLogger.Infof("getEntryQuality: quality=%v priceLevels=%v volatilityRegime=%v",
-		qualityDuration, priceLevelsDuration, volatilityRegimeDuration)
 
 	maps := map[string]interface{}{
 		"Quality":          quality,
@@ -290,9 +279,7 @@ func (web *Web) getEntryQuality(w http.ResponseWriter, _ *http.Request) {
 // у getEntryQuality: сырое наблюдение отдельно от решения.
 func (web *Web) getStrength(w http.ResponseWriter, _ *http.Request) {
 
-	start := time.Now()
 	strength := web.App.AssetsSetup.GetAllStrengthComponents()
-	appWebLogger.Infof("getStrength: %v", time.Since(start))
 
 	maps := map[string]interface{}{
 		"Strength": strength,

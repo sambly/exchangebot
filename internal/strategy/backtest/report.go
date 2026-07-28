@@ -44,6 +44,13 @@ type Report struct {
 	LimitFilled  int
 	LimitExpired int
 
+	// PartialFills - сколько раз срабатывал частичный тейк (см.
+	// sales.Sales.PartialTakeProfit). Не считается отдельными сделками - весь
+	// путь позиции (партиальное закрытие + финальное) сворачивается в ОДНУ
+	// запись Trade, взвешенную по закрытым долям (см. Engine.closeTrade) -
+	// это просто счётчик "сколько раз это вообще происходило" для отчёта.
+	PartialFills int
+
 	Trades []Trade
 
 	// Считается в finalize
@@ -109,6 +116,9 @@ func (r *Report) Render() string {
 	fmt.Fprintf(&b, "=== Бэктест %s: %s — %s, пар: %d ===\n",
 		r.Period, r.From.Format("2006-01-02"), r.To.Format("2006-01-02"), r.Pairs)
 	fmt.Fprintf(&b, "сигналов: %d, сделок: %d\n", r.Signals, len(r.Trades))
+	if r.PartialFills > 0 {
+		fmt.Fprintf(&b, "частичных тейков: %d (взвешены внутри сделок, отдельно не считаются)\n", r.PartialFills)
+	}
 	if r.LimitPlaced > 0 {
 		fmt.Fprintf(&b, "лимитные заявки: выставлено %d, исполнено %d (%.0f%%), снято по TTL %d\n",
 			r.LimitPlaced, r.LimitFilled, float64(r.LimitFilled)/float64(r.LimitPlaced)*100, r.LimitExpired)

@@ -39,6 +39,17 @@ const (
 	ExitTakeProfit ExitReason = "take-profit"
 	ExitStopLoss   ExitReason = "stop-loss"
 	ExitTimeout    ExitReason = "timeout"
+
+	// ExitTrailingStop - закрыто трейлинг-стопом (см. structsale): цена
+	// откатила от своего лучшего значения с момента входа больше допустимого,
+	// а не пробила фиксированный стоп от входа. Отдельная причина, а не
+	// ExitStopLoss - у неё другая, путь-зависимая цена закрытия, и
+	// backtest.Engine.tryExit намеренно проверяет ExitStopLoss/ExitTakeProfit
+	// только по статичным, известным заранее уровням (see: stopPrice/takePrice);
+	// любая ДРУГАЯ причина (в том числе эта) засчитывается только на цене
+	// закрытия бара - то есть с этой причиной результат бэктеста всегда честный,
+	// без подмены цены.
+	ExitTrailingStop ExitReason = "trailing-stop"
 )
 
 type Sales interface {
@@ -66,4 +77,18 @@ type Sales interface {
 	// Execute проверяет позицию на текущей цене И закрывает её, если пора.
 	// Возвращает true, если позиция закрыта.
 	Execute(ms exModel.MarketsStat, position Position) (closed bool)
+
+	// PartialTakeProfit - есть ли у политики уровень частичного тейка для
+	// этой позиции: дистанция в % от входа (в сторону прибыли, всегда >0,
+	// СЧИТАЕТСЯ ОТ position.TakeProfitPercent - конкретной цели ЭТОЙ
+	// позиции, а не от какой-то отдельной волатильности) и доля ОТ
+	// ПЕРВОНАЧАЛЬНОГО объёма позиции, которую нужно закрыть при достижении
+	// этой дистанции.
+	//
+	// Функция ЧИСТАЯ и без состояния "уже сработало" - вызывающий код сам
+	// решает, срабатывал ли уже частичный тейк для этой конкретной позиции
+	// (см. backtest.simPosition.partialFills), и не зовёт её повторно после
+	// первого срабатывания. У политик без частичного тейка (simplesale)
+	// ok всегда false.
+	PartialTakeProfit(position Position) (distancePercent, fraction float64, ok bool)
 }
