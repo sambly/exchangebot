@@ -175,3 +175,16 @@ export interface StrengthData {
 export interface GetStrengthResponse {
   Strength: StrengthData
 }
+
+// Ответ от /trade/api/getStrategiesStatus - стратегии с runtime-переключателями
+// (см. Go-комментарий у strategy.WebToggle/strategy.WebNotificationToggle).
+// Has* независимы: у base есть только уведомления, у executor - только
+// Enabled, у anomaly - оба. Стратегия без обоих в списке не появится вовсе.
+export interface StrategyStatus {
+  IDName: string
+  Name: string
+  HasEnable: boolean
+  Enabled: boolean
+  HasNotifications: boolean
+  NotificationsEnabled: boolean
+}

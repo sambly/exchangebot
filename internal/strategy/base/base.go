@@ -23,8 +23,10 @@ type StrategyBase struct {
 	Notification *notification.Notification
 	TelegramMenu *StrategyBaseMenu
 
-	// NotificationEnable переключается из телеграм-меню, а читается горутиной
-	// стратегии - поэтому живёт отдельно от Config, за мьютексом.
+	// StrategyEnable/NotificationEnable переключаются из телеграм-меню (и
+	// теперь из веба), а читаются горутиной стратегии - поэтому живут
+	// отдельно от Config, за мьютексом (см. пакет toggle).
+	StrategyEnable     *toggle.Bool
 	NotificationEnable *toggle.Bool
 
 	Periods      map[string]time.Duration
@@ -75,6 +77,7 @@ func NewStrategy(assetsPrices *prices.AssetsPrices, periods map[string]time.Dura
 		Periods:            periods,
 		Config:             cfg,
 		Notification:       notify,
+		StrategyEnable:     toggle.New(cfg.StrategyEnable),
 		NotificationEnable: toggle.New(cfg.NotificationEnable),
 	}
 	return str, nil
@@ -85,6 +88,19 @@ func (s *StrategyBase) WithTelegramMenu() *StrategyBase {
 	s.TelegramMenu = tlgMenu
 	return s
 }
+
+// GetIDName/GetName - общая идентичность для strategy.WebToggle и
+// strategy.WebNotificationToggle.
+func (s *StrategyBase) GetIDName() string { return s.Config.IDName }
+func (s *StrategyBase) GetName() string   { return s.Config.Name }
+
+// IsEnabled/SetEnabled - см. strategy.WebToggle.
+func (s *StrategyBase) IsEnabled() bool   { return s.StrategyEnable.Get() }
+func (s *StrategyBase) SetEnabled(v bool) { s.StrategyEnable.Set(v) }
+
+// IsNotifyEnabled/SetNotifyEnabled - см. strategy.WebNotificationToggle.
+func (s *StrategyBase) IsNotifyEnabled() bool   { return s.NotificationEnable.Get() }
+func (s *StrategyBase) SetNotifyEnabled(v bool) { s.NotificationEnable.Set(v) }
 
 func (str *StrategyBase) Start(ctx context.Context) error {
 
@@ -102,7 +118,7 @@ func (str *StrategyBase) Start(ctx context.Context) error {
 
 func (str *StrategyBase) changePrices() {
 
-	if !str.Config.StrategyEnable {
+	if !str.StrategyEnable.Get() {
 		return
 	}
 

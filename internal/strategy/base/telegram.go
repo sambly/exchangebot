@@ -18,10 +18,14 @@ var (
 	}
 
 	// Inline кнопки
+	btnEnableStrategy  = tele.Btn{Text: "✅ Включить детектор", Unique: "enable_base"}
+	btnDisableStrategy = tele.Btn{Text: "❌ Отключить детектор", Unique: "disable_base"}
+
 	btnEnableNotifications  = tele.Btn{Text: "🔔 Включить уведомления", Unique: "enable_notif_base"}
 	btnDisableNotifications = tele.Btn{Text: "🔕 Отключить уведомления", Unique: "disable_notif_base"}
 
 	inlineButtons = [][]tele.Btn{
+		{btnEnableStrategy, btnDisableStrategy},
 		{btnEnableNotifications, btnDisableNotifications},
 	}
 )
@@ -51,6 +55,11 @@ func (m *StrategyBaseMenu) Show(c tele.Context, handler model.MenuHandler) error
 	handler.DeleteUserMessages(c, userID)
 
 	text := fmt.Sprintf("Настройки стратегии: %s\n", m.Strategy.Config.Name)
+	if m.Strategy.StrategyEnable.Get() {
+		text += "Детектор: ✅ включён\n"
+	} else {
+		text += "Детектор: ❌ отключён\n"
+	}
 	if m.Strategy.NotificationEnable.Get() {
 		text += "Уведомления: включены"
 	} else {
@@ -75,6 +84,16 @@ func (m *StrategyBaseMenu) Handle(b *tele.Bot, handler model.MenuHandler) {
 	// Обработчик кнопки входа в меню стратегий
 	b.Handle(&m.ButtonsHandler.EntryButton, func(c tele.Context) error {
 		return m.Show(c, handler)
+	})
+
+	b.Handle(&btnEnableStrategy, func(c tele.Context) error {
+		m.Strategy.StrategyEnable.Set(true)
+		return c.Respond(&tele.CallbackResponse{Text: "Детектор включён ✅", ShowAlert: true})
+	})
+
+	b.Handle(&btnDisableStrategy, func(c tele.Context) error {
+		m.Strategy.StrategyEnable.Set(false)
+		return c.Respond(&tele.CallbackResponse{Text: "Детектор отключён ❌", ShowAlert: true})
 	})
 
 	b.Handle(&btnEnableNotifications, func(c tele.Context) error {

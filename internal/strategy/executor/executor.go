@@ -113,6 +113,10 @@ func (s *Executor) GetTelegramMenu() model.WindowHandler {
 func (s *Executor) IsEnabled() bool   { return s.Enabled.Get() }
 func (s *Executor) SetEnabled(v bool) { s.Enabled.Set(v) }
 
+// GetIDName/GetName - см. strategy.WebToggle.
+func (s *Executor) GetIDName() string { return s.Config.IDName }
+func (s *Executor) GetName() string   { return s.Config.Name }
+
 // Start - единственное место, где исполнитель что-то делает.
 //
 // И сигналы, и рыночные тики обрабатываются ЗДЕСЬ, в своей горутине. Раньше

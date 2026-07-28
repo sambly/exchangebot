@@ -26,6 +26,36 @@ type Strategy interface {
 	OnMarket(ms exModel.MarketsStat)
 }
 
+// WebIdentity - имя/идентификатор стратегии для веба. Общая часть
+// WebToggle/WebNotificationToggle: обе оптируют её раздельно, а не одна
+// другую, потому что стратегии реализуют их независимо (base - только
+// уведомления, executor - только сам тумблер, anomaly - оба).
+type WebIdentity interface {
+	GetIDName() string
+	GetName() string
+}
+
+// WebToggle - опциональный контракт для стратегий с runtime-переключателем
+// самой стратегии. Реализуют только пакеты с настоящим toggle.Bool (anomaly,
+// executor) - по аналогии с GetTelegramMenu(), который тоже optional (nil,
+// если меню нет). Стратегии без этого метода просто не появляются в
+// соответствующей части веб-списка.
+type WebToggle interface {
+	WebIdentity
+	IsEnabled() bool
+	SetEnabled(bool)
+}
+
+// WebNotificationToggle - опциональный контракт для стратегий с
+// runtime-переключателем уведомлений. Независим от WebToggle: у base есть
+// только он (нет toggle.Bool на саму стратегию), у executor - наоборот, нет
+// уведомлений вовсе.
+type WebNotificationToggle interface {
+	WebIdentity
+	IsNotifyEnabled() bool
+	SetNotifyEnabled(bool)
+}
+
 type Option func(*ControllerStrategy)
 
 type ControllerStrategy struct {

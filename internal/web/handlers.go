@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/sambly/exchangebot/internal/order"
+	"github.com/sambly/exchangebot/internal/strategy"
 	"github.com/sambly/exchangebot/internal/strategy/executor"
 	"gopkg.in/yaml.v3"
 )
@@ -368,4 +369,124 @@ func (web *Web) getStrategies(w http.ResponseWriter, _ *http.Request) {
 	if err := json.NewEncoder(w).Encode(maps); err != nil {
 		appWebLogger.Errorf("error json encoder: %v", err)
 	}
+}
+
+// getStrategiesStatus отдаёт список стратегий с runtime-переключателями (см.
+// strategy.WebToggle/strategy.WebNotificationToggle) и их текущее состояние.
+// Оба интерфейса опциональны и независимы: HasEnable/HasNotifications
+// показывают фронту, какие тумблеры вообще есть у конкретной стратегии
+// (base - только уведомления, executor - только сам тумблер, anomaly - оба).
+// Стратегия без обоих интерфейсов в список не попадает вовсе.
+func (web *Web) getStrategiesStatus(w http.ResponseWriter, _ *http.Request) {
+	type strategyStatus struct {
+		IDName               string
+		Name                 string
+		HasEnable            bool
+		Enabled              bool
+		HasNotifications     bool
+		NotificationsEnabled bool
+	}
+
+	list := []strategyStatus{}
+	for _, s := range web.App.ControllerStrategy.Strategies {
+		row := strategyStatus{}
+		known := false
+
+		if wt, ok := s.(strategy.WebToggle); ok {
+			row.IDName, row.Name = wt.GetIDName(), wt.GetName()
+			row.HasEnable, row.Enabled = true, wt.IsEnabled()
+			known = true
+		}
+		if nt, ok := s.(strategy.WebNotificationToggle); ok {
+			if !known {
+				row.IDName, row.Name = nt.GetIDName(), nt.GetName()
+				known = true
+			}
+			row.HasNotifications, row.NotificationsEnabled = true, nt.IsNotifyEnabled()
+		}
+
+		if !known {
+			continue
+		}
+		list = append(list, row)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(list); err != nil {
+		appWebLogger.Errorf("error json encoder: %v", err)
+	}
+}
+
+// toggleStrategy включает/выключает стратегию по IDName - тот же
+// StrategyEnable.Set(), что дергает Telegram-меню, просто с другого входа.
+func (web *Web) toggleStrategy(w http.ResponseWriter, r *http.Request) {
+	bodyByte, err := io.ReadAll(r.Body)
+	if err != nil {
+		appWebLogger.Errorf("error readfile: %v", err)
+		http.Error(w, "не удалось прочитать тело запроса", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		IDName  string
+		Enabled bool
+	}
+	if err := json.Unmarshal(bodyByte, &req); err != nil {
+		appWebLogger.Errorf("error json unmarshal: %v", err)
+		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
+		return
+	}
+
+	for _, s := range web.App.ControllerStrategy.Strategies {
+		wt, ok := s.(strategy.WebToggle)
+		if !ok || wt.GetIDName() != req.IDName {
+			continue
+		}
+		wt.SetEnabled(req.Enabled)
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]bool{"Enabled": wt.IsEnabled()}); err != nil {
+			appWebLogger.Errorf("error json encoder: %v", err)
+		}
+		return
+	}
+
+	http.Error(w, "стратегия не найдена", http.StatusNotFound)
+}
+
+// toggleStrategyNotifications включает/выключает уведомления стратегии по
+// IDName - см. toggleStrategy, тот же паттерн, второй независимый тумблер.
+func (web *Web) toggleStrategyNotifications(w http.ResponseWriter, r *http.Request) {
+	bodyByte, err := io.ReadAll(r.Body)
+	if err != nil {
+		appWebLogger.Errorf("error readfile: %v", err)
+		http.Error(w, "не удалось прочитать тело запроса", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		IDName  string
+		Enabled bool
+	}
+	if err := json.Unmarshal(bodyByte, &req); err != nil {
+		appWebLogger.Errorf("error json unmarshal: %v", err)
+		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
+		return
+	}
+
+	for _, s := range web.App.ControllerStrategy.Strategies {
+		nt, ok := s.(strategy.WebNotificationToggle)
+		if !ok || nt.GetIDName() != req.IDName {
+			continue
+		}
+		nt.SetNotifyEnabled(req.Enabled)
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]bool{"Enabled": nt.IsNotifyEnabled()}); err != nil {
+			appWebLogger.Errorf("error json encoder: %v", err)
+		}
+		return
+	}
+
+	http.Error(w, "стратегия не найдена", http.StatusNotFound)
 }

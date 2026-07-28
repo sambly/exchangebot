@@ -335,6 +335,18 @@ func (s *AnomalyStrategy) WithTelegramMenu() *AnomalyStrategy {
 	return s
 }
 
+// GetIDName/GetName/IsEnabled/SetEnabled - см. strategy.WebToggle. Тонкая
+// обёртка над тем же StrategyEnable, которым уже управляет telegram.go.
+func (s *AnomalyStrategy) GetIDName() string { return s.Config.IDName }
+func (s *AnomalyStrategy) GetName() string   { return s.Config.Name }
+func (s *AnomalyStrategy) IsEnabled() bool   { return s.StrategyEnable.Get() }
+func (s *AnomalyStrategy) SetEnabled(v bool) { s.StrategyEnable.Set(v) }
+
+// IsNotifyEnabled/SetNotifyEnabled - см. strategy.WebNotificationToggle.
+// Обёртка над тем же NotificationEnable, которым управляет telegram.go.
+func (s *AnomalyStrategy) IsNotifyEnabled() bool   { return s.NotificationEnable.Get() }
+func (s *AnomalyStrategy) SetNotifyEnabled(v bool) { s.NotificationEnable.Set(v) }
+
 // seedHistory заполняет историю метрик из БД при старте.
 //
 // Агрегированная свеча периода = ровно одна выборка истории: рантайм считает

@@ -19,6 +19,7 @@ import OrdersChart from './TradeViewPanel/OrdersChart.vue'
 import DepthChart from './TradeViewPanel/DepthChart.vue'
 import OrdersActive from './OrdersPanel/OrdersActive.vue'
 import OrdersHistory from './OrdersPanel/OrdersHistory.vue'
+import StrategiesDialog from './StrategyPanel/StrategiesDialog.vue'
 
 const PRICE_TABLE_WIDTH = '30%'
 
@@ -29,6 +30,7 @@ const { refreshOrders } = useOrders()
 const toast = useToast()
 
 const isRefreshing = ref(false)
+const strategiesDialogVisible = ref(false)
 
 const ordersBarHeight = computed(() => ui.ordersBarSize === 'large' ? '40vh' : '20vh')
 
@@ -148,6 +150,14 @@ onMounted(() => {
               :outlined="ui.activeChart !== 'depth'"
               @click="ui.activeChart = 'depth'"
             />
+            <Button
+              label="Стратегии"
+              icon="pi pi-cog"
+              size="small"
+              severity="secondary"
+              outlined
+              @click="strategiesDialogVisible = true"
+            />
           </div>
 
           <div class="trading-workspace-content">
@@ -189,6 +199,8 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <StrategiesDialog v-model:visible="strategiesDialogVisible" />
 
   </div>
 </template>
