@@ -139,6 +139,41 @@ function buildMarkers(): any[] {
   return markers.sort((a, b) => (a.time as number) - (b.time as number))
 }
 
+// Сколько баров оставить видимыми справа от целевой свечи - чтобы маркер
+// ордера не упирался прямо в правый край графика.
+const SCROLL_MARGIN_BARS = 10
+
+// Если выбран конкретный ордер (клик по строке в OrdersActive/OrdersHistory),
+// открываем график сразу на нём, а не на "последних барах". Для уже
+// закрытого ордера (пришёл из истории) целимся по времени ЗАКРЫТИЯ - его
+// открытие может быть далеко в прошлом и не так интересно, как момент выхода.
+function scrollToTarget(candleData: CandlestickData[]) {
+  if (!chart || candleData.length === 0) return
+
+  const order = ordersForPair.value.find(o => o.ID === ui.selectedOrderId)
+  if (!order) {
+    chart.timeScale().scrollToRealTime()
+    return
+  }
+
+  const targetTime = (order.Status === 'Close' && order.Time)
+    ? (toChartTime(order.Time) as number)
+    : (toChartTime(order.TimeCreated) as number)
+
+  let targetIndex = 0
+  for (let i = 0; i < candleData.length; i++) {
+    if ((candleData[i].time as number) <= targetTime) {
+      targetIndex = i
+    } else {
+      break
+    }
+  }
+
+  const lastIndex = candleData.length - 1
+  const offset = Math.max(0, (lastIndex - targetIndex) - SCROLL_MARGIN_BARS)
+  chart.timeScale().scrollToPosition(offset, false)
+}
+
 function refreshMarkers() {
   if (!candleSeries) return
   const markers = buildMarkers()
@@ -281,10 +316,20 @@ async function loadData() {
 
     refreshMarkers()
 
-    // scrollToRealTime вместо fitContent: последний укладывает ВСЮ историю в
-    // область графика (свечи схлопываются в кашу при большом диапазоне),
-    // а нам нужен вид на последние бары - как в обычном торговом терминале.
-    chart.timeScale().scrollToRealTime()
+    // scrollToTarget вместо fitContent: последний укладывает ВСЮ историю в
+    // область графика (свечи схлопываются в кашу при большом диапазоне) - нам
+    // нужен вид на последние бары (как в обычном торговом терминале) либо,
+    // если выбран конкретный ордер, вид на его окрестность.
+    scrollToTarget(candleData)
+
+    // Если пользователь хоть раз вручную потянул ось цены, lightweight-charts
+    // насовсем выключает autoScale для этого экземпляра графика - и он
+    // остаётся выключенным при смене таймфрейма (chart не пересоздаётся,
+    // только setData). Из-за этого новые свечи после переключения фрейма
+    // рисуются в СТАРОМ диапазоне цены и выглядят сплющенными, пока не
+    // подправишь ось руками. Принудительно включаем autoScale на каждую
+    // загрузку данных, чтобы диапазон всегда пересчитывался под текущие бары.
+    candleSeries.priceScale().applyOptions({ autoScale: true })
 
     attachCrosshair()
   } catch (err) {
@@ -296,6 +341,9 @@ async function loadData() {
 
 function scrollToLatest() {
   chart?.timeScale().scrollToRealTime()
+  // Та же причина, что и в loadData(): если ось цены была растянута руками,
+  // сама по себе перемотка времени её не переcчитает.
+  candleSeries?.priceScale().applyOptions({ autoScale: true })
 }
 
 async function initialize() {
@@ -376,6 +424,14 @@ onBeforeUnmount(() => {
     chart = null
     candleSeries = null
     markersPrimitive = null
+  }
+  // Компонент подключён через v-if (MainView.vue), а не v-show - размонтируется,
+  // как только переключаются на другую вкладку графика (Price/Volume/Стакан).
+  // Это и есть момент "график ордеров больше не активен" - сбрасываем выбор,
+  // иначе подсветка строки в OrdersActive/OrdersHistory (и акцент маркера при
+  // следующем открытии) будет висеть на давно неактуальном ордере.
+  if (ui.selectedOrderId !== null) {
+    ui.selectedOrderId = null
   }
   tooltip?.remove()
   hideSpinner()

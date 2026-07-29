@@ -43,6 +43,10 @@ function onRowClick(event: DataTableRowClickEvent) {
   ui.activeChart = 'orders'
 }
 
+const getRowClass = (data: Order) => ({
+  'table-row-active': ui.selectedOrderId === data.ID
+})
+
 async function handleClose(orderId: number) {
   try {
     const res = await fetch('/trade/api/closeDeal', {
@@ -120,6 +124,7 @@ async function handleCloseAll() {
       scrollHeight="flex"
       class="orders-table"
       dataKey="ID"
+      :rowClass="getRowClass"
       @row-click="onRowClick"
     >
       <Column header="Тип" style="min-width: 60px">
@@ -214,4 +219,8 @@ async function handleCloseAll() {
 :deep(.p-datatable-thead > tr > th) { padding: 0.5rem 0.4rem; font-weight: 600; position: sticky; top: 0; z-index: 1; }
 :deep(.p-datatable-tbody > tr) { cursor: pointer; transition: background-color 0.2s; }
 :deep(.p-datatable-tbody > tr > td) { padding: 0.35rem 0.4rem; }
+
+:deep(.table-row-active > td) {
+  background: color-mix(in srgb, var(--p-primary-color) 12%, transparent);
+}
 </style>
