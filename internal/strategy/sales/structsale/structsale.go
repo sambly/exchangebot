@@ -84,7 +84,7 @@ func (str *StrategyStructSale) Name() string {
 // распространяется - дистанция до дальней стены такая, какая есть, раздувать
 // её произвольным множителем не за что.
 func (str *StrategyStructSale) Plan(sig signal.Signal) (takeProfit, stopLoss float64, hold time.Duration) {
-	cfg := str.Config
+	cfg := str.Config.forSource(sig.Source)
 
 	if sig.Volatility > 0 {
 		takeProfit = sig.Volatility * cfg.TakeProfitVol
@@ -98,7 +98,9 @@ func (str *StrategyStructSale) Plan(sig signal.Signal) (takeProfit, stopLoss flo
 		takeProfit *= 1 + float64(sig.Level-1)*cfg.StrengthScalePerLevel
 	}
 
-	if structTake, structStop, ok := str.structuralPlan(sig); ok {
+	if structTake, structStop, ok := str.structuralPriceLevelsPlan(sig, &cfg); ok {
+		takeProfit, stopLoss = structTake, structStop
+	} else if structTake, structStop, ok := str.structuralPlan(sig, &cfg); ok {
 		takeProfit, stopLoss = structTake, structStop
 	}
 
@@ -119,17 +121,52 @@ func (str *StrategyStructSale) Plan(sig signal.Signal) (takeProfit, stopLoss flo
 // подписки на стакан, или сейчас не обе стены найдены) либо соотношение
 // дальней стены к ближней меньше MinStructuralScore: слабая структурная
 // картина хуже статистической оценки волатильности, а не лучше.
-func (str *StrategyStructSale) structuralPlan(sig signal.Signal) (takeProfit, stopLoss float64, ok bool) {
-	if !str.Config.UseStructuralLevels || str.entrySetup == nil {
+func (str *StrategyStructSale) structuralPlan(sig signal.Signal, cfg *Config) (takeProfit, stopLoss float64, ok bool) {
+	if !cfg.UseStructuralLevels || str.entrySetup == nil {
 		return 0, 0, false
 	}
 
 	quality, found := str.entrySetup.GetQuality(sig.Pair, sig.Period)
-	if !found || quality.Score < str.Config.MinStructuralScore {
+	if !found || quality.Score < cfg.MinStructuralScore {
 		return 0, 0, false
 	}
 
 	return quality.TakeDistancePercent, quality.StopDistancePercent, true
+}
+
+// structuralPriceLevelsPlan - тот же принцип, что у structuralPlan (стоп = до
+// БЛИЖНЕГО уровня, тейк = до ДАЛЬНЕГО, симметрично по стороне), но источник -
+// swing high/low на свечах (entrysetup.GetPriceLevels), а не стены стакана.
+// Проверяется в Plan ПЕРЕД structuralPlan - см. Go-комментарий у
+// Config.UseStructuralPriceLevels.
+//
+// ok=false - структурных данных сейчас нет (entrySetup=nil, не обе стороны
+// найдены) либо соотношение дальнего уровня к ближнему меньше
+// MinStructuralPriceLevelsScore.
+func (str *StrategyStructSale) structuralPriceLevelsPlan(sig signal.Signal, cfg *Config) (takeProfit, stopLoss float64, ok bool) {
+	if !cfg.UseStructuralPriceLevels || str.entrySetup == nil {
+		return 0, 0, false
+	}
+
+	levels, found := str.entrySetup.GetPriceLevels(sig.Pair, sig.Period)
+	if !found || !levels.HasSupport || !levels.HasResistance {
+		return 0, 0, false
+	}
+
+	stop, take := levels.Support.DistancePercent, levels.Resistance.DistancePercent
+	if stop > take {
+		stop, take = take, stop
+	}
+	if stop <= 0 {
+		return 0, 0, false
+	}
+
+	score := take / stop
+	if score < cfg.MinStructuralPriceLevelsScore {
+		return 0, 0, false
+	}
+
+	return take, stop, true
 }
 
 // Execute - см. simplesale.Execute: то же самое, решение и закрытие разнесены
@@ -175,6 +212,7 @@ func (str *StrategyStructSale) ShouldExit(price float64, at time.Time, position 
 	if entry == 0 || price == 0 {
 		return "", false
 	}
+	cfg := str.Config.forSource(position.Signal.Source)
 	isSell := position.Order.Side == order.SideTypeSell
 
 	extreme := str.updateExtreme(position.Order.ID, entry, price, isSell)
@@ -191,12 +229,12 @@ func (str *StrategyStructSale) ShouldExit(price float64, at time.Time, position 
 		return sales.ExitStopLoss, true
 	}
 
-	trailingActive := str.Config.TrailingActivationPercent > 0 && extremeProfit >= str.Config.TrailingActivationPercent
+	trailingActive := cfg.TrailingActivationPercent > 0 && extremeProfit >= cfg.TrailingActivationPercent
 
 	switch {
 	case trailingActive:
 		giveBack := extremeProfit - profit
-		if giveBack >= str.Config.TrailingCallbackPercent {
+		if giveBack >= cfg.TrailingCallbackPercent {
 			str.clearPositionState(position.Order.ID)
 			return sales.ExitTrailingStop, true
 		}
@@ -210,7 +248,7 @@ func (str *StrategyStructSale) ShouldExit(price float64, at time.Time, position 
 		// Адаптивный таймаут: сделка уже в достаточном плюсе - не обрываем
 		// работающую позицию только потому, что истекло время, продлеваем
 		// дедлайн (один раз, см. tryExtendDeadline) вместо закрытия.
-		if !str.tryExtendDeadline(position, profit) {
+		if !str.tryExtendDeadline(position, profit, &cfg) {
 			str.clearPositionState(position.Order.ID)
 			return sales.ExitTimeout, true
 		}
@@ -277,8 +315,7 @@ func (str *StrategyStructSale) effectiveDeadline(position sales.Position) time.T
 // выдавалось, возвращает false, даже если прибыль всё ещё выше порога -
 // иначе позиция, зависшая в небольшом перманентном плюсе, никогда не
 // закрылась бы по времени вовсе.
-func (str *StrategyStructSale) tryExtendDeadline(position sales.Position, profit float64) bool {
-	cfg := str.Config
+func (str *StrategyStructSale) tryExtendDeadline(position sales.Position, profit float64, cfg *Config) bool {
 	if cfg.AdaptiveTimeoutMinProfitPercent <= 0 || cfg.AdaptiveTimeoutExtensionPeriods <= 0 {
 		return false
 	}
@@ -310,7 +347,7 @@ func (str *StrategyStructSale) tryExtendDeadline(position sales.Position, profit
 // волатильности. РАБОТАЕТ ТОЛЬКО В БЭКТЕСТЕ (см. Config.PartialTakeProfit*) -
 // Execute/ShouldExit в бою эту фичу не используют.
 func (str *StrategyStructSale) PartialTakeProfit(position sales.Position) (distancePercent, fraction float64, ok bool) {
-	cfg := str.Config
+	cfg := str.Config.forSource(position.Signal.Source)
 	if cfg.PartialTakeProfitPercent <= 0 || cfg.PartialTakeProfitFraction <= 0 || cfg.PartialTakeProfitFraction >= 1 {
 		return 0, 0, false
 	}

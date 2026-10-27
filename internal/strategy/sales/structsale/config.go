@@ -65,6 +65,24 @@ type Config struct {
 	// цель, узкий стоп, это не лучше волатильностной оценки, а хуже.
 	MinStructuralScore float64 `yaml:"minStructuralScore"`
 
+	// UseStructuralPriceLevels - тот же принцип, что у UseStructuralLevels, но
+	// источник структуры - НЕ стены стакана (entrysetup.GetQuality), а свечные
+	// swing high/low (entrysetup.GetPriceLevels): стоп = дистанция до ближнего
+	// уровня, тейк = до дальнего. Проверяется РАНЬШЕ UseStructuralLevels в
+	// Plan - если оба включены для одного источника, приоритет у свечных
+	// уровней. В отличие от стен стакана, эта фича работает и в бэктесте (у
+	// свечей есть история, в отличие от стакана) - хотя backtest.Engine пока
+	// её не подключает (см. Go-комментарий в начале файла).
+	//
+	// Задумана для источника levels (вход у тех же swing-уровней) - см.
+	// config.example.yaml, секция sources - естественно выходить по той же
+	// структуре, по которой был вход, а не по независимому снимку стакана.
+	UseStructuralPriceLevels bool `yaml:"useStructuralPriceLevels"`
+
+	// MinStructuralPriceLevelsScore - тот же смысл, что у MinStructuralScore,
+	// для UseStructuralPriceLevels.
+	MinStructuralPriceLevelsScore float64 `yaml:"minStructuralPriceLevelsScore"`
+
 	// PartialTakeProfitPercent - на какой ДОЛЕ дистанции до полного тейка
 	// (0..1, от position.TakeProfitPercent - конкретной цели уже посчитанного
 	// плана, а не заново от волатильности) закрывать часть позиции. 0 -
@@ -94,6 +112,127 @@ type Config struct {
 	// зависшая в небольшом перманентном плюсе, никогда не закрылась бы по
 	// времени вовсе.
 	AdaptiveTimeoutExtensionPeriods int `yaml:"adaptiveTimeoutExtensionPeriods"`
+
+	// Sources - оверрайды параметров плана ПО ИСТОЧНИКУ СИГНАЛА (sig.Source),
+	// см. SourceOverride. structsale - одна политика выхода на весь Executor
+	// (WithSaleStrategy принимает ровно одну), а детекторы у него разные
+	// (anomaly, potential, будущий levels-детектор от swing-уровней) - без
+	// этого у них не было бы способа тюниться независимо иначе, чем через
+	// второй Executor целиком. Источник без записи здесь - все поля берёт из
+	// глобальных значений выше, как раньше.
+	Sources map[string]SourceOverride `yaml:"sources"`
+}
+
+// SourceOverride - частичный оверрайд Config для одного sig.Source. Указатели,
+// а не голые значения - иначе не отличить "не задано, бери глобальное" от
+// "явно задано 0/false" (например, useStructuralLevels: false для источника,
+// у которого глобально true). Поля названы и задокументированы 1:1 с Config -
+// см. комментарии там же.
+type SourceOverride struct {
+	TakeProfitVol *float64 `yaml:"takeProfitVol"`
+	StopLossVol   *float64 `yaml:"stopLossVol"`
+
+	TakeProfitPercent *float64 `yaml:"takeProfitPercent"`
+	StopLossPercent   *float64 `yaml:"stopLossPercent"`
+
+	MinTakeProfitPercent *float64 `yaml:"minTakeProfitPercent"`
+	MaxTakeProfitPercent *float64 `yaml:"maxTakeProfitPercent"`
+	MinStopLossPercent   *float64 `yaml:"minStopLossPercent"`
+	MaxStopLossPercent   *float64 `yaml:"maxStopLossPercent"`
+
+	MaxHoldPeriods *int `yaml:"maxHoldPeriods"`
+
+	StrengthScalePerLevel *float64 `yaml:"strengthScalePerLevel"`
+
+	TrailingActivationPercent *float64 `yaml:"trailingActivationPercent"`
+	TrailingCallbackPercent   *float64 `yaml:"trailingCallbackPercent"`
+
+	UseStructuralLevels *bool    `yaml:"useStructuralLevels"`
+	MinStructuralScore  *float64 `yaml:"minStructuralScore"`
+
+	UseStructuralPriceLevels      *bool    `yaml:"useStructuralPriceLevels"`
+	MinStructuralPriceLevelsScore *float64 `yaml:"minStructuralPriceLevelsScore"`
+
+	PartialTakeProfitPercent  *float64 `yaml:"partialTakeProfitPercent"`
+	PartialTakeProfitFraction *float64 `yaml:"partialTakeProfitFraction"`
+
+	AdaptiveTimeoutMinProfitPercent *float64 `yaml:"adaptiveTimeoutMinProfitPercent"`
+	AdaptiveTimeoutExtensionPeriods *int     `yaml:"adaptiveTimeoutExtensionPeriods"`
+}
+
+// forSource - Config с применённым оверрайдом для source (если он задан).
+// Возвращает КОПИЮ - вызывающий код читает её как обычный Config, не заботясь
+// об источнике сигнала за пределами этого одного вызова.
+func (c *Config) forSource(source string) Config {
+	resolved := *c
+
+	override, ok := c.Sources[source]
+	if !ok {
+		return resolved
+	}
+
+	if override.TakeProfitVol != nil {
+		resolved.TakeProfitVol = *override.TakeProfitVol
+	}
+	if override.StopLossVol != nil {
+		resolved.StopLossVol = *override.StopLossVol
+	}
+	if override.TakeProfitPercent != nil {
+		resolved.TakeProfitPercent = *override.TakeProfitPercent
+	}
+	if override.StopLossPercent != nil {
+		resolved.StopLossPercent = *override.StopLossPercent
+	}
+	if override.MinTakeProfitPercent != nil {
+		resolved.MinTakeProfitPercent = *override.MinTakeProfitPercent
+	}
+	if override.MaxTakeProfitPercent != nil {
+		resolved.MaxTakeProfitPercent = *override.MaxTakeProfitPercent
+	}
+	if override.MinStopLossPercent != nil {
+		resolved.MinStopLossPercent = *override.MinStopLossPercent
+	}
+	if override.MaxStopLossPercent != nil {
+		resolved.MaxStopLossPercent = *override.MaxStopLossPercent
+	}
+	if override.MaxHoldPeriods != nil {
+		resolved.MaxHoldPeriods = *override.MaxHoldPeriods
+	}
+	if override.StrengthScalePerLevel != nil {
+		resolved.StrengthScalePerLevel = *override.StrengthScalePerLevel
+	}
+	if override.TrailingActivationPercent != nil {
+		resolved.TrailingActivationPercent = *override.TrailingActivationPercent
+	}
+	if override.TrailingCallbackPercent != nil {
+		resolved.TrailingCallbackPercent = *override.TrailingCallbackPercent
+	}
+	if override.UseStructuralLevels != nil {
+		resolved.UseStructuralLevels = *override.UseStructuralLevels
+	}
+	if override.MinStructuralScore != nil {
+		resolved.MinStructuralScore = *override.MinStructuralScore
+	}
+	if override.UseStructuralPriceLevels != nil {
+		resolved.UseStructuralPriceLevels = *override.UseStructuralPriceLevels
+	}
+	if override.MinStructuralPriceLevelsScore != nil {
+		resolved.MinStructuralPriceLevelsScore = *override.MinStructuralPriceLevelsScore
+	}
+	if override.PartialTakeProfitPercent != nil {
+		resolved.PartialTakeProfitPercent = *override.PartialTakeProfitPercent
+	}
+	if override.PartialTakeProfitFraction != nil {
+		resolved.PartialTakeProfitFraction = *override.PartialTakeProfitFraction
+	}
+	if override.AdaptiveTimeoutMinProfitPercent != nil {
+		resolved.AdaptiveTimeoutMinProfitPercent = *override.AdaptiveTimeoutMinProfitPercent
+	}
+	if override.AdaptiveTimeoutExtensionPeriods != nil {
+		resolved.AdaptiveTimeoutExtensionPeriods = *override.AdaptiveTimeoutExtensionPeriods
+	}
+
+	return resolved
 }
 
 func NewConfig() (*Config, error) {

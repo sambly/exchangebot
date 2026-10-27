@@ -76,6 +76,40 @@ func TestScaleFloorSuppressesFlatSeries(t *testing.T) {
 	}
 }
 
+// Относительный пол (см. NewMetricRecordRelative) должен подавлять z-score,
+// когда история плотно кучкуется вокруг ненулевого уровня (MAD крошечный),
+// хотя сам уровень отнюдь не близок к нулю - ровно та ситуация, из-за
+// которой абсолютный scaleFloor OFI на боевом логе (см. ARCHITECTURE.md §10)
+// не защищал от z в сотни: разброс МЕЖДУ окнами может быть крошечным, даже
+// когда сами значения велики.
+func TestRelativeScaleFloorSuppressesTightClusterAroundNonzeroLevel(t *testing.T) {
+	values := make([]float64, 0, 30)
+	for i := 0; i < 30; i++ {
+		values = append(values, 50+0.1*float64(i%3)) // почти не меняется, но не ноль
+	}
+
+	noFloor := NewMetricRecord(len(values)+10, 20, 0)
+	withFloor := NewMetricRecordRelative(len(values)+10, 20, 0, 0.1)
+	for _, v := range values {
+		noFloor.Add(v)
+		withFloor.Add(v)
+	}
+
+	// В разы больше типичного уровня (~50), а не на порядки - но при
+	// схлопнувшемся MAD даже это даёт нереалистичный z.
+	probe := 300.0
+
+	zNoFloor := noFloor.ZScore(probe)
+	zWithFloor := withFloor.ZScore(probe)
+
+	if math.Abs(zNoFloor) < 50 {
+		t.Fatalf("ожидался нереалистично большой z без относительного пола (демонстрация проблемы), получено %.2f", zNoFloor)
+	}
+	if math.Abs(zWithFloor) >= math.Abs(zNoFloor) {
+		t.Fatalf("относительный пол должен снижать z по сравнению с обычным: без пола=%.2f, с полом=%.2f", zNoFloor, zWithFloor)
+	}
+}
+
 // MAD вырождается в ноль, если больше половины значений одинаковы.
 // Тогда должен использоваться запасной разброс, а не деление на ноль.
 func TestZScoreZeroMADFallback(t *testing.T) {

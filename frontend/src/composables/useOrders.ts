@@ -42,6 +42,7 @@ export function useOrders() {
     if (data.orderUpdate) store.updateOrder(data.orderUpdate as Order)
     if (data.orderAdd) store.addOrder(data.orderAdd as Order)
     if (data.orderDelete) store.removeOrder((data.orderDelete as Order).ID)
+    if (data.orderHistoryAdd) store.addToHistory([data.orderHistoryAdd as Order])
     if (data.orderHistoryDelete) store.removeFromHistory((data.orderHistoryDelete as Order).ID)
     if (data.orderHistoryClear) store.clearHistory()
   })

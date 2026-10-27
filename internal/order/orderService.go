@@ -45,6 +45,15 @@ type TradeState interface {
 	GetOrdersHistoryCopy() (orders map[string][]Order)
 	CreateOrderMarket(deal Deal) (*Order, error)
 	ClosePosition(id int64, deal Deal) (*Order, error)
+	// RollbackClose - см. OrderService.ClosePosition: отменяет ClosePosition,
+	// если она уже успела перевести ордер из активных в историю в памяти, а
+	// последующая запись в БД (Repo.ClosePosition) упала. Без отката ордер
+	// навсегда "теряется" - в памяти закрыт, в БД по-прежнему активен, и
+	// любая следующая попытка закрыть его (например, со стороны политики
+	// выхода, повторяющей проверку на каждом тике) будет получать "не
+	// найден" бесконечно, хотя реальная позиция (и риск по ней) осталась
+	// открытой - см. ARCHITECTURE.md §10.9.
+	RollbackClose(id int64) error
 	// ReducePosition закрывает ЧАСТЬ активной позиции: fraction (0..1) - доля
 	// ОТ ПЕРВОНАЧАЛЬНОГО объёма (Order.OriginalQuantity, не текущего Quantity -
 	// он уже мог быть уменьшен предыдущим частичным закрытием). В отличие от
@@ -56,6 +65,15 @@ type TradeState interface {
 	// чистая операция "уменьшить ещё на fraction", сколько раз её вызвать,
 	// решает не она.
 	ReducePosition(id int64, fraction float64, deal Deal) (*Order, error)
+	// RollbackReduce - см. RollbackClose, тот же принцип для ReducePosition:
+	// если запись в БД после неё упала, отменяет применённые в памяти
+	// изменения (Quantity/RealizedProfit) - без отката они разошлись бы
+	// между памятью и БД после одного неудачного запроса (см.
+	// ARCHITECTURE.md §10.9). Менее опасный класс той же проблемы, что была
+	// у ClosePosition: ордер не покидает активные, поэтому "теряется
+	// навсегда" здесь не может - но бухгалтерия разъезжается. fraction - та
+	// же доля, что передавалась в ReducePosition.
+	RollbackReduce(id int64, fraction float64) error
 	RemoveOrderHistory(id int64) (*Order, error)
 	ClearHistory()
 	UpdateOrdersPrice(pair string, price float64) []Order
@@ -227,6 +245,14 @@ func (os *OrderService) ClosePosition(id int64, deal Deal) error {
 	}
 
 	if err := os.Repo.ClosePosition(id, order); err != nil {
+		// В памяти ClosePosition уже отработала (order выше - её результат),
+		// а БД это не подтвердила - без отката ордер навсегда осел бы
+		// "закрытым" в памяти при статусе ACTIVE в БД, и ни одна следующая
+		// попытка закрыть его не смогла бы его найти (см. ARCHITECTURE.md
+		// §10.9 - ровно так был найден этот баг).
+		if rollbackErr := os.State.RollbackClose(id); rollbackErr != nil {
+			orderLogger.Errorf("close position id=%d: не удалось откатить закрытие после ошибки БД (%v): %v", id, err, rollbackErr)
+		}
 		return err
 	}
 
@@ -241,7 +267,15 @@ func (os *OrderService) ClosePosition(id int64, deal Deal) error {
 
 	os.updateOrdersDependencies(*order)
 
-	messageOrder, _ := json.Marshal(map[string]interface{}{"orderDelete": order})
+	// orderDelete - убрать из активных; orderHistoryAdd - тем же сообщением
+	// добавить в историю на фронте, а не только в базу. Раньше слали только
+	// orderDelete - для автоматического закрытия (стратегией, без HTTP-ответа
+	// клиенту) это означало, что вкладка "История сделок" не обновлялась сама
+	// вообще, пока пользователь не нажмёт "Обновить" (полный re-fetch). Ручное
+	// закрытие с фронта (OrdersActive.vue) этого не показывало, потому что
+	// само дописывало историю из HTTP-ответа - заплатка на один конкретный
+	// случай, а не общий механизм.
+	messageOrder, _ := json.Marshal(map[string]interface{}{"orderDelete": order, "orderHistoryAdd": order})
 	os.socketsMessage.SendData(messageOrder)
 
 	return nil
@@ -262,6 +296,13 @@ func (os *OrderService) ReducePosition(id int64, fraction float64, deal Deal) er
 	}
 
 	if err := os.Repo.ReducePosition(id, order); err != nil {
+		// Тот же принцип, что у ClosePosition (см. RollbackClose): в памяти
+		// изменения уже применены, БД их не подтвердила - без отката
+		// Quantity/RealizedProfit разошлись бы с БД после одного неудачного
+		// запроса.
+		if rollbackErr := os.State.RollbackReduce(id, fraction); rollbackErr != nil {
+			orderLogger.Errorf("reduce position id=%d: не удалось откатить частичное закрытие после ошибки БД (%v): %v", id, err, rollbackErr)
+		}
 		return err
 	}
 

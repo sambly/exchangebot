@@ -15,6 +15,7 @@ import { useOrdersStore } from '../../stores/orders'
 import { useUIStore } from '../../stores/ui'
 import Button from 'primevue/button'
 import { toChartTime } from '../../utils/chartTime'
+import { themeBackground } from '../../utils/chartTheme'
 
 const props = defineProps<{
   pair: string
@@ -47,7 +48,7 @@ let tooltip: HTMLDivElement | null = null
 let spinnerEl: HTMLDivElement | null = null
 
 const textColor = () => props.darkMode ? '#d1d4dc' : '#111'
-const bgColor = () => props.darkMode ? '#131722' : '#ffffff'
+const bgColor = () => themeBackground(!!props.darkMode)
 const gridColor = () => props.darkMode ? '#2B2B43' : '#E1E3EA'
 
 // ======================================================

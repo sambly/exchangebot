@@ -8,7 +8,9 @@ import (
 	exModel "github.com/sambly/exchangeService/pkg/model"
 	"github.com/sambly/exchangebot/internal/depth"
 	"github.com/sambly/exchangebot/internal/entrysetup"
+	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/order"
+	"github.com/sambly/exchangebot/internal/prices"
 	"github.com/sambly/exchangebot/internal/strategy/sales"
 	"github.com/sambly/exchangebot/internal/strategy/signal"
 )
@@ -100,6 +102,68 @@ func TestPlanFallsBackToPercents(t *testing.T) {
 
 	if takeProfit != 2.0 || stopLoss != 1.5 {
 		t.Fatalf("без волатильности ожидались проценты из конфига (2.0/1.5), получено %.2f/%.2f", takeProfit, stopLoss)
+	}
+}
+
+// Оверрайд по источнику (Config.Sources) должен применяться ТОЛЬКО к
+// сигналам с этим Source, не трогая глобальные значения для остальных - это
+// и есть смысл variant A из обсуждения (structsale общая на весь Executor, но
+// разные детекторы тюнятся независимо через один и тот же конфиг-файл).
+func TestPlanAppliesSourceOverride(t *testing.T) {
+	str := testSale()
+	overrideTP := 5.0
+	overrideSL := 3.0
+	str.Config.Sources = map[string]SourceOverride{
+		"levels": {
+			TakeProfitPercent: &overrideTP,
+			StopLossPercent:   &overrideSL,
+		},
+	}
+
+	takeProfit, stopLoss, _ := str.Plan(signal.Signal{Source: "levels", Period: "1h", Level: 1})
+	if takeProfit != overrideTP || stopLoss != overrideSL {
+		t.Fatalf("источник levels должен получить оверрайд (5.0/3.0), получено %.2f/%.2f", takeProfit, stopLoss)
+	}
+
+	// Другой источник (или его отсутствие) не должен видеть чужой оверрайд.
+	takeProfit, stopLoss, _ = str.Plan(signal.Signal{Source: "anomaly", Period: "1h", Level: 1})
+	if takeProfit != 2.0 || stopLoss != 1.5 {
+		t.Fatalf("источник anomaly должен остаться на глобальных значениях (2.0/1.5), получено %.2f/%.2f", takeProfit, stopLoss)
+	}
+}
+
+// Оверрайд *bool должен уметь явно выключать фичу для одного источника, даже
+// если глобально она включена - указатель, а не голое bool, ради именно
+// этого различения "не задано" / "явно false".
+func TestPlanSourceOverrideCanDisableStructuralLevels(t *testing.T) {
+	pair := "BTCUSDT"
+	es := setupWithWalls(t, pair)
+
+	str := testSale()
+	str.entrySetup = es
+	str.Config.UseStructuralLevels = true
+	str.Config.MinStructuralScore = 1.0
+
+	disabled := false
+	str.Config.Sources = map[string]SourceOverride{
+		"nolevels": {UseStructuralLevels: &disabled},
+	}
+
+	quality, ok := es.GetQuality(pair, "15m")
+	if !ok {
+		t.Fatal("ожидалась найденная Quality для теста")
+	}
+
+	// Глобально (без оверрайда) структурный план должен применяться.
+	takeProfit, _, _ := str.Plan(signal.Signal{Source: "anomaly", Pair: pair, Period: "15m", Volatility: 0.1, Level: 1})
+	if math.Abs(takeProfit-quality.TakeDistancePercent) > 1e-9 {
+		t.Fatalf("без оверрайда ожидался структурный тейк %.4f, получено %.4f", quality.TakeDistancePercent, takeProfit)
+	}
+
+	// У источника nolevels структурный план явно выключен - откат на волатильность.
+	takeProfit, _, _ = str.Plan(signal.Signal{Source: "nolevels", Pair: pair, Period: "15m", Volatility: 0.1, Level: 1})
+	if math.Abs(takeProfit-quality.TakeDistancePercent) < 1e-9 {
+		t.Fatal("у источника nolevels структурный план должен быть выключен оверрайдом")
 	}
 }
 
@@ -285,6 +349,154 @@ func setupWithWalls(t *testing.T, pair string) *entrysetup.AssetsSetup {
 	return entrysetup.NewAssetsSetup(nil, ad)
 }
 
+// fakeCandleRepo/flatCandlesWithLevels - тот же приём, что в
+// entrysetup/levels_test.go: плоская история с одним swing high (resistance)
+// и одним swing low (support) около текущей цены, без похода в реальную БД.
+type fakeCandleRepo struct {
+	candles []exModel.Candle
+}
+
+func (r fakeCandleRepo) SelectMarketStateTimev2(time.Time) ([]exModel.Candle, error) { return nil, nil }
+func (r fakeCandleRepo) SelectDeltaPeriod(string, string) ([]model.ChangeDeltaForCandle, error) {
+	return nil, nil
+}
+func (r fakeCandleRepo) SelectCandlesFromPeriod(string, time.Time) ([]exModel.Candle, error) {
+	return r.candles, nil
+}
+
+func flatCandlesWithLevels(pair string, from time.Time, step time.Duration, n int, base, supportPrice, resistancePrice float64) []exModel.Candle {
+	out := make([]exModel.Candle, 0, n)
+	for i := 0; i < n; i++ {
+		c := exModel.Candle{Pair: pair, Time: from.Add(step * time.Duration(i)), Close: base, High: base, Low: base}
+		if i == n/2-10 {
+			c.Low = supportPrice
+		}
+		if i == n/2+10 {
+			c.High = resistancePrice
+		}
+		out = append(out, c)
+	}
+	out[n-1].Close = base
+	return out
+}
+
+// setupWithPriceLevels - AssetsSetup с реальными PriceLevels (свечная
+// история через fakeCandleRepo), а не стенами стакана - для тестов
+// structuralPriceLevelsPlan.
+func setupWithPriceLevels(t *testing.T, pair string, base, supportPrice, resistancePrice float64) *entrysetup.AssetsSetup {
+	t.Helper()
+
+	periods := map[string]time.Duration{"15m": 15 * time.Minute}
+	from := time.Now().Add(-101 * 15 * time.Minute)
+	candles := flatCandlesWithLevels(pair, from, 15*time.Minute, 101, base, supportPrice, resistancePrice)
+
+	ap, err := prices.NewAssetsPrices([]string{pair}, periods, periods, fakeCandleRepo{candles: candles})
+	if err != nil {
+		t.Fatalf("NewAssetsPrices: %v", err)
+	}
+
+	return entrysetup.NewAssetsSetup(ap, nil)
+}
+
+// Когда включён UseStructuralPriceLevels и обе стороны (support/resistance)
+// найдены, structuralPriceLevelsPlan должен отдать ровно их дистанции.
+func TestStructuralPriceLevelsPlanUsesLevelsDistances(t *testing.T) {
+	pair := "BTCUSDT"
+	es := setupWithPriceLevels(t, pair, 100, 92, 115) // support 8% вниз, resistance 15% вверх
+
+	levels, ok := es.GetPriceLevels(pair, "15m")
+	if !ok || !levels.HasSupport || !levels.HasResistance {
+		t.Fatalf("ожидались обе стороны PriceLevels, получено %+v (ok=%v)", levels, ok)
+	}
+
+	str := testSale()
+	str.entrySetup = es
+	str.Config.UseStructuralPriceLevels = true
+	str.Config.MinStructuralPriceLevelsScore = 1.0
+
+	takeProfit, stopLoss, ok := str.structuralPriceLevelsPlan(signal.Signal{Pair: pair, Period: "15m"}, str.Config)
+	if !ok {
+		t.Fatal("structuralPriceLevelsPlan должен вернуть ok=true")
+	}
+	if math.Abs(takeProfit-levels.Resistance.DistancePercent) > 1e-9 || math.Abs(stopLoss-levels.Support.DistancePercent) > 1e-9 {
+		t.Fatalf("ожидались дистанции PriceLevels (tp=%.4f sl=%.4f), получено tp=%.4f sl=%.4f",
+			levels.Resistance.DistancePercent, levels.Support.DistancePercent, takeProfit, stopLoss)
+	}
+}
+
+// Если для источника включены ОБЕ структурные фичи, Plan должен предпочесть
+// свечные уровни стенам стакана - см. Go-комментарий у
+// Config.UseStructuralPriceLevels ("проверяется РАНЬШЕ").
+func TestPlanPrefersPriceLevelsOverWalls(t *testing.T) {
+	pair := "BTCUSDT"
+
+	periods := map[string]time.Duration{"15m": 15 * time.Minute}
+	from := time.Now().Add(-101 * 15 * time.Minute)
+	candles := flatCandlesWithLevels(pair, from, 15*time.Minute, 101, 100, 92, 115) // support 8%, resistance 15%
+	ap, err := prices.NewAssetsPrices([]string{pair}, periods, periods, fakeCandleRepo{candles: candles})
+	if err != nil {
+		t.Fatalf("NewAssetsPrices: %v", err)
+	}
+
+	bids := wallLevels(100.0, -1.0, 20, 1.0, 1, 50.0) // ближняя стена ~1% вниз
+	asks := wallLevels(100.1, 1.0, 20, 1.0, 10, 50.0) // дальняя стена ~10% вверх
+	ad := depth.NewAssetsDepth([]string{pair})
+	ad.OnDepth(exModel.DepthUpdate{Pair: pair, Bids: bids, Asks: asks})
+
+	// Один AssetsSetup с ОБОИМИ источниками структуры, чтобы Plan реально
+	// выбирал между ними, а не просто использовал единственный доступный.
+	es := entrysetup.NewAssetsSetup(ap, ad)
+
+	levels, _ := es.GetPriceLevels(pair, "15m")
+	quality, _ := es.GetQuality(pair, "15m")
+
+	str := testSale()
+	str.entrySetup = es
+	str.Config.UseStructuralPriceLevels = true
+	str.Config.MinStructuralPriceLevelsScore = 1.0
+	str.Config.UseStructuralLevels = true
+	str.Config.MinStructuralScore = 1.0
+
+	takeProfit, stopLoss, _ := str.Plan(signal.Signal{Pair: pair, Period: "15m", Volatility: 0.1, Level: 1})
+
+	if math.Abs(takeProfit-levels.Resistance.DistancePercent) > 1e-9 || math.Abs(stopLoss-levels.Support.DistancePercent) > 1e-9 {
+		t.Fatalf("ожидались дистанции PriceLevels (tp=%.4f sl=%.4f) - приоритет над стенами, получено tp=%.4f sl=%.4f (стены дали бы tp=%.4f sl=%.4f)",
+			levels.Resistance.DistancePercent, levels.Support.DistancePercent, takeProfit, stopLoss,
+			quality.TakeDistancePercent, quality.StopDistancePercent)
+	}
+}
+
+// Слишком слабое соотношение (ниже MinStructuralPriceLevelsScore) не должно
+// приниматься - тот же принцип, что у TestStructuralPlanRejectsWeakScore.
+func TestStructuralPriceLevelsPlanRejectsWeakScore(t *testing.T) {
+	pair := "BTCUSDT"
+	es := setupWithPriceLevels(t, pair, 100, 92, 115)
+
+	str := testSale()
+	str.entrySetup = es
+	str.Config.UseStructuralPriceLevels = true
+	str.Config.MinStructuralPriceLevelsScore = 1000 // заведомо недостижимо
+
+	if _, _, ok := str.structuralPriceLevelsPlan(signal.Signal{Pair: pair, Period: "15m"}, str.Config); ok {
+		t.Fatal("при недостаточном score structuralPriceLevelsPlan должен вернуть ok=false")
+	}
+}
+
+// UseStructuralPriceLevels=false должен отключать фичу, даже если entrySetup
+// есть и обе стороны найдены.
+func TestStructuralPriceLevelsPlanDisabledByConfig(t *testing.T) {
+	pair := "BTCUSDT"
+	es := setupWithPriceLevels(t, pair, 100, 92, 115)
+
+	str := testSale()
+	str.entrySetup = es
+	str.Config.UseStructuralPriceLevels = false
+
+	if _, _, ok := str.structuralPriceLevelsPlan(signal.Signal{Pair: pair, Period: "15m"}, str.Config); ok {
+		t.Fatal("при UseStructuralPriceLevels=false structuralPriceLevelsPlan должен вернуть ok=false")
+	}
+}
+
 // Когда структурные данные доступны и достаточно привлекательны,
 // structuralPlan должен отдавать РОВНО дистанции Quality, а не что-то от
 // волатильности.
@@ -302,7 +514,7 @@ func TestStructuralPlanUsesQualityDistances(t *testing.T) {
 	str.Config.UseStructuralLevels = true
 	str.Config.MinStructuralScore = 1.0
 
-	takeProfit, stopLoss, ok := str.structuralPlan(signal.Signal{Pair: pair, Period: "15m"})
+	takeProfit, stopLoss, ok := str.structuralPlan(signal.Signal{Pair: pair, Period: "15m"}, str.Config)
 	if !ok {
 		t.Fatal("structuralPlan должен вернуть ok=true")
 	}
@@ -341,7 +553,7 @@ func TestStructuralPlanNilEntrySetup(t *testing.T) {
 	str.entrySetup = nil
 	str.Config.UseStructuralLevels = true
 
-	if _, _, ok := str.structuralPlan(signal.Signal{Pair: "BTCUSDT", Period: "15m"}); ok {
+	if _, _, ok := str.structuralPlan(signal.Signal{Pair: "BTCUSDT", Period: "15m"}, str.Config); ok {
 		t.Fatal("без entrySetup structuralPlan должен вернуть ok=false")
 	}
 }
@@ -356,7 +568,7 @@ func TestStructuralPlanDisabledByConfig(t *testing.T) {
 	str.entrySetup = es
 	str.Config.UseStructuralLevels = false
 
-	if _, _, ok := str.structuralPlan(signal.Signal{Pair: pair, Period: "15m"}); ok {
+	if _, _, ok := str.structuralPlan(signal.Signal{Pair: pair, Period: "15m"}, str.Config); ok {
 		t.Fatal("при UseStructuralLevels=false structuralPlan должен вернуть ok=false")
 	}
 }
@@ -513,7 +725,7 @@ func TestStructuralPlanRejectsWeakScore(t *testing.T) {
 	str.Config.UseStructuralLevels = true
 	str.Config.MinStructuralScore = 1000 // заведомо недостижимо
 
-	if _, _, ok := str.structuralPlan(signal.Signal{Pair: pair, Period: "15m"}); ok {
+	if _, _, ok := str.structuralPlan(signal.Signal{Pair: pair, Period: "15m"}, str.Config); ok {
 		t.Fatal("при недостаточном Score structuralPlan должен вернуть ok=false")
 	}
 }

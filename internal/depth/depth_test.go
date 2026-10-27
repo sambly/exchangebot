@@ -142,6 +142,74 @@ func TestAssetsDepthGetBestBidAsk(t *testing.T) {
 	}
 }
 
+// Больше объёма на биде, чем на аске - микро-цена должна сдвигаться К АСКУ
+// (вверх от mid): много резервируемого спроса снизу эмпирически "тянет"
+// цену наверх, потому что асков не хватит его насытить.
+func TestAssetsDepthGetMicroPriceSkewsTowardThinnerSide(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 9}},
+		Asks: []exModel.DepthLevel{{Price: 102, Quantity: 1}},
+	})
+
+	micro, deviationPercent, ok := ad.GetMicroPrice("BTCUSDT")
+	if !ok {
+		t.Fatal("GetMicroPrice: ожидался успех")
+	}
+
+	// (100*1 + 102*9) / 10 = 101.8
+	wantMicro := 101.8
+	if math.Abs(micro-wantMicro) > 1e-9 {
+		t.Fatalf("micro-цена: ожидали %v, получили %v", wantMicro, micro)
+	}
+	if deviationPercent <= 0 {
+		t.Fatalf("бид тяжелее аска - deviationPercent должен быть положительным (тянет вверх от mid=101), получили %v", deviationPercent)
+	}
+}
+
+// Симметричный стакан (равные объёмы) - микро-цена должна совпасть с mid,
+// отклонение - около нуля.
+func TestAssetsDepthGetMicroPriceEqualsMidOnBalancedBook(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 5}},
+		Asks: []exModel.DepthLevel{{Price: 102, Quantity: 5}},
+	})
+
+	micro, deviationPercent, ok := ad.GetMicroPrice("BTCUSDT")
+	if !ok {
+		t.Fatal("GetMicroPrice: ожидался успех")
+	}
+	if math.Abs(micro-101) > 1e-9 {
+		t.Fatalf("на сбалансированном стакане micro-цена должна равняться mid=101, получили %v", micro)
+	}
+	if math.Abs(deviationPercent) > 1e-9 {
+		t.Fatalf("на сбалансированном стакане отклонение должно быть 0, получили %v", deviationPercent)
+	}
+}
+
+// Без готового стакана (или без обеих сторон) GetMicroPrice должен честно
+// отдавать ready=false, а не нулевые значения как будто посчитано.
+func TestAssetsDepthGetMicroPriceNotReadyWithoutBook(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	if _, _, ok := ad.GetMicroPrice("BTCUSDT"); ok {
+		t.Fatal("без апдейтов GetMicroPrice должен вернуть ok=false")
+	}
+
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 5}},
+	})
+	if _, _, ok := ad.GetMicroPrice("BTCUSDT"); ok {
+		t.Fatal("без асков GetMicroPrice должен вернуть ok=false")
+	}
+}
+
 // DepthState{Ready: false} должен полностью очищать стакан (ре-синк начинается
 // с чистого листа) и сбрасывать готовность.
 func TestAssetsDepthNotReadyClearsBook(t *testing.T) {
@@ -429,4 +497,242 @@ func TestAssetsDepthOnDepthIgnoresUnknownType(t *testing.T) {
 	if ad.IsReady("BTCUSDT") {
 		t.Fatal("неизвестный payload не должен помечать пару готовой")
 	}
+}
+
+// --- OFI (Order Flow Imbalance) ---
+
+// Улучшение цены бида (появился более высокий бид) - событие бычье, вклад
+// равен ПОЛНОМУ новому объёму: это не изменение существующего уровня, а
+// появление нового лучшего уровня с нуля.
+func TestOfiEventBidPriceImproves(t *testing.T) {
+	got := ofiEvent(100, 10, 102, 15, 101, 10, 101, 10)
+	if got != 15 {
+		t.Fatalf("ожидался вклад +15 (полный новый объём бида), получено %.2f", got)
+	}
+}
+
+// Ухудшение цены бида (лучший бид просел) - весь ПРЕЖНИЙ объём засчитывается
+// как убывший: тот уровень для топа книги перестал существовать.
+func TestOfiEventBidPriceWorsens(t *testing.T) {
+	got := ofiEvent(102, 15, 100, 10, 101, 10, 101, 10)
+	if got != -15 {
+		t.Fatalf("ожидался вклад -15 (весь прежний объём бида), получено %.2f", got)
+	}
+}
+
+// Цена бида та же - только изменение объёма НА МЕСТЕ.
+func TestOfiEventBidQuantitySameLevel(t *testing.T) {
+	got := ofiEvent(100, 10, 100, 16, 101, 10, 101, 10)
+	if got != 6 {
+		t.Fatalf("ожидался вклад +6 (16-10), получено %.2f", got)
+	}
+}
+
+// Улучшение цены аска для продавца - это ЦЕНА ВНИЗ (подрезание, агрессивная
+// продажа): вклад аска = полный новый объём, а итоговый OFI (bid - ask)
+// становится ОТРИЦАТЕЛЬНЫМ - рост предложения медвежий.
+func TestOfiEventAskPriceImproves(t *testing.T) {
+	got := ofiEvent(100, 10, 100, 10, 101, 10, 99, 12)
+	if got != -12 {
+		t.Fatalf("ожидался вклад -12 (агрессивная продажа), получено %.2f", got)
+	}
+}
+
+// Отступление аска (цена вверх, продавцы отступили) - прежний объём аска
+// убывает, а итоговый OFI становится ПОЛОЖИТЕЛЬНЫМ: меньше давления
+// продавцов - это бычий сигнал.
+func TestOfiEventAskPriceWorsens(t *testing.T) {
+	got := ofiEvent(100, 10, 100, 10, 101, 10, 103, 8)
+	if got != 10 {
+		t.Fatalf("ожидался вклад +10 (снятое давление продавцов), получено %.2f", got)
+	}
+}
+
+// Аск на той же цене - только изменение объёма на месте, с обратным знаком
+// (рост объёма аска - медвежий вклад).
+func TestOfiEventAskQuantitySameLevel(t *testing.T) {
+	got := ofiEvent(100, 10, 100, 10, 101, 10, 101, 14)
+	if got != -4 {
+		t.Fatalf("ожидался вклад -4 (-(14-10)), получено %.2f", got)
+	}
+}
+
+// Бид и аск одновременно двигаются в бычью сторону - вклады складываются, а
+// не гасят друг друга.
+func TestOfiEventCombinedBullish(t *testing.T) {
+	// Бид улучшился (+15) И аск отступил (+10 за счёт снятого объёма).
+	got := ofiEvent(100, 10, 102, 15, 101, 10, 103, 8)
+	if got != 25 {
+		t.Fatalf("ожидался суммарный вклад +25 (15+10), получено %.2f", got)
+	}
+}
+
+// Накопление в пределах одного окна: несколько апдейтов подряд (троттлинг
+// коммита заморожен) должны суммироваться в ofiAccumulator, а после
+// разморозки - попасть в GetOFIZScore одним закоммиченным значением и
+// обнулить аккумулятор.
+func TestAssetsDepthOFIAccumulatesThenCommits(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	// Бутстрап: первый апдейт (нет предыдущего топа - событие не считается) и
+	// коммитит немедленно (nextOFISampleAt нулевое), поэтому дальше троттлинг
+	// замораживаем сами и обнуляем то, что успело закоммититься на бутстрапе.
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 10}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 10}},
+	})
+
+	b := ad.books["BTCUSDT"]
+	b.nextOFISampleAt = time.Now().Add(time.Hour)
+	b.ofiAccumulator = 0
+
+	// Событие 1: бид улучшился 100->102 (+15).
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 102, Quantity: 15}},
+	})
+	// Событие 2: аск отступил 101->103 (+10). Старый уровень нужно снять явно
+	// (qty=0) - иначе в карте останутся оба, и лучшим по-прежнему будет 101.
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Asks: []exModel.DepthLevel{
+			{Price: 101, Quantity: 0},
+			{Price: 103, Quantity: 8},
+		},
+	})
+
+	if b.ofiAccumulator != 25 {
+		t.Fatalf("накопленный OFI = %.2f, ожидалось 25 (15+10)", b.ofiAccumulator)
+	}
+
+	// Разрешаем коммит и триггерим его апдейтом без реальных изменений уровней
+	// (пустые Bids/Asks) - топ книги не меняется, событие не добавляется.
+	b.nextOFISampleAt = time.Now().Add(-time.Second)
+	ad.OnDepth(exModel.DepthUpdate{Pair: "BTCUSDT"})
+
+	value, _, ready := ad.GetOFIZScore("BTCUSDT")
+	if !ready {
+		t.Fatal("GetOFIZScore: ожидался ready=true")
+	}
+	if value != 25 {
+		t.Fatalf("закоммиченное значение = %.2f, ожидалось 25", value)
+	}
+	if b.ofiAccumulator != 0 {
+		t.Fatalf("после коммита аккумулятор должен обнулиться, получено %.2f", b.ofiAccumulator)
+	}
+}
+
+// Пересинк книги (DepthState{Ready:false}) должен сбрасывать hasPrevBest:
+// первое событие после пересинка не должно сравнивать топ книги ДО пересинка
+// с топом ПОСЛЕ - это скачок, порождённый самим пересинком, а не потоком заявок.
+func TestAssetsDepthOFISkipsEventAcrossResync(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 10}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 10}},
+	})
+
+	b := ad.books["BTCUSDT"]
+	b.nextOFISampleAt = time.Now().Add(time.Hour)
+	b.ofiAccumulator = 0
+
+	// Пересинк: стакан сбрасывается, готовность временно снята.
+	ad.OnDepth(exModel.DepthState{Pair: "BTCUSDT", Ready: false})
+	if b.hasPrevBest {
+		t.Fatal("после clear() hasPrevBest должен быть сброшен")
+	}
+
+	// Новый снапшот после пересинка - совершенно другая книга (цены далеко от
+	// прежних). Если бы hasPrevBest не сбросился, это дало бы огромный
+	// паразитный скачок OFI.
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 50, Quantity: 1000}},
+		Asks: []exModel.DepthLevel{{Price: 51, Quantity: 1000}},
+	})
+
+	if b.ofiAccumulator != 0 {
+		t.Fatalf("первое событие после пересинка не должно ничего добавлять в аккумулятор, получено %.2f", b.ofiAccumulator)
+	}
+}
+
+// Один резкий бычий поток не должен считаться "подтверждённым" сразу - нужно,
+// чтобы он держался ofiConfirmMinStreak закоммиченных окон подряд.
+func TestAssetsDepthOFIConfirmedSideRequiresStreak(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 10}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 10}},
+	})
+
+	b := ad.books["BTCUSDT"]
+	b.nextOFISampleAt = time.Now().Add(time.Hour)
+	for i := 0; i < ofiMinSamples; i++ {
+		b.ofiHistory.Add(0)
+	}
+
+	sampleBullishOFI(ad, b, 101)
+	if _, confirmed := ad.GetOFIConfirmedSide("BTCUSDT"); confirmed {
+		t.Fatal("после одного сэмпла сторона не должна считаться подтверждённой")
+	}
+
+	sampleBullishOFI(ad, b, 102)
+	sampleBullishOFI(ad, b, 103)
+
+	side, confirmed := ad.GetOFIConfirmedSide("BTCUSDT")
+	if !confirmed || side != order.SideTypeBuy {
+		t.Fatalf("после %d сэмплов подряд ожидался Confirmed=BUY, получено side=%v confirmed=%v", ofiConfirmMinStreak, side, confirmed)
+	}
+}
+
+// Резкий разворот потока должен сбрасывать стрик - подтверждение не должно
+// "унаследоваться" от предыдущей, уже неактуальной стороны.
+func TestAssetsDepthOFIConfirmedSideResetsOnFlip(t *testing.T) {
+	ad := NewAssetsDepth([]string{"BTCUSDT"})
+
+	ad.OnDepth(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: 100, Quantity: 10}},
+		Asks: []exModel.DepthLevel{{Price: 101, Quantity: 10}},
+	})
+
+	b := ad.books["BTCUSDT"]
+	b.nextOFISampleAt = time.Now().Add(time.Hour)
+	for i := 0; i < ofiMinSamples; i++ {
+		b.ofiHistory.Add(0)
+	}
+
+	sampleBullishOFI(ad, b, 101)
+	sampleBullishOFI(ad, b, 102)
+	sampleBullishOFI(ad, b, 103)
+	if _, confirmed := ad.GetOFIConfirmedSide("BTCUSDT"); !confirmed {
+		t.Fatal("ожидался Confirmed=BUY перед проверкой сброса")
+	}
+
+	// Резкий медвежий сдвиг: аск обрушивается далеко вниз от текущего лучшего
+	// (101) - один сэмпл, сброс стрика.
+	b.nextOFISampleAt = time.Now().Add(-time.Second)
+	ad.applyUpdate(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Asks: []exModel.DepthLevel{{Price: 50, Quantity: 1000}},
+	})
+
+	if _, confirmed := ad.GetOFIConfirmedSide("BTCUSDT"); confirmed {
+		t.Fatal("после разворота потока подтверждение должно сброситься")
+	}
+}
+
+// sampleBullishOFI - один "тик" резко бычьего потока (бид улучшается до price
+// с большим объёмом), с разморозкой троттлинга коммита перед апдейтом.
+func sampleBullishOFI(ad *AssetsDepth, b *book, price float64) {
+	b.nextOFISampleAt = time.Now().Add(-time.Second)
+	ad.applyUpdate(exModel.DepthUpdate{
+		Pair: "BTCUSDT",
+		Bids: []exModel.DepthLevel{{Price: price, Quantity: 1000}},
+	})
 }

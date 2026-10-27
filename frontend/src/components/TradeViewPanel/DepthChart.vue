@@ -9,6 +9,7 @@ import {
   type Time
 } from 'lightweight-charts'
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { themeBackground } from '../../utils/chartTheme'
 
 const props = defineProps<{
   pair: string
@@ -76,7 +77,7 @@ function getTextColor() {
   return props.darkMode ? '#d1d4dc' : '#111111'
 }
 function getBackgroundColor() {
-  return props.darkMode ? '#131722' : '#ffffff'
+  return themeBackground(!!props.darkMode)
 }
 function getGridColor() {
   return props.darkMode ? '#2B2B43' : '#E1E3EA'

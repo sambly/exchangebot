@@ -17,21 +17,28 @@ type Side = 'BUY' | 'SELL'
 
 // Компоненты композита. regime - не голосующий сигнал (у сжатия волатильности
 // нет стороны), а множитель силы остальных - см. applyComposite ниже.
+//
+// «Стены» здесь больше нет (strategy_v2, см. ARCHITECTURE.md §10.3):
+// направленный сигнал по резервному объёму на уровне стакана легко
+// подделывается спуфингом, а confirm-стрик защищает только от однотактного
+// шума, не от целенаправленной подмены ордера. Имбаланс/Buy-активность
+// заменены на OFI/VPIN - те же роли, но событийная/объёмная методология
+// вместо снапшота по времени (см. Go-комментарий у entrysetup.StrengthComponents).
 const COMPONENTS = [
-  { key: 'imbalance', label: 'Имбаланс', hint: 'Book-имбаланс топ-20 уровней стакана, z-score относительно истории пары (см. таблицу "Имбаланс").' },
-  { key: 'walls', label: 'Стены', hint: 'Асимметрия стен стакана: во сколько раз дальняя стена дальше ближней, знак - какая сторона ближе.' },
-  { key: 'levels', label: 'Уровни', hint: 'То же самое, но по разворотным точкам на графике цены (swing high/low), а не по стакану.' },
-  { key: 'activity', label: 'Buy-активность', hint: 'Насколько активность покупателей (объём и число сделок, инициированных покупкой) сейчас необычна для пары - z-score относительно её собственной истории.' },
+  { key: 'ofi', label: 'OFI', hint: 'Order Flow Imbalance - событийный поток заявок на лучших уровнях стакана (Cont-Kukanov-Stoikov), z-score относительно истории пары.' },
+  { key: 'levels', label: 'Уровни', hint: 'Асимметрия уровней поддержки/сопротивления по разворотным точкам на графике цены (swing high/low).' },
+  { key: 'vpin', label: 'VPIN', hint: 'Доля покупок в объёмном бакете (VPIN-подобный, Easley/López de Prado/O\'Hara) - z-score относительно истории пары.' },
+  { key: 'relstrength', label: 'Отн. сила', hint: 'Кросс-секционный сигнал: изменение цены пары относительно МЕДИАНЫ изменения по всему рынку за тот же период - отличает идиосинкратическую аномалию пары от общего движения рынка (например, всё падает вслед за BTC).' },
   { key: 'regime', label: 'Сжатие волатильности', hint: 'Множитель, не голос: усиливает композит, когда пара двигалась в последнее время заметно меньше обычного (сжатие часто предшествует выносу).' },
 ] as const
 
 type ComponentKey = typeof COMPONENTS[number]['key']
 
 const enabled = reactive<Record<ComponentKey, boolean>>({
-  imbalance: true,
-  walls: true,
+  ofi: true,
   levels: true,
-  activity: true,
+  vpin: true,
+  relstrength: true,
   regime: true,
 })
 
@@ -43,20 +50,19 @@ interface StrengthRow {
   side: Side | null
   agree: number
   total: number
-  hasImbalance: boolean
-  imbalanceZ: number
-  imbalanceConfirmed: boolean
-  hasWalls: boolean
-  wallsSide: Side | null
-  wallsScore: number
-  wallsConfirmed: boolean
+  hasOFI: boolean
+  ofiZ: number
+  ofiConfirmed: boolean
   hasLevels: boolean
   levelsSide: Side | null
   levelsScore: number
   hasRegime: boolean
   regime: number
-  hasActivity: boolean
-  activityZ: number
+  hasVPIN: boolean
+  vpinZ: number
+  hasRelativeStrength: boolean
+  relativeStrengthZ: number
+  relativeStrengthConfirmed: boolean
 }
 
 const market = useMarketStore()
@@ -89,10 +95,26 @@ function signOf(side: Side): number {
   return side === 'BUY' ? 1 : -1
 }
 
-// WallsScore/LevelsScore - "во сколько раз дальше" (>=1, без верхней границы).
-// Логарифм переводит это в шкалу, сравнимую с z-score остальных компонентов:
-// score=1 (нет реальной асимметрии) даёт 0, score=e даёт 1 - тот же порядок,
-// что и заметный z-score.
+// CONTRIBUTION_CLAMP - потолок |вклада| одного компонента в композит.
+//
+// Разбор боевых логов (см. ARCHITECTURE.md §10) показал: OFI на реальных
+// (не вырожденных, не баг) резких всплесках объёма честно даёт z в сотни -
+// это не ошибка калибровки, а особенность единиц измерения (сырой объём
+// базового актива), просто плохо ложащаяся на привычную "z-score = сигмы"
+// интуицию. Без потолка один такой тик полностью перевешивает "Потенциал"
+// для пары - средние ±2..5 остальных компонентов тонут в одном выбросе.
+// Клип - только для СРЕДНЕГО: сырое значение в своей колонке показывается
+// как есть, обрезается только вклад в композит.
+const CONTRIBUTION_CLAMP = 10
+
+function clampContribution(value: number): number {
+  return Math.max(-CONTRIBUTION_CLAMP, Math.min(CONTRIBUTION_CLAMP, value))
+}
+
+// LevelsScore - "во сколько раз дальше" (>=1, без верхней границы). Логарифм
+// переводит это в шкалу, сравнимую с z-score остальных компонентов: score=1
+// (нет реальной асимметрии) даёт 0, score=e даёт 1 - тот же порядок, что и
+// заметный z-score.
 function ratioContribution(side: Side, score: number): number {
   return signOf(side) * Math.log(Math.max(score, 1))
 }
@@ -100,24 +122,32 @@ function ratioContribution(side: Side, score: number): number {
 function buildRow(pair: string, entry: StrengthEntry | undefined): StrengthRow {
   const contributions: number[] = []
 
-  // Имбаланс и стены - живые снимки стакана, могут флипнуться от одной
-  // перевыставленной/снятой заявки (спуфинг или просто шум). В композит
-  // идут, только если сторона уже подтвердилась (см. Go-комментарий у
-  // depth.GetImbalanceConfirmedSide) - иначе "Потенциал" мигал бы на каждый
-  // секундный дёрг стакана вместо того, чтобы отражать реально держащийся
-  // перекос. Сами значения в колонках при этом показываются всегда - это
-  // только фильтр для композита, не сокрытие данных.
-  if (enabled.imbalance && entry?.HasImbalance && entry.ImbalanceConfirmed) {
-    contributions.push(entry.ImbalanceZScore)
+  // OFI и VPIN - окна, коммитящиеся раз в некоторое время (а не мгновенный
+  // снимок), но сторона всё равно может смениться на первом же новом окне. В
+  // композит идут, только если сторона уже подтвердилась (см.
+  // Go-комментарий у depth.GetOFIConfirmedSide/prices.GetVPINConfirmedSide) -
+  // иначе "Потенциал" мигал бы на каждую смену окна вместо того, чтобы
+  // отражать реально держащийся перекос. Сами значения в колонках при этом
+  // показываются всегда - это только фильтр для композита, не сокрытие данных.
+  // Каждый вклад клипуется CONTRIBUTION_CLAMP-ом - см. комментарий там же.
+  if (enabled.ofi && entry?.HasOFI && entry.OFIConfirmed) {
+    contributions.push(clampContribution(entry.OFIZScore))
   }
-  if (enabled.activity && entry?.HasActivity) {
-    contributions.push(entry.ActivityZScore)
+  // VPIN - без confirm-gate, в отличие от OFI/RelativeStrength: разбор логов
+  // (см. ARCHITECTURE.md §10) показал, что streak-подтверждение здесь не
+  // срабатывает НИКОГДА (0 раз за 43ч на 5 парах) - бакет коммитится раз в
+  // 20-55 минут, а требовать 3 подряд экстремальных бакета - это часы
+  // непрерывного перекоса, чего на практике не бывает. Сам бакет уже
+  // интеграл ~20 минут ордерфлоу (усреднён), в отличие от сырого тика OFI -
+  // доп. подтверждение через ещё несколько таких интегралов избыточно.
+  if (enabled.vpin && entry?.HasVPIN) {
+    contributions.push(clampContribution(entry.VPINZScore))
   }
-  if (enabled.walls && entry?.HasWalls && entry.WallsConfirmed) {
-    contributions.push(ratioContribution(entry.WallsSide, entry.WallsScore))
+  if (enabled.relstrength && entry?.HasRelativeStrength && entry.RelativeStrengthConfirmed) {
+    contributions.push(clampContribution(entry.RelativeStrengthZScore))
   }
   if (enabled.levels && entry?.HasLevels) {
-    contributions.push(ratioContribution(entry.LevelsSide, entry.LevelsScore))
+    contributions.push(clampContribution(ratioContribution(entry.LevelsSide, entry.LevelsScore)))
   }
 
   let composite = contributions.length
@@ -142,20 +172,19 @@ function buildRow(pair: string, entry: StrengthEntry | undefined): StrengthRow {
     side,
     agree,
     total: contributions.length,
-    hasImbalance: entry?.HasImbalance ?? false,
-    imbalanceZ: entry?.ImbalanceZScore ?? 0,
-    imbalanceConfirmed: entry?.ImbalanceConfirmed ?? false,
-    hasWalls: entry?.HasWalls ?? false,
-    wallsSide: entry?.HasWalls ? entry.WallsSide : null,
-    wallsScore: entry?.WallsScore ?? 0,
-    wallsConfirmed: entry?.WallsConfirmed ?? false,
+    hasOFI: entry?.HasOFI ?? false,
+    ofiZ: entry?.OFIZScore ?? 0,
+    ofiConfirmed: entry?.OFIConfirmed ?? false,
     hasLevels: entry?.HasLevels ?? false,
     levelsSide: entry?.HasLevels ? entry.LevelsSide : null,
     levelsScore: entry?.LevelsScore ?? 0,
     hasRegime: entry?.HasRegime ?? false,
     regime: entry?.Regime ?? 0,
-    hasActivity: entry?.HasActivity ?? false,
-    activityZ: entry?.ActivityZScore ?? 0,
+    hasVPIN: entry?.HasVPIN ?? false,
+    vpinZ: entry?.VPINZScore ?? 0,
+    hasRelativeStrength: entry?.HasRelativeStrength ?? false,
+    relativeStrengthZ: entry?.RelativeStrengthZScore ?? 0,
+    relativeStrengthConfirmed: entry?.RelativeStrengthConfirmed ?? false,
   }
 }
 
@@ -375,7 +404,7 @@ onBeforeUnmount(stopPolling)
           style="min-width: 130px"
         >
           <template #header>
-            <span class="header-hint" title="Средний вклад отмеченных чекбоксами компонентов (имбаланс/стены/уровни/активность), усиленный при сжатии волатильности. Знак - BUY/SELL, величина - насколько выражен сетап. Не рекомендация входить, сводная оценка по структуре рынка прямо сейчас.">
+            <span class="header-hint" title="Средний вклад отмеченных чекбоксами компонентов (OFI/VPIN/уровни/отн. сила), усиленный при сжатии волатильности. Знак - BUY/SELL, величина - насколько выражен сетап. Не рекомендация входить, сводная оценка по структуре рынка прямо сейчас.">
               Потенциал
             </span>
           </template>
@@ -402,40 +431,21 @@ onBeforeUnmount(stopPolling)
           </template>
         </Column>
 
-        <!-- Imbalance -->
+        <!-- OFI -->
         <Column
-          field="imbalanceZ"
+          field="ofiZ"
           :sortable="true"
           style="min-width: 100px"
         >
           <template #header>
-            <span class="header-hint" title="Book-имбаланс, z-score (см. таблицу «Имбаланс»). Серым - сторона ещё не подтвердилась (держится меньше нескольких опросов подряд) и в «Потенциал» пока не засчитывается.">Имбаланс</span>
+            <span class="header-hint" title="Order Flow Imbalance, z-score (событийный поток заявок на лучших уровнях стакана). Серым - сторона ещё не подтвердилась (держится меньше нескольких окон подряд) и в «Потенциал» пока не засчитывается.">OFI</span>
           </template>
           <template #body="{ data }">
             <span
-              :style="{ color: liveSideColor(data.hasImbalance, data.imbalanceConfirmed, data.imbalanceZ > 0 ? 'BUY' : 'SELL') }"
-              :title="data.hasImbalance && !data.imbalanceConfirmed ? 'Сторона ещё не подтвердилась - в композит «Потенциал» пока не входит' : ''"
+              :style="{ color: liveSideColor(data.hasOFI, data.ofiConfirmed, data.ofiZ > 0 ? 'BUY' : 'SELL') }"
+              :title="data.hasOFI && !data.ofiConfirmed ? 'Сторона ещё не подтвердилась - в композит «Потенциал» пока не входит' : ''"
             >
-              {{ data.hasImbalance ? fmt(data.imbalanceZ) : '—' }}
-            </span>
-          </template>
-        </Column>
-
-        <!-- Walls -->
-        <Column
-          field="wallsScore"
-          :sortable="true"
-          style="min-width: 100px"
-        >
-          <template #header>
-            <span class="header-hint" title="Стены стакана: сторона + во сколько раз дальняя стена дальше ближней. Серым - сторона ещё не подтвердилась (держится меньше нескольких опросов подряд) и в «Потенциал» пока не засчитывается.">Стены</span>
-          </template>
-          <template #body="{ data }">
-            <span
-              :style="{ color: liveSideColor(data.hasWalls, data.wallsConfirmed, data.wallsSide) }"
-              :title="data.hasWalls && !data.wallsConfirmed ? 'Сторона ещё не подтвердилась - в композит «Потенциал» пока не входит' : ''"
-            >
-              {{ data.hasWalls ? `${data.wallsSide} ×${data.wallsScore.toFixed(2)}` : '—' }}
+              {{ data.hasOFI ? fmt(data.ofiZ) : '—' }}
             </span>
           </template>
         </Column>
@@ -456,18 +466,37 @@ onBeforeUnmount(stopPolling)
           </template>
         </Column>
 
-        <!-- Activity -->
+        <!-- VPIN -->
         <Column
-          field="activityZ"
+          field="vpinZ"
           :sortable="true"
-          style="min-width: 110px"
+          style="min-width: 100px"
         >
           <template #header>
-            <span class="header-hint" title="Buy-активность: z-score объёма и числа сделок, инициированных покупателем, относительно истории пары.">Активность</span>
+            <span class="header-hint" title="VPIN-подобный: доля покупок в объёмном (не временном) бакете, z-score относительно истории пары. Голосует в «Потенциал» всегда, без доп. подтверждения - см. Go-комментарий в buildRow.">VPIN</span>
           </template>
           <template #body="{ data }">
-            <span :style="{ color: data.hasActivity ? sideColor(data.activityZ > 0 ? 'BUY' : 'SELL') : 'inherit' }">
-              {{ data.hasActivity ? fmt(data.activityZ) : '—' }}
+            <span :style="{ color: sideColor(data.hasVPIN ? (data.vpinZ > 0 ? 'BUY' : 'SELL') : null) }">
+              {{ data.hasVPIN ? fmt(data.vpinZ) : '—' }}
+            </span>
+          </template>
+        </Column>
+
+        <!-- Relative strength -->
+        <Column
+          field="relativeStrengthZ"
+          :sortable="true"
+          style="min-width: 100px"
+        >
+          <template #header>
+            <span class="header-hint" title="Кросс-секционная относительная сила: изменение цены пары минус медианное изменение по всему рынку за тот же период, z-score относительно истории пары. Серым - сторона ещё не подтвердилась и в «Потенциал» пока не засчитывается.">Отн. сила</span>
+          </template>
+          <template #body="{ data }">
+            <span
+              :style="{ color: liveSideColor(data.hasRelativeStrength, data.relativeStrengthConfirmed, data.relativeStrengthZ > 0 ? 'BUY' : 'SELL') }"
+              :title="data.hasRelativeStrength && !data.relativeStrengthConfirmed ? 'Сторона ещё не подтвердилась - в композит «Потенциал» пока не входит' : ''"
+            >
+              {{ data.hasRelativeStrength ? fmt(data.relativeStrengthZ) : '—' }}
             </span>
           </template>
         </Column>

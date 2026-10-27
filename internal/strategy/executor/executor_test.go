@@ -5,6 +5,7 @@ import (
 	"time"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/entrysetup"
 	"github.com/sambly/exchangebot/internal/model"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
@@ -104,6 +105,34 @@ func TestSideForPeriodOverride(t *testing.T) {
 	}
 }
 
+// SourceDirections должен ПОЛНОСТЬЮ обходить Periods для источников с
+// записью - у potential/levels Direction это уже готовая рекомендация
+// стороны, и период-зависимый fade (настроенный под anomaly) не должен
+// молча её разворачивать.
+func TestSideForSourceDirectionsBypassesPeriods(t *testing.T) {
+	cfg := &Config{
+		OnUp: "buy", OnDown: "sell", MinLevel: 2,
+		Periods: map[string]PeriodDirection{
+			"15m": {OnUp: "sell", OnDown: "buy"}, // fade, настроен под anomaly
+		},
+		SourceDirections: map[string]PeriodDirection{
+			"levels": {OnUp: "buy", OnDown: "sell"},
+		},
+	}
+
+	// anomaly на 15m - как раньше, fade из Periods.
+	anomalySig := signal.Signal{Source: "anomaly", Period: "15m", Level: 2, Direction: signal.DirectionUp}
+	if side, _, ok := cfg.SideFor(anomalySig); !ok || side != order.SideTypeSell {
+		t.Fatalf("anomaly на 15m без SourceDirections должен использовать fade из Periods: получено (%v, %v)", side, ok)
+	}
+
+	// levels на ТОМ ЖЕ 15m - свой оверрайд, а не fade из Periods.
+	levelsSig := signal.Signal{Source: "levels", Period: "15m", Level: 2, Direction: signal.DirectionUp}
+	if side, _, ok := cfg.SideFor(levelsSig); !ok || side != order.SideTypeBuy {
+		t.Fatalf("levels должен использовать SourceDirections (buy), а не fade из Periods: получено (%v, %v)", side, ok)
+	}
+}
+
 // SkipDivergent отсекает сигналы "пустого стакана" (цена сходила при
 // активности ниже обычной) ещё до определения стороны сделки.
 func TestSideForSkipsDivergent(t *testing.T) {
@@ -171,6 +200,30 @@ func TestRiskMaxPositions(t *testing.T) {
 	}
 }
 
+// MaxPositions - бюджет НА КАЖДЫЙ источник сигнала независимо, а не общий
+// потолок сразу на всех: anomaly, выев свой лимит, не должен мешать potential
+// (или любому другому источнику) открывать свои позиции - иначе один
+// активный детектор мог бы полностью заблокировать вход для остальных.
+func TestRiskMaxPositionsIsPerSource(t *testing.T) {
+	str := testStrategy() // MaxPositions: 2
+
+	str.addPosition(order.Order{ID: 1, Pair: "BTCUSDT"}, sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), 2.0, 1.5, time.Hour)
+	str.addPosition(order.Order{ID: 2, Pair: "ETHUSDT"}, sig("ETHUSDT", 2, signal.DirectionUp, "anomaly"), 2.0, 1.5, time.Hour)
+
+	// anomaly уже выел свой лимит (2/2) - но у potential свой отдельный бюджет.
+	if _, ok := str.riskAllows(sig("SOLUSDT", 3, signal.DirectionUp, "potential")); !ok {
+		t.Fatal("лимит anomaly не должен мешать входу от другого источника (potential)")
+	}
+
+	str.addPosition(order.Order{ID: 3, Pair: "SOLUSDT"}, sig("SOLUSDT", 3, signal.DirectionUp, "potential"), 2.0, 1.5, time.Hour)
+	str.addPosition(order.Order{ID: 4, Pair: "DOGEUSDT"}, sig("DOGEUSDT", 3, signal.DirectionUp, "potential"), 2.0, 1.5, time.Hour)
+
+	// Теперь и potential выел свой лимит (2/2) - следующий его сигнал должен отсекаться.
+	if _, ok := str.riskAllows(sig("PEPEUSDT", 3, signal.DirectionUp, "potential")); ok {
+		t.Fatal("при достигнутом лимите potential (2/2) вход должен быть запрещён")
+	}
+}
+
 // После закрытия позиции пара уходит на cooldown: иначе тот же сигнал тут же
 // откроет её заново.
 func TestRiskPairCooldownAfterClose(t *testing.T) {
@@ -187,6 +240,212 @@ func TestRiskPairCooldownAfterClose(t *testing.T) {
 	str.lastClose["BTCUSDT"] = time.Now().Add(-2 * time.Hour)
 	if _, ok := str.riskAllows(sig("BTCUSDT", 3, signal.DirectionUp, "anomaly")); !ok {
 		t.Fatal("после истечения cooldown вход должен разрешаться")
+	}
+}
+
+// fakeMarketContext - фейк MarketContext для тестов marketFiltersAllow, без
+// поднятия настоящих AssetsPrices/AssetsDepth (см. Go-комментарий у
+// MarketContext в executor.go). Данных нет по умолчанию (ok=false) - как у
+// свежесозданного AssetsSetup без истории.
+type fakeMarketContext struct {
+	regime      map[string]float64
+	regimeOK    map[string]bool
+	priceLevels map[string]entrysetup.PriceLevels
+	levelsOK    map[string]bool
+	trend       map[string]float64
+	trendOK     map[string]bool
+}
+
+func newFakeMarketContext() *fakeMarketContext {
+	return &fakeMarketContext{
+		regime:      make(map[string]float64),
+		regimeOK:    make(map[string]bool),
+		priceLevels: make(map[string]entrysetup.PriceLevels),
+		levelsOK:    make(map[string]bool),
+		trend:       make(map[string]float64),
+		trendOK:     make(map[string]bool),
+	}
+}
+
+func (f *fakeMarketContext) withTrend(pair, period string, trend float64) *fakeMarketContext {
+	f.trend[pair+"|"+period] = trend
+	f.trendOK[pair+"|"+period] = true
+	return f
+}
+
+func (f *fakeMarketContext) GetTrendStrength(pair, period string) (float64, bool) {
+	k := pair + "|" + period
+	return f.trend[k], f.trendOK[k]
+}
+
+func (f *fakeMarketContext) withRegime(pair, period string, regime float64) *fakeMarketContext {
+	f.regime[pair+"|"+period] = regime
+	f.regimeOK[pair+"|"+period] = true
+	return f
+}
+
+func (f *fakeMarketContext) withLevels(pair, period string, levels entrysetup.PriceLevels) *fakeMarketContext {
+	f.priceLevels[pair+"|"+period] = levels
+	f.levelsOK[pair+"|"+period] = true
+	return f
+}
+
+func (f *fakeMarketContext) GetVolatilityRegime(pair, period string) (float64, bool) {
+	k := pair + "|" + period
+	return f.regime[k], f.regimeOK[k]
+}
+
+func (f *fakeMarketContext) GetPriceLevels(pair, period string) (entrysetup.PriceLevels, bool) {
+	k := pair + "|" + period
+	return f.priceLevels[k], f.levelsOK[k]
+}
+
+// levelsFavoring - PriceLevels, у которых LevelsSideScore однозначно
+// рекомендует side (дальний уровень вдвое дальше ближнего - выше
+// levelsScoreEpsilon в любом реалистичном пороге).
+func levelsFavoring(side order.SideType) entrysetup.PriceLevels {
+	near, far := entrysetup.PriceLevel{DistancePercent: 1.0}, entrysetup.PriceLevel{DistancePercent: 2.0}
+	if side == order.SideTypeBuy {
+		// Ближе поддержка - LevelsSideScore рекомендует BUY.
+		return entrysetup.PriceLevels{Support: near, HasSupport: true, Resistance: far, HasResistance: true}
+	}
+	return entrysetup.PriceLevels{Support: far, HasSupport: true, Resistance: near, HasResistance: true}
+}
+
+// Без AssetsSetup (nil) оба фильтра должны молчать - так же, как выключенные
+// в конфиге (Executor может быть собран без WithAssetsSetup вовсе).
+func TestMarketFiltersAllowNoAssetsSetup(t *testing.T) {
+	str := testStrategy()
+	str.Config.MaxVolatilityRegime = 1.5
+	str.Config.RequireLevelsAgree = true
+
+	if _, ok := str.marketFiltersAllow(sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), order.SideTypeBuy); !ok {
+		t.Fatal("без AssetsSetup фильтры не должны блокировать вход")
+	}
+}
+
+// Выключенные в конфиге (0/false) фильтры не должны блокировать вход даже
+// при подключённом AssetsSetup с "плохими" данными.
+func TestMarketFiltersAllowDisabledByDefault(t *testing.T) {
+	str := testStrategy()
+	str.AssetsSetup = newFakeMarketContext().
+		withRegime("BTCUSDT", "15m", 10.0).
+		withLevels("BTCUSDT", "15m", levelsFavoring(order.SideTypeSell))
+
+	if _, ok := str.marketFiltersAllow(sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), order.SideTypeBuy); !ok {
+		t.Fatal("выключенные фильтры (0/false) не должны блокировать вход")
+	}
+}
+
+func TestMarketFiltersAllowRejectsHighVolatilityRegime(t *testing.T) {
+	str := testStrategy()
+	str.Config.MaxVolatilityRegime = 2.0
+	str.AssetsSetup = newFakeMarketContext().withRegime("HEIUSDT", "15m", 3.5)
+
+	if _, ok := str.marketFiltersAllow(sig("HEIUSDT", 2, signal.DirectionUp, "anomaly"), order.SideTypeBuy); ok {
+		t.Fatal("режим волатильности выше maxVolatilityRegime должен блокировать вход")
+	}
+}
+
+func TestMarketFiltersAllowAllowsLowVolatilityRegime(t *testing.T) {
+	str := testStrategy()
+	str.Config.MaxVolatilityRegime = 2.0
+	str.AssetsSetup = newFakeMarketContext().withRegime("BTCUSDT", "15m", 1.2)
+
+	if _, ok := str.marketFiltersAllow(sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), order.SideTypeBuy); !ok {
+		t.Fatal("режим волатильности ниже maxVolatilityRegime не должен блокировать вход")
+	}
+}
+
+// Нет данных о режиме волатильности (не готов, мало истории) - фильтр не
+// должен блокировать: он отсекает подтверждённо разогнавшиеся пары, а не
+// "неизвестные".
+func TestMarketFiltersAllowAllowsUnknownVolatilityRegime(t *testing.T) {
+	str := testStrategy()
+	str.Config.MaxVolatilityRegime = 2.0
+	str.AssetsSetup = newFakeMarketContext() // нет записи для BTCUSDT|15m
+
+	if _, ok := str.marketFiltersAllow(sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), order.SideTypeBuy); !ok {
+		t.Fatal("отсутствие данных о режиме волатильности не должно блокировать вход")
+	}
+}
+
+func TestMarketFiltersAllowRejectsLevelsDisagreement(t *testing.T) {
+	str := testStrategy()
+	str.Config.RequireLevelsAgree = true
+	// Уровни рекомендуют SELL (сопротивление ближе), а сторона сделки - BUY.
+	str.AssetsSetup = newFakeMarketContext().withLevels("BTCUSDT", "15m", levelsFavoring(order.SideTypeSell))
+
+	if _, ok := str.marketFiltersAllow(sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), order.SideTypeBuy); ok {
+		t.Fatal("расхождение стороны сделки с уровнями должно блокировать вход")
+	}
+}
+
+func TestMarketFiltersAllowAllowsLevelsAgreement(t *testing.T) {
+	str := testStrategy()
+	str.Config.RequireLevelsAgree = true
+	str.AssetsSetup = newFakeMarketContext().withLevels("BTCUSDT", "15m", levelsFavoring(order.SideTypeBuy))
+
+	if _, ok := str.marketFiltersAllow(sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), order.SideTypeBuy); !ok {
+		t.Fatal("согласие стороны сделки с уровнями не должно блокировать вход")
+	}
+}
+
+// Нет уровней (недостаточно свечной истории) - RequireLevelsAgree не должен
+// блокировать: нечем подтвердить не значит "противоречит".
+func TestMarketFiltersAllowAllowsMissingLevels(t *testing.T) {
+	str := testStrategy()
+	str.Config.RequireLevelsAgree = true
+	str.AssetsSetup = newFakeMarketContext() // нет записи для BTCUSDT|15m
+
+	if _, ok := str.marketFiltersAllow(sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), order.SideTypeBuy); !ok {
+		t.Fatal("отсутствие уровней не должно блокировать вход")
+	}
+}
+
+// MaxTrendStrengthBySource - ПО ИСТОЧНИКУ: у источника без записи в карте
+// фильтр не применяется вовсе, даже при сильном тренде.
+func TestMarketFiltersAllowRejectsHighTrendStrengthForListedSource(t *testing.T) {
+	str := testStrategy()
+	str.Config.MaxTrendStrengthBySource = map[string]float64{"potential": 0.35}
+	str.AssetsSetup = newFakeMarketContext().withTrend("BTCUSDT", "15m", 0.8)
+
+	if _, ok := str.marketFiltersAllow(sig("BTCUSDT", 2, signal.DirectionUp, "potential"), order.SideTypeBuy); ok {
+		t.Fatal("сильный тренд у перечисленного источника должен блокировать вход")
+	}
+}
+
+func TestMarketFiltersAllowIgnoresTrendStrengthForUnlistedSource(t *testing.T) {
+	str := testStrategy()
+	str.Config.MaxTrendStrengthBySource = map[string]float64{"potential": 0.35}
+	str.AssetsSetup = newFakeMarketContext().withTrend("BTCUSDT", "15m", 0.8)
+
+	// anomaly не перечислена в MaxTrendStrengthBySource - тот же сильный
+	// тренд её сигнал не должен блокировать.
+	if _, ok := str.marketFiltersAllow(sig("BTCUSDT", 2, signal.DirectionUp, "anomaly"), order.SideTypeBuy); !ok {
+		t.Fatal("источник без записи в MaxTrendStrengthBySource не должен фильтроваться")
+	}
+}
+
+func TestMarketFiltersAllowAllowsLowTrendStrength(t *testing.T) {
+	str := testStrategy()
+	str.Config.MaxTrendStrengthBySource = map[string]float64{"levels": 0.35}
+	str.AssetsSetup = newFakeMarketContext().withTrend("BTCUSDT", "15m", 0.1)
+
+	if _, ok := str.marketFiltersAllow(sig("BTCUSDT", 2, signal.DirectionUp, "levels"), order.SideTypeBuy); !ok {
+		t.Fatal("слабый тренд (боковик) не должен блокировать mean-reversion источник")
+	}
+}
+
+// Нет данных о силе тренда (мало истории) - фильтр не должен блокировать, тот
+// же принцип, что у остальных MarketContext-фильтров.
+func TestMarketFiltersAllowAllowsUnknownTrendStrength(t *testing.T) {
+	str := testStrategy()
+	str.Config.MaxTrendStrengthBySource = map[string]float64{"levels": 0.35}
+	str.AssetsSetup = newFakeMarketContext() // нет записи для BTCUSDT|15m
+
+	if _, ok := str.marketFiltersAllow(sig("BTCUSDT", 2, signal.DirectionUp, "levels"), order.SideTypeBuy); !ok {
+		t.Fatal("отсутствие данных о силе тренда не должно блокировать вход")
 	}
 }
 

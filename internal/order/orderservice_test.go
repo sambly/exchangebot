@@ -1,6 +1,7 @@
 package order_test
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -31,6 +32,13 @@ type stubOrderRepo struct {
 	reduced    int
 	deleted    []int64
 	deletedAll int
+
+	// closeErr/reduceErr - если заданы, следующий(е) вызовы ClosePosition/
+	// ReducePosition возвращают эту ошибку вместо успеха - имитирует сбой
+	// записи в БД (см. TestClosePositionRollsBackOnRepoFailure,
+	// TestReducePositionRollsBackOnRepoFailure).
+	closeErr  error
+	reduceErr error
 }
 
 func (*stubOrderRepo) GetAll() ([]*order.Order, error) { return nil, nil }
@@ -38,12 +46,18 @@ func (*stubOrderRepo) Create(*order.Order) error       { return nil }
 func (r *stubOrderRepo) ClosePosition(int64, *order.Order) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.closeErr != nil {
+		return r.closeErr
+	}
 	r.closed++
 	return nil
 }
 func (r *stubOrderRepo) ReducePosition(int64, *order.Order) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.reduceErr != nil {
+		return r.reduceErr
+	}
 	r.reduced++
 	return nil
 }
@@ -141,6 +155,80 @@ func TestClosePositionUnknownID(t *testing.T) {
 
 	if err := svc.ClosePosition(999, order.Deal{Strategy: "manual"}); err == nil {
 		t.Fatal("ожидалась ошибка при закрытии несуществующего ордера")
+	}
+}
+
+// Реальный боевой случай (см. ARCHITECTURE.md §10.9): ClosePosition уже
+// перевела ордер из активных в историю В ПАМЯТИ, а запись в БД упала (там
+// была ошибка драйвера MySQL "commands out of sync"). Без отката ордер
+// навсегда "терялся" - в памяти закрыт, в БД по-прежнему ACTIVE, и ни одна
+// следующая попытка закрыть его не находила его снова ("активный ордер id=N
+// не найден" на каждом тике, часами). Тест проверяет, что после сбоя БД
+// повторная попытка закрытия (когда БД снова отвечает) находит ордер и
+// закрывает его успешно - то есть откат действительно вернул его в активные.
+func TestClosePositionRollsBackOnRepoFailure(t *testing.T) {
+	svc, _, _, repo := newTestServiceWithRepo(t)
+
+	created, err := svc.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 1, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket: %v", err)
+	}
+
+	repo.closeErr = errors.New("commands out of sync. You can't run this command now")
+	if err := svc.ClosePosition(created.ID, order.Deal{Strategy: "manual"}); err == nil {
+		t.Fatal("ожидалась ошибка при сбое записи в БД")
+	}
+
+	// БД "восстановилась" - повторная попытка закрыть тот же id должна найти
+	// ордер (а не "не найден") и на этот раз успешно закрыть его.
+	repo.closeErr = nil
+	if err := svc.ClosePosition(created.ID, order.Deal{Strategy: "manual"}); err != nil {
+		t.Fatalf("после отката повторное закрытие должно было найти ордер, получено: %v", err)
+	}
+}
+
+// Менее опасный, но тот же класс бага, что у ClosePosition (см.
+// TestClosePositionRollsBackOnRepoFailure): ReducePosition уже применила
+// изменения (Quantity/RealizedProfit) в памяти, запись в БД упала - без
+// отката эти поля разошлись бы с БД навсегда. Проверяет, что после сбоя
+// Quantity/RealizedProfit возвращаются к исходным значениям (а не остаются
+// "наполовину применёнными"), и что повторная попытка (БД снова отвечает)
+// проходит нормально.
+func TestReducePositionRollsBackOnRepoFailure(t *testing.T) {
+	svc, pw, _, repo := newTestServiceWithRepo(t)
+
+	created, err := svc.CreateOrderMarket(order.Deal{Pair: "BTCUSDT", Size: 1, SideType: order.SideTypeBuy})
+	if err != nil {
+		t.Fatalf("CreateOrderMarket: %v", err)
+	}
+
+	findOrder := func() order.Order {
+		t.Helper()
+		for _, o := range pw.GetOrdersActiveCopy()["BTCUSDT"] {
+			if o.ID == created.ID {
+				return o
+			}
+		}
+		t.Fatal("ордер должен оставаться активным")
+		return order.Order{}
+	}
+
+	repo.reduceErr = errors.New("commands out of sync. You can't run this command now")
+	if err := svc.ReducePosition(created.ID, 0.5, order.Deal{Strategy: "manual"}); err == nil {
+		t.Fatal("ожидалась ошибка при сбое записи в БД")
+	}
+
+	if o := findOrder(); o.Quantity != created.Quantity || o.RealizedProfit != 0 {
+		t.Fatalf("после отката ожидались исходные Quantity=%v RealizedProfit=0, получено Quantity=%v RealizedProfit=%v",
+			created.Quantity, o.Quantity, o.RealizedProfit)
+	}
+
+	repo.reduceErr = nil
+	if err := svc.ReducePosition(created.ID, 0.5, order.Deal{Strategy: "manual"}); err != nil {
+		t.Fatalf("после отката повторное частичное закрытие должно было пройти, получено: %v", err)
+	}
+	if o := findOrder(); o.Quantity >= created.Quantity {
+		t.Fatalf("после успешного ReducePosition Quantity должен уменьшиться, получено %v (было %v)", o.Quantity, created.Quantity)
 	}
 }
 

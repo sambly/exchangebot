@@ -11,6 +11,38 @@ import (
 	"github.com/sambly/exchangebot/internal/prices"
 )
 
+func TestWallsSidePicksCloserWall(t *testing.T) {
+	// support ближе -> BUY
+	walls := Walls{
+		HasSupport:    true,
+		Support:       Wall{DistancePercent: 0.5},
+		HasResistance: true,
+		Resistance:    Wall{DistancePercent: 2.0},
+	}
+	side, ok := wallsSide(walls)
+	if !ok || side != order.SideTypeBuy {
+		t.Fatalf("ожидался BUY (support ближе), получено side=%v ok=%v", side, ok)
+	}
+
+	// resistance ближе -> SELL
+	walls = Walls{
+		HasSupport:    true,
+		Support:       Wall{DistancePercent: 3.0},
+		HasResistance: true,
+		Resistance:    Wall{DistancePercent: 1.0},
+	}
+	side, ok = wallsSide(walls)
+	if !ok || side != order.SideTypeSell {
+		t.Fatalf("ожидался SELL (resistance ближе), получено side=%v ok=%v", side, ok)
+	}
+}
+
+func TestWallsSideRequiresBothWalls(t *testing.T) {
+	if _, ok := wallsSide(Walls{HasSupport: true, Support: Wall{DistancePercent: 1}}); ok {
+		t.Fatal("без Resistance wallsSide должен вернуть ok=false")
+	}
+}
+
 // levels строит n уровней с шагом step от price0, все с одинаковым объёмом
 // baseQty, кроме index wallIdx - там объём wallQty (стена).
 func levels(price0, step float64, n int, baseQty float64, wallIdx int, wallQty float64) []exModel.DepthLevel {

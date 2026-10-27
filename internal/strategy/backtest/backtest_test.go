@@ -16,6 +16,11 @@ import (
 type stubDetector struct {
 	risePercent float64
 	level       int
+	// sourceByPair - переопределение Signal.Source для конкретной пары, по
+	// умолчанию (nil или пара не задана) - "stub". Нужен только тесту про
+	// per-source MaxPositions (см. TestRunMaxPositionsIsPerSource) - остальные
+	// тесты не задают эту карту и получают прежнее поведение.
+	sourceByPair map[string]string
 }
 
 func (d stubDetector) DetectCandle(pair, period string, prev, current exModel.Candle) (signal.Signal, bool) {
@@ -26,8 +31,12 @@ func (d stubDetector) DetectCandle(pair, period string, prev, current exModel.Ca
 	if change < d.risePercent {
 		return signal.Signal{}, false
 	}
+	source := "stub"
+	if s, ok := d.sourceByPair[pair]; ok {
+		source = s
+	}
 	return signal.Signal{
-		Source:        "stub",
+		Source:        source,
 		Pair:          pair,
 		Period:        period,
 		Time:          current.Time,
@@ -202,6 +211,46 @@ func TestRunRiskRules(t *testing.T) {
 	}
 	if report.Rejected["пара на cooldown после закрытия"] != 2 {
 		t.Errorf("сигналы на cooldown должны отклоняться, rejected=%v", report.Rejected)
+	}
+}
+
+// MaxPositions - бюджет НА КАЖДЫЙ источник сигнала независимо, а не общий
+// потолок сразу на всех (см. тот же комментарий у executor.riskAllows) -
+// бэктест обязан считать ТЕ ЖЕ правила, что в бою (см. комментарий в
+// backtest.go у ПРОХОДА 2), иначе его отчёт разойдётся с реальным поведением
+// исполнителя, когда сигналов от разных источников станет больше одного.
+func TestRunMaxPositionsIsPerSource(t *testing.T) {
+	exits := testExits()
+	exits.Config.TakeProfitPercent = 10.0
+	exits.Config.StopLossPercent = 8.0
+	exits.Config.MaxHoldPeriods = 0
+
+	entry := testEntry()
+	entry.MaxPositions = 1 // по одной позиции на источник
+
+	detector := stubDetector{
+		risePercent:  3.0,
+		level:        2,
+		sourceByPair: map[string]string{"BTCUSDT": "sourceA", "ETHUSDT": "sourceB"},
+	}
+
+	engine := New(detector, entry, exits, Options{
+		Period:         "15m",
+		PeriodDuration: 15 * time.Minute,
+		Periods:        map[string]time.Duration{"15m": 15 * time.Minute},
+	})
+
+	candles := []exModel.Candle{
+		bar("BTCUSDT", at(0), 100),
+		bar("BTCUSDT", at(1), 104), // sourceA: вход
+		bar("ETHUSDT", at(0), 100),
+		bar("ETHUSDT", at(1), 104), // sourceB: вход - у sourceA свой лимит, sourceB не должен его делить
+	}
+
+	report := engine.Run(candles)
+
+	if len(report.Trades) != 2 {
+		t.Fatalf("лимит одного источника не должен мешать входу другого - ожидалось 2 сделки, получено %d (rejected=%v)", len(report.Trades), report.Rejected)
 	}
 }
 

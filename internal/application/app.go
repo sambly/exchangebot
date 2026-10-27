@@ -206,6 +206,10 @@ func (app *Application) Run(ctx context.Context) error {
 		return app.ControllerStrategy.StartAll(gCtx)
 	})
 
+	g.Go(func() error {
+		return app.runIndicatorDiag(gCtx)
+	})
+
 	duration := time.Since(timeStart)
 	appLogger.Infof("Время выполнения предварительной загрузки данных: %v ", duration)
 	appLogger.Infof("Время старта: %v ", timeStart)

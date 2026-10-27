@@ -35,11 +35,20 @@ type MetricRecord struct {
 	// получает z=10. Практически это означало бы шквал ложных срабатываний
 	// сразу после старта, пока буфер не наберётся.
 	minSamples int
-	// scaleFloor - нижняя граница разброса. У метрик, которые почти всегда
-	// стоят на месте (стейблкоины по цене, неликвид по объёму, стакан без
-	// движения), MAD вырождается почти в ноль, и любое шевеление даёт z в
-	// десятки. Пол разброса переводит такой z обратно в осмысленный диапазон.
+	// scaleFloor - нижняя граница разброса В АБСОЛЮТНЫХ ЕДИНИЦАХ метрики. У
+	// метрик, которые почти всегда стоят на месте (стейблкоины по цене,
+	// неликвид по объёму, стакан без движения), MAD вырождается почти в ноль,
+	// и любое шевеление даёт z в десятки. Пол разброса переводит такой z
+	// обратно в осмысленный диапазон.
+	//
+	// Годится только для метрик с известным заранее масштабом (доля, процент)
+	// - см. relativeScaleFloor для метрик, у которых абсолютный масштаб
+	// различается на порядки от инструмента к инструменту (например, OFI).
 	scaleFloor float64
+	// relativeScaleFloor - см. NewMetricRecordRelative. 0 - выключено (обычный
+	// абсолютный scaleFloor, поведение не меняется для существующих
+	// потребителей).
+	relativeScaleFloor float64
 }
 
 func NewMetricRecord(maxLen, minSamples int, scaleFloor float64) *MetricRecord {
@@ -55,6 +64,32 @@ func NewMetricRecord(maxLen, minSamples int, scaleFloor float64) *MetricRecord {
 		minSamples: minSamples,
 		scaleFloor: scaleFloor,
 	}
+}
+
+// NewMetricRecordRelative - как NewMetricRecord, но разброс дополнительно не
+// может быть меньше relativeScaleFloor от среднего |значения| САМОЙ истории
+// (см. meanAbs), а не только от абсолютной константы absoluteScaleFloor.
+//
+// Нужно метрикам вроде OFI (Order Flow Imbalance, см. internal/depth): её
+// масштаб - сырые единицы базового актива, и различается на порядки между
+// парами (BTC - тысячные доли, мемкоин - миллионы). Единый абсолютный
+// scaleFloor для всех пар сразу либо ничего не защищает (мал для крупных
+// пар), либо душит мелкие - относительный же пол калибруется по истории
+// КОНКРЕТНОЙ пары автоматически. Среднее, а не медиана: у метрик, где
+// большинство окон близки к нулю (пара почти не торгуется) и лишь изредка
+// случается всплеск, медиана |значений| тоже вырождается в ноль - среднее
+// устойчивее, потому что редкие всплески его не обнуляют.
+//
+// absoluteScaleFloor остаётся нужен отдельно: относительный пол calibруется
+// ОТ ИСТОРИИ, а пока история целиком нулевая (буквально ничего ещё не
+// происходило - самый первый всплеск после холодного старта), relativeScaleFloor
+// * meanAbs(история) = 0 - без запасного абсолютного пола scale выродился бы
+// в 0, а ZScore на scale=0 честно возвращает 0 (см. ZScore), а не большое
+// значение, и первый же реальный всплеск остался бы незамеченным.
+func NewMetricRecordRelative(maxLen, minSamples int, absoluteScaleFloor, relativeScaleFloor float64) *MetricRecord {
+	mr := NewMetricRecord(maxLen, minSamples, absoluteScaleFloor)
+	mr.relativeScaleFloor = relativeScaleFloor
+	return mr
 }
 
 func (mr *MetricRecord) Add(value float64) {
@@ -132,7 +167,25 @@ func (mr *MetricRecord) ZScore(value float64) float64 {
 // scaleLocked - робастная оценка разброса: MAD, приведённый к шкале сигмы.
 func (mr *MetricRecord) scaleLocked() float64 {
 	_, scale := medianAndScale(mr.values, mr.scaleFloor)
+	if mr.relativeScaleFloor > 0 {
+		if floor := mr.relativeScaleFloor * meanAbs(mr.values); floor > scale {
+			scale = floor
+		}
+	}
 	return scale
+}
+
+// meanAbs - среднее |значений| среза. См. NewMetricRecordRelative - почему
+// среднее, а не медиана.
+func meanAbs(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sum := 0.0
+	for _, v := range values {
+		sum += math.Abs(v)
+	}
+	return sum / float64(len(values))
 }
 
 // medianAndScale - медиана и робастный разброс (MAD, приведённый к шкале

@@ -16,6 +16,8 @@ import (
 	"github.com/sambly/exchangebot/internal/strategy/anomaly"
 	"github.com/sambly/exchangebot/internal/strategy/base"
 	"github.com/sambly/exchangebot/internal/strategy/executor"
+	"github.com/sambly/exchangebot/internal/strategy/levels"
+	"github.com/sambly/exchangebot/internal/strategy/potential"
 	"github.com/sambly/exchangebot/internal/strategy/sales/structsale"
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 )
@@ -90,6 +92,7 @@ func NewControllerStrategy(
 		Pairs:           pairs,
 		Notification:    notify,
 		OrderController: orderController,
+		AssetsSetup:     assetsSetup,
 	}
 
 	for _, option := range options {
@@ -106,9 +109,9 @@ func NewControllerStrategy(
 // build собирает граф стратегий.
 //
 // Три роли, и они не пересекаются:
-//   - ДЕТЕКТОРЫ (base, anomaly) - находят события и публикуют сигналы;
+//   - ДЕТЕКТОРЫ (base, anomaly, potential, levels) - находят события и публикуют сигналы;
 //   - ИСПОЛНИТЕЛЬ (executor) - решает, открывать ли позицию по сигналу;
-//   - ПОЛИТИКА ВЫХОДА (simplesale) - решает, когда закрывать.
+//   - ПОЛИТИКА ВЫХОДА (structsale) - решает, когда закрывать.
 //
 // Кто на кого подписан, решается ЗДЕСЬ, а не внутри пакетов. Поэтому новый
 // детектор не тащит за собой торговую логику, а новая торговая логика не
@@ -134,6 +137,27 @@ func (cs *ControllerStrategy) build() error {
 	}
 	cs.AddStrategy(anomalyStrategy)
 
+	// potential - детектор на композитном индикаторе "Потенциал" (OFI+VPIN+
+	// Уровни+Относительная сила, см. internal/strategy/potential). В отличие
+	// от anomaly/base не требует cs.Notification - нет ни Telegram-меню, ни
+	// уведомлений (см. Go-комментарий в potential.go), стратегия совсем новая
+	// и непроверенная на реальной торговле.
+	potentialStrategy, err := potential.NewStrategy(cs.AssetsPrices, cs.AssetsSetup, cs.Pairs)
+	if err != nil {
+		return err
+	}
+	cs.AddStrategy(potentialStrategy)
+
+	// levels - детектор на свечных уровнях поддержки/сопротивления (swing
+	// high/low, см. internal/strategy/levels) - структурный вход, тот же
+	// примитив, что и компонент "Уровни" в композите "Потенциал", но не
+	// разбавленный остальными компонентами.
+	levelsStrategy, err := levels.NewStrategy(cs.AssetsPrices, cs.AssetsSetup, cs.Pairs)
+	if err != nil {
+		return err
+	}
+	cs.AddStrategy(levelsStrategy)
+
 	tradeExecutor, err := executor.New(cs.Notification, cs.OrderController)
 	if err != nil {
 		return err
@@ -147,11 +171,16 @@ func (cs *ControllerStrategy) build() error {
 		return err
 	}
 	tradeExecutor.WithSaleStrategy(exitPolicy)
+	tradeExecutor.WithAssetsSetup(cs.AssetsSetup)
 
-	// Исполнитель слушает оба детектора. Какие сигналы он реально берёт в работу -
-	// решают фильтры в его конфиге (sources, minLevel, onUp/onDown).
+	// Исполнитель слушает всех детекторов. Какие сигналы он реально берёт в
+	// работу - решают фильтры в его конфиге (sources, minLevel, onUp/onDown) -
+	// подписка здесь только открывает канал, реальная торговля по источнику
+	// включается отдельным явным шагом в конфиге исполнителя (см. sources).
 	baseStrategy.Subscribe(tradeExecutor.Signals)
 	anomalyStrategy.Subscribe(tradeExecutor.Signals)
+	potentialStrategy.Subscribe(tradeExecutor.Signals)
+	levelsStrategy.Subscribe(tradeExecutor.Signals)
 
 	cs.AddStrategy(tradeExecutor)
 

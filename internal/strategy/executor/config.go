@@ -45,7 +45,24 @@ type Config struct {
 	// работают на разных периодах по-разному: на 15m/1h цена после аномалии в
 	// среднем откатывается (fade выгоднее), на 4h слабо, но продолжает (momentum
 	// выгоднее). Один OnUp/OnDown на все периоды сразу игнорирует эту разницу.
+	//
+	// ВАЖНО: это переопределение относится ТОЛЬКО к сигналам, у которых
+	// Direction означает "куда пошла цена" (anomaly, base) - у них momentum и
+	// fade осмысленно разные стратегии. У потенциал/levels-детекторов
+	// Direction уже сама по себе рекомендация стороны (композит/структура УЖЕ
+	// решили BUY или SELL), а не сырое движение - "fade" для них означало бы
+	// буквально торговать НАОБОРОТ собственной рекомендации. Такие источники
+	// должны быть в SourceDirections ниже, который проверяется РАНЬШЕ и
+	// полностью обходит эту таблицу.
 	Periods map[string]PeriodDirection `yaml:"periods"`
+
+	// SourceDirections - оверрайд OnUp/OnDown ПО ИСТОЧНИКУ СИГНАЛА (sig.
+	// Source), проверяется в actionFor ПЕРВЫМ и, если для источника есть
+	// запись, полностью ЗАМЕНЯЕТ и глобальный OnUp/OnDown, и таблицу Periods -
+	// период-зависимая fade/momentum логика Periods предназначена для anomaly
+	// (см. комментарий там же) и не должна молча применяться к источникам, где
+	// Direction - уже готовая рекомендация стороны (potential, levels).
+	SourceDirections map[string]PeriodDirection `yaml:"sourceDirections"`
 
 	// SkipDivergent - не входить в сигналы с Divergent=true: движение цены
 	// прошло при активности НИЖЕ обычной ("пустой стакан"), такие движения
@@ -61,13 +78,60 @@ type Config struct {
 	// Size - размер сделки
 	Size float64 `yaml:"size"`
 
-	// MaxPositions - сколько позиций держим одновременно суммарно.
-	// На рыночном движении аномальными становятся десятки пар разом.
+	// MaxPositions - сколько позиций держим одновременно НА КАЖДЫЙ источник
+	// сигнала (sig.Source) НЕЗАВИСИМО, а не общий потолок на всех сразу: у
+	// anomaly свой бюджет в MaxPositions позиций, у potential (или любого
+	// будущего детектора) - свой такой же, один источник не может выесть
+	// лимит у другого. На рыночном движении аномальными становятся десятки
+	// пар разом - без лимита это было бы не диверсификацией, а плечом.
 	MaxPositions int `yaml:"maxPositions"`
 
 	// PairCooldownMinutes - сколько ждать после закрытия позиции по паре,
 	// прежде чем открывать по ней новую. Защита от "лестницы" по одной паре.
 	PairCooldownMinutes int `yaml:"pairCooldownMinutes"`
+
+	// MaxVolatilityRegime - верхняя граница entrysetup.GetVolatilityRegime
+	// (ОТНОШЕНИЕ недавней волатильности пары к типичной, не путать с Volatility
+	// в signal.Signal - той, что нужна политике выхода) для входа. >1 - пара
+	// уже разогналась сильнее обычного ПРЯМО СЕЙЧАС. 0 - фильтр выключен.
+	//
+	// Проверяется в Executor.marketFiltersAllow (нужен AssetsSetup, поэтому не
+	// здесь, в SideFor - тот чистая функция сигнала и конфига). Если режим не
+	// посчитан (мало истории) - НЕ блокирует, фильтр только отсекает
+	// подтверждённо разогнавшиеся пары, а не "неизвестные".
+	//
+	// См. ARCHITECTURE.md §10.15: одна такая пара (HEIUSDT) дала anomaly
+	// больше всего убытка за 20ч форвард-теста - серия сигналов на
+	// экстремально тонком/волатильном инструменте.
+	MaxVolatilityRegime float64 `yaml:"maxVolatilityRegime"`
+
+	// RequireLevelsAgree - перед входом сверять сторону сделки со свечными
+	// swing-уровнями (entrysetup.GetPriceLevels + LevelsSideScore): ближе
+	// поддержка - должны покупать, ближе сопротивление - продавать. Если
+	// уровней нет или они не дают чёткой стороны - НЕ блокирует (нечем
+	// подтвердить не значит "противоречит"), блокирует только явное
+	// РАСХОЖДЕНИЕ с резолвнутой стороной сделки. Действует на ВСЕ источники
+	// сразу (глобальный фильтр, не per-source).
+	RequireLevelsAgree bool `yaml:"requireLevelsAgree"`
+
+	// MaxTrendStrengthBySource - верхняя граница entrysetup.GetTrendStrength
+	// (0..1, efficiency ratio: 1 - цена прошла путь по прямой, сильный тренд;
+	// 0 - зигзаг без чистого сдвига, боковик) ПО ИСТОЧНИКУ СИГНАЛА. Источник
+	// БЕЗ записи здесь - фильтр для него не применяется вовсе. Это ДРУГАЯ ось,
+	// чем MaxVolatilityRegime (та - амплитуда движения относительно своей же
+	// нормы, эта - направленность движения) - map, а не одно число: в отличие
+	// от MaxVolatilityRegime, здесь смысл в том, что источники ведут себя
+	// принципиально по-разному. anomaly на 4h настроена на momentum (см.
+	// periods в config.yaml) - сильный тренд ей скорее помогает, добавлять её
+	// сюда бездумно нельзя. potential/levels - mean-reversion по своей природе
+	// (торгуют от уровня/разворота композита), см. ARCHITECTURE.md §10.16:
+	// реальный бэктест на BTC показал profit factor 1.62 в боковике против
+	// -0.74 в тренде на ОДНОЙ И ТОЙ ЖЕ логике входа, разница только в фильтре
+	// режима.
+	//
+	// Как и остальные MarketContext-фильтры - если сила тренда не посчитана
+	// (мало истории), НЕ блокирует.
+	MaxTrendStrengthBySource map[string]float64 `yaml:"maxTrendStrengthBySource"`
 }
 
 // PeriodDirection - переопределение OnUp/OnDown для одного периода.
@@ -126,6 +190,23 @@ func (c *Config) SideFor(sig signal.Signal) (order.SideType, Reject, bool) {
 // по периоду (Periods): период важнее глобального OnUp/OnDown, если задан.
 func (c *Config) actionFor(sig signal.Signal) string {
 	onUp, onDown := c.OnUp, c.OnDown
+
+	// SourceDirections - см. Go-комментарий у поля: для источников с записью
+	// здесь Periods (fade/momentum по периоду сигнала) не применяется вовсе -
+	// эта логика имеет смысл только для сигналов типа "куда пошла цена"
+	// (anomaly), а не для готовых рекомендаций стороны (potential/levels).
+	if sd, ok := c.SourceDirections[sig.Source]; ok {
+		if sd.OnUp != "" {
+			onUp = sd.OnUp
+		}
+		if sd.OnDown != "" {
+			onDown = sd.OnDown
+		}
+		if sig.Direction == signal.DirectionDown {
+			return onDown
+		}
+		return onUp
+	}
 
 	if pd, ok := c.Periods[sig.Period]; ok {
 		if pd.OnUp != "" {

@@ -140,20 +140,20 @@ export interface GetEntryQualityResponse {
 // каждая со своим Has-флагом (сигнал сейчас недоступен - не ноль, а "нет
 // данных"). Композит из них и то, какие компоненты учитывать, считает фронт
 // (чекбоксы в DataStrength.vue) - см. Go-комментарий у entrysetup.StrengthComponents.
+//
+// «Стены» здесь больше нет (убраны в рамках strategy_v2, см. ARCHITECTURE.md
+// §10.3 - направленный сигнал по резервному объёму легко подделывается
+// спуфингом). Имбаланс и Buy-активность заменены на OFI/VPIN - те же роли
+// (направленный поток заявок / перевес покупательской активности), но
+// событийная/объёмная методология вместо снапшота по времени.
 export interface StrengthEntry {
-  HasImbalance: boolean
-  ImbalanceZScore: number
-  // ImbalanceConfirmed - сторона имбаланса держится несколько сэмплов подряд
-  // (см. Go-комментарий у depth.GetImbalanceConfirmedSide), а не мелькнула на
-  // одном снимке стакана. Раздельно от Has* - значение показываем всегда,
-  // подтверждение решает, учитывать ли его в композите "Потенциала".
-  ImbalanceConfirmed: boolean
-
-  HasWalls: boolean
-  WallsSide: 'BUY' | 'SELL'
-  WallsScore: number
-  // WallsConfirmed - см. ImbalanceConfirmed, но для стен.
-  WallsConfirmed: boolean
+  HasOFI: boolean
+  OFIZScore: number
+  // OFIConfirmed - сторона OFI держится несколько закоммиченных окон подряд
+  // (см. Go-комментарий у depth.GetOFIConfirmedSide), а не мелькнула в
+  // последнем. Раздельно от Has* - значение показываем всегда, подтверждение
+  // решает, учитывать ли его в композите "Потенциала".
+  OFIConfirmed: boolean
 
   HasLevels: boolean
   LevelsSide: 'BUY' | 'SELL'
@@ -162,8 +162,19 @@ export interface StrengthEntry {
   HasRegime: boolean
   Regime: number
 
-  HasActivity: boolean
-  ActivityZScore: number
+  HasVPIN: boolean
+  VPINZScore: number
+  // VPINConfirmed - см. OFIConfirmed, тот же принцип для VPIN.
+  VPINConfirmed: boolean
+
+  // HasRelativeStrength/RelativeStrengthZScore - кросс-секционный сигнал:
+  // пара относительно МЕДИАНЫ рынка за тот же период, а не относительно
+  // своей же истории цены (как всё остальное здесь) - отличает
+  // идиосинкратическую аномалию пары от бета-движения всего рынка.
+  HasRelativeStrength: boolean
+  RelativeStrengthZScore: number
+  // RelativeStrengthConfirmed - см. OFIConfirmed, тот же принцип.
+  RelativeStrengthConfirmed: boolean
 }
 
 export interface StrengthData {

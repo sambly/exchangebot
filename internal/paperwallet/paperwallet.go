@@ -285,6 +285,35 @@ func (p *PaperWallet) ClosePosition(id int64, deal order.Deal) (*order.Order, er
 	return nil, fmt.Errorf("активный ордер id=%d не найден", id)
 }
 
+// RollbackClose - см. TradeState.RollbackClose (order.go). Отменяет
+// ClosePosition, если она уже перевела ордер из активных в историю в
+// памяти, а последующая запись в БД упала: ищет id в истории (там он уже
+// оказался после ClosePosition) и возвращает его обратно в активные в том
+// состоянии, в каком он был бы, если бы ClosePosition вообще не вызывалась -
+// иначе ордер навсегда "терялся" бы (в памяти закрыт, в БД по-прежнему
+// активен), и ни одна следующая попытка закрыть его не смогла бы его найти
+// (реальный случай - см. ARCHITECTURE.md §10.9).
+func (p *PaperWallet) RollbackClose(id int64) error {
+	p.Lock()
+	defer p.Unlock()
+
+	for pair, orders := range p.ordersHistory {
+		for i, o := range orders {
+			if o.ID == id {
+				o.Status = order.OrderStatusTypeActive
+				o.ExitReason = ""
+				o.Profit = 0
+
+				p.ordersHistory[pair] = append(orders[:i], orders[i+1:]...)
+				p.addOrderActive(o)
+				return nil
+			}
+		}
+	}
+
+	return fmt.Errorf("ордер id=%d не найден в истории для отката закрытия", id)
+}
+
 // ReducePosition закрывает ЧАСТЬ активной позиции (см. sales.Sales.
 // PartialTakeProfit): fraction (0..1) - доля ОТ ПЕРВОНАЧАЛЬНОГО объёма
 // (o.OriginalQuantity, не текущего o.Quantity - он уже мог быть уменьшен
@@ -335,6 +364,57 @@ func (p *PaperWallet) ReducePosition(id int64, fraction float64, deal order.Deal
 	}
 
 	return nil, fmt.Errorf("активный ордер id=%d не найден", id)
+}
+
+// RollbackReduce - см. TradeState.RollbackReduce (order.go). Отменяет
+// ReducePosition, если запись в БД после неё упала: Quantity откатывается
+// точно (fraction*OriginalQuantity - от цены не зависит), RealizedProfit -
+// пересчётом по ТЕКУЩЕЙ рыночной цене, а не по цене на момент исходного
+// ReducePosition (её здесь не сохраняли). Расхождение возможно только на
+// то движение цены, что произошло за время между исходным вызовом и этим
+// откатом (обычно доли секунды - сам вызов и есть реакция на ошибку записи
+// в БД) - в бумажном кошельке для форвард-теста это несущественно, в
+// отличие от ClosePosition, где без отката ордер терялся бы НАВСЕГДА.
+func (p *PaperWallet) RollbackReduce(id int64, fraction float64) error {
+	p.Lock()
+	defer p.Unlock()
+
+	if fraction <= 0 || fraction >= 1 {
+		return fmt.Errorf("некорректная доля частичного закрытия %v", fraction)
+	}
+
+	for pair, orders := range p.ordersActive {
+		for _, o := range orders {
+			if o.ID != id {
+				continue
+			}
+
+			marketStat, err := p.assetsPrices.GetMarketsStatForPair(pair)
+			if err != nil {
+				return err
+			}
+			if marketStat.Price == 0 || o.PriceCreated == 0 {
+				return fmt.Errorf("error цена пары равна 0")
+			}
+			if o.OriginalQuantity == 0 {
+				return fmt.Errorf("у ордера id=%d не задан исходный объём", id)
+			}
+
+			gross := 0.0
+			if o.Side == order.SideTypeBuy {
+				gross = (marketStat.Price / o.PriceCreated * 100) - 100
+			}
+			if o.Side == order.SideTypeSell {
+				gross = (o.PriceCreated / marketStat.Price * 100) - 100
+			}
+
+			o.RealizedProfit -= fraction * netProfit(gross)
+			o.Quantity += fraction * o.OriginalQuantity
+			return nil
+		}
+	}
+
+	return fmt.Errorf("активный ордер id=%d не найден для отката частичного закрытия", id)
 }
 
 // UpdateOrdersPrice проставляет активным ордерам пары текущую цену и профит,

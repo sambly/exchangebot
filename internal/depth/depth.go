@@ -64,6 +64,63 @@ const (
 	imbalanceConfirmMinStreak = 3
 )
 
+// Параметры Order Flow Imbalance (OFI, Cont-Kukanov-Stoikov, "The Price
+// Impact of Order Book Events", 2014).
+//
+// В отличие от imbalance (мгновенный СНИМОК топа книги - сколько объёма
+// стоит прямо сейчас), OFI - это НАКОПЛЕННЫЙ ПОТОК событий лучшего бида/аска
+// за окно: появилась заявка или подрос объём на месте - плюс, заявка
+// снялась или цена отступила - минус (см. ofiEvent). У снимка нет памяти:
+// одна крупная заявка, тут же отменённая, даёт точно такой же имбаланс, как
+// заявка, простоявшая час. OFI эту заявку увидит только на тех событиях,
+// где она реально появилась и реально снялась - краткий спуфинг вносит
+// маленький вклад в обе стороны и гасится, а не доминирует в снимке.
+//
+// В академической работе показана почти линейная связь OFI с движением цены
+// на коротких горизонтах, устойчивая по времени и по разным инструментам -
+// сильнее, чем у сырого снимка имбаланса.
+const (
+	// ofiWindowDuration - окно, за которое НАКАПЛИВАЕТСЯ сумма событий перед
+	// тем как попасть в историю для z-score (см. book.ofiAccumulator). Тот же
+	// порядок, что у imbalanceSampleInterval - специально, чтобы не плодить
+	// разные ритмы опроса без причины: обе величины сэмплируются на одном
+	// такте книги.
+	ofiWindowDuration = 10 * time.Second
+
+	// ofiWindowSize/ofiMinSamples - то же самое, что imbalanceWindowSize/
+	// imbalanceMinSamples, но для истории OFI - см. их комментарии.
+	ofiWindowSize = 90
+	ofiMinSamples = 20
+
+	// ofiScaleFloor - запасной АБСОЛЮТНЫЙ пол на случай, когда история ещё
+	// целиком нулевая (см. stat.NewMetricRecordRelative) - относительный пол
+	// ниже не защищает первый в жизни всплеск, ему не от чего калиброваться.
+	// Крошечная величина: единственная её задача - не дать scale стать
+	// буквальным нулём (тогда ZScore честно вернул бы 0 вместо большого
+	// значения), а не задать осмысленный масштаб - для этого есть
+	// ofiRelativeScaleFloor.
+	ofiScaleFloor = 1e-9
+
+	// ofiRelativeScaleFloor - ОТНОСИТЕЛЬНЫЙ пол разброса (см.
+	// stat.NewMetricRecordRelative), а не абсолютная константа: imbalance
+	// лежит в известном диапазоне [-1,1], а OFI - сумма объёмов В ЕДИНИЦАХ
+	// БАЗОВОГО АКТИВА, и для BTC это тысячные доли, а для мемкоина - миллионы.
+	// Единого осмысленного абсолютного "пола" для всех пар не существует -
+	// поэтому пол берётся как доля от среднего |значения| ИСТОРИИ САМОЙ ЭТОЙ
+	// пары: на боевом логе (см. ARCHITECTURE.md §10) с одним лишь абсолютным
+	// scaleFloor=1e-9 MAD на тихих парах мог схлопываться настолько, что
+	// z-score улетал в сотни (видели -114 на PEPEUSDT) на событии, которое
+	// было лишь на порядок больше типичного для этой же пары.
+	ofiRelativeScaleFloor = 0.1
+
+	// ofiConfirmZThreshold/ofiConfirmMinStreak - см. imbalanceConfirmZThreshold/
+	// imbalanceConfirmMinStreak, тот же принцип и те же значения по
+	// умолчанию, отдельные константы - чтобы потом можно было настраивать
+	// OFI и имбаланс независимо, не разбираясь, что от чего зависит.
+	ofiConfirmZThreshold = 2.0
+	ofiConfirmMinStreak  = 3
+)
+
 // Level - один уровень стакана: цена и суммарное количество на ней.
 type Level struct {
 	Price    float64
@@ -103,6 +160,35 @@ type book struct {
 	// imbalanceHistory - реже, чем реальные апдейты книги, специально, чтобы
 	// счётчик не набивался за доли секунды на одном и том же шумном тике.
 	imbalanceSideConfirm stat.SideConfirm
+
+	// --- OFI (Order Flow Imbalance, см. константы выше) ---
+
+	// prevBidPrice/prevBidQty/prevAskPrice/prevAskQty - топ книги ПЕРЕД
+	// последним применённым апдейтом. Нужны, чтобы посчитать вклад СОБЫТИЯ
+	// (см. ofiEvent) - сравнивается предыдущее состояние топа с новым, а не
+	// снимок сам по себе. hasPrevBest=false до первого события с обеими
+	// сторонами книги - есть с чем сравнивать только начиная со второго.
+	prevBidPrice, prevBidQty float64
+	prevAskPrice, prevAskQty float64
+	hasPrevBest              bool
+
+	// ofiAccumulator - сумма вкладов событий с момента последнего коммита в
+	// ofiHistory (см. ofiWindowDuration). В отличие от imbalance, у OFI нет
+	// "текущего снимка" - это всегда сумма ЗА ОКНО, поэтому копится на
+	// КАЖДОМ апдейте книги, а не только на throttled-тике.
+	ofiAccumulator  float64
+	nextOFISampleAt time.Time
+	ofiHistory      *stat.MetricRecord
+	ofiSideConfirm  stat.SideConfirm
+
+	// ofiLastValue/ofiLastZScore - последнее ЗАКОММИЧЕННОЕ окно (см.
+	// commitOFI): в отличие от imbalance, которую можно дёшево пересчитать
+	// на любой момент, OFI между коммитами - это "ещё не полностью
+	// накопленное окно", сравнивать его с историей полных окон было бы
+	// нечестно. Читатели (GetOFIZScore) получают именно эти закэшированные
+	// значения, обновляемые раз в ofiWindowDuration.
+	ofiLastValue  float64
+	ofiLastZScore float64
 }
 
 func newBook() *book {
@@ -110,6 +196,7 @@ func newBook() *book {
 		bids:             make(map[float64]float64),
 		asks:             make(map[float64]float64),
 		imbalanceHistory: stat.NewMetricRecord(imbalanceWindowSize, imbalanceMinSamples, imbalanceScaleFloor),
+		ofiHistory:       stat.NewMetricRecordRelative(ofiWindowSize, ofiMinSamples, ofiScaleFloor, ofiRelativeScaleFloor),
 	}
 }
 
@@ -151,6 +238,67 @@ func (b *book) imbalance(levels int) (float64, bool) {
 	return (bidVol - askVol) / total, true
 }
 
+// bestBidAsk - лучшие бид/аск без сортировки всей книги (линейный проход по
+// карте) - для top-of-book этого достаточно и заметно дешевле, чем
+// пересортировывать весь стакан на каждый вызов. Вызывающий код обязан уже
+// держать нужный лок AssetsDepth.mu. ok=false, если хотя бы одна из сторон
+// пуста.
+func (b *book) bestBidAsk() (bidPrice, bidQty, askPrice, askQty float64, ok bool) {
+	var bestBid, bestAsk Level
+	for price, qty := range b.bids {
+		if price > bestBid.Price {
+			bestBid = Level{Price: price, Quantity: qty}
+		}
+	}
+	for price, qty := range b.asks {
+		if bestAsk.Price == 0 || price < bestAsk.Price {
+			bestAsk = Level{Price: price, Quantity: qty}
+		}
+	}
+
+	if bestBid.Price == 0 || bestAsk.Price == 0 {
+		return 0, 0, 0, 0, false
+	}
+	return bestBid.Price, bestBid.Quantity, bestAsk.Price, bestAsk.Quantity, true
+}
+
+// ofiEvent - вклад ОДНОГО апдейта книги в Order Flow Imbalance (Cont-Kukanov-
+// Stoikov): сравнивает топ книги ДО апдейта с топом ПОСЛЕ.
+//
+// Бид: цена улучшилась (выросла) - засчитывается весь новый объём (новый
+// лучший уровень появился с нуля, с точки зрения "спроса на этой цене");
+// цена ухудшилась (упала) - весь прежний объём засчитывается как убывший
+// (тот уровень для топа книги больше не существует); цена та же - только
+// изменение объёма на месте. Аск - зеркально, но "улучшение" для агрессивной
+// продажи - это движение ЦЕНЫ ВНИЗ (подрезание), поэтому знаки сравнения
+// у цены аска обратные бидовым.
+//
+// Итоговый event = вклад бида МИНУС вклад аска: рост спроса и/или падение
+// предложения - положительно (бычье), и наоборот.
+func ofiEvent(prevBidPrice, prevBidQty, bidPrice, bidQty, prevAskPrice, prevAskQty, askPrice, askQty float64) float64 {
+	var bidContribution float64
+	switch {
+	case bidPrice > prevBidPrice:
+		bidContribution = bidQty
+	case bidPrice < prevBidPrice:
+		bidContribution = -prevBidQty
+	default:
+		bidContribution = bidQty - prevBidQty
+	}
+
+	var askContribution float64
+	switch {
+	case askPrice < prevAskPrice:
+		askContribution = askQty
+	case askPrice > prevAskPrice:
+		askContribution = -prevAskQty
+	default:
+		askContribution = askQty - prevAskQty
+	}
+
+	return bidContribution - askContribution
+}
+
 func (b *book) apply(update exModel.DepthUpdate) {
 	for _, level := range update.Bids {
 		if level.Quantity == 0 {
@@ -174,6 +322,14 @@ func (b *book) clear() {
 	b.bids = make(map[float64]float64)
 	b.asks = make(map[float64]float64)
 	b.lastUpdateID = 0
+
+	// hasPrevBest сбрасывается, а ofiHistory/ofiAccumulator - НЕТ, тем же
+	// принципом, что и imbalanceHistory (см. её комментарий): пересинк -
+	// разрыв в сырых уровнях, а не повод забыть статистическое поведение
+	// пары. Но БЕЗ сброса hasPrevBest первое событие после пересинка сравнило
+	// бы топ книги ДО пересинка с топом ПОСЛЕ - это скачок, порождённый самим
+	// пересинком, а не реальным потоком заявок.
+	b.hasPrevBest = false
 }
 
 // AssetsDepth - L2-стакан по каждой паре. Наполняется подпиской на
@@ -220,6 +376,7 @@ func (ad *AssetsDepth) applyUpdate(update exModel.DepthUpdate) {
 	if !ok {
 		return
 	}
+
 	b.apply(update)
 
 	// exchangeService/pkg/exchange.DataFeed.StartDepthFeeder (не Combined,
@@ -231,6 +388,19 @@ func (ad *AssetsDepth) applyUpdate(update exModel.DepthUpdate) {
 	// на Combined-подписку в будущем).
 	b.ready = true
 
+	// OFI считается ПО СОБЫТИЮ - сравнением топа книги ДО этого апдейта
+	// (b.prevBid*/prevAsk*, оставшиеся с КОНЦА предыдущего вызова - вся
+	// мутация книги идёт под одним и тем же ad.mu, так что состояние между
+	// вызовами не меняется ничем посторонним) с топом ПОСЛЕ.
+	if bidPrice, bidQty, askPrice, askQty, hasBest := b.bestBidAsk(); hasBest {
+		if b.hasPrevBest {
+			b.ofiAccumulator += ofiEvent(b.prevBidPrice, b.prevBidQty, bidPrice, bidQty, b.prevAskPrice, b.prevAskQty, askPrice, askQty)
+		}
+		b.prevBidPrice, b.prevBidQty = bidPrice, bidQty
+		b.prevAskPrice, b.prevAskQty = askPrice, askQty
+		b.hasPrevBest = true
+	}
+
 	now := time.Now()
 	if !now.Before(b.nextImbalanceSampleAt) {
 		if value, ok := b.imbalance(imbalanceLevels); ok {
@@ -238,19 +408,34 @@ func (ad *AssetsDepth) applyUpdate(update exModel.DepthUpdate) {
 			// сэмпл занижает свой же z относительно самого себя.
 			z := b.imbalanceHistory.ZScore(value)
 			b.imbalanceHistory.Add(value)
-			b.imbalanceSideConfirm.Update(sideFromZScore(z))
+			b.imbalanceSideConfirm.Update(sideFromZScore(z, imbalanceConfirmZThreshold))
 		}
 		b.nextImbalanceSampleAt = now.Add(imbalanceSampleInterval)
 	}
+
+	// Коммит окна OFI - ОТДЕЛЬНЫЙ throttle от имбаланса (тот же
+	// ofiWindowDuration, но независимая переменная nextOFISampleAt): копится
+	// ofiAccumulator на каждом апдейте выше, а в историю уходит раз в окно.
+	if !now.Before(b.nextOFISampleAt) {
+		z := b.ofiHistory.ZScore(b.ofiAccumulator)
+		b.ofiHistory.Add(b.ofiAccumulator)
+		b.ofiSideConfirm.Update(sideFromZScore(z, ofiConfirmZThreshold))
+		b.ofiLastValue = b.ofiAccumulator
+		b.ofiLastZScore = z
+		b.ofiAccumulator = 0
+		b.nextOFISampleAt = now.Add(ofiWindowDuration)
+	}
 }
 
-// sideFromZScore - сторона имбаланса для счётчика устойчивости: "" (нет явной
-// стороны), пока |z| не превысил imbalanceConfirmZThreshold.
-func sideFromZScore(z float64) string {
-	if z >= imbalanceConfirmZThreshold {
+// sideFromZScore - сторона сигнала для счётчика устойчивости: "" (нет явной
+// стороны), пока |z| не превысил threshold. Общая для имбаланса и OFI -
+// у каждого свой порог (imbalanceConfirmZThreshold/ofiConfirmZThreshold),
+// сейчас совпадающий по значению, но не обязанный совпадать.
+func sideFromZScore(z, threshold float64) string {
+	if z >= threshold {
 		return string(order.SideTypeBuy)
 	}
-	if z <= -imbalanceConfirmZThreshold {
+	if z <= -threshold {
 		return string(order.SideTypeSell)
 	}
 	return ""
@@ -311,23 +496,50 @@ func (ad *AssetsDepth) GetBestBidAsk(pair string) (bid, ask Level, ready bool) {
 		return Level{}, Level{}, false
 	}
 
-	var bestBid, bestAsk Level
-	for price, qty := range b.bids {
-		if price > bestBid.Price {
-			bestBid = Level{Price: price, Quantity: qty}
-		}
-	}
-	for price, qty := range b.asks {
-		if bestAsk.Price == 0 || price < bestAsk.Price {
-			bestAsk = Level{Price: price, Quantity: qty}
-		}
-	}
-
-	if bestBid.Price == 0 || bestAsk.Price == 0 {
+	bidPrice, bidQty, askPrice, askQty, ok := b.bestBidAsk()
+	if !ok {
 		return Level{}, Level{}, false
 	}
+	return Level{Price: bidPrice, Quantity: bidQty}, Level{Price: askPrice, Quantity: askQty}, true
+}
 
-	return bestBid, bestAsk, true
+// GetMicroPrice - взвешенная "справедливая" цена лучшего уровня (Stoikov,
+// 2018): (bidPrice*askQty + askPrice*bidQty) / (bidQty+askQty). В отличие от
+// mid (простое среднее bid/ask, объём не учитывает), микро-цена сдвинута в
+// сторону той стороны, где сейчас МЕНЬШЕ объёма - там его "легче вымести", и
+// эмпирически цена в среднем туда и движется. deviationPercent - на сколько
+// микро-цена отличается от mid, в процентах от mid: положительное - "тянет"
+// вверх, отрицательное - вниз.
+//
+// НЕ добавлена как ещё один голос в композит "Потенциал" (entrysetup) -
+// математически deviationPercent тождественен имбалансу ЛУЧШЕГО уровня,
+// перевыраженному в единицах цены (deviation = imbalance*spread/2), то есть
+// не несёт независимой информации сверх того, что уже даёт OFI (который на
+// этом же уровне книги событийный, а не снапшот). Практическая ценность
+// здесь другая: как более честный ориентир "текущей цены" вместо mid/
+// последней сделки там, где нужна опорная цена, а не голосующий сигнал -
+// см. ARCHITECTURE.md §10 про то, где именно её стоит применить.
+func (ad *AssetsDepth) GetMicroPrice(pair string) (microPrice, deviationPercent float64, ready bool) {
+	ad.mu.RLock()
+	defer ad.mu.RUnlock()
+
+	b, ok := ad.books[pair]
+	if !ok || !b.ready {
+		return 0, 0, false
+	}
+
+	bidPrice, bidQty, askPrice, askQty, ok := b.bestBidAsk()
+	if !ok || bidQty+askQty <= 0 {
+		return 0, 0, false
+	}
+
+	mid := (bidPrice + askPrice) / 2
+	if mid <= 0 {
+		return 0, 0, false
+	}
+
+	micro := (bidPrice*askQty + askPrice*bidQty) / (bidQty + askQty)
+	return micro, (micro - mid) / mid * 100, true
 }
 
 // GetTopLevels отдаёт лучшие n уровней стакана с каждой стороны, уже
@@ -447,6 +659,77 @@ func (ad *AssetsDepth) GetAllImbalanceZScore() map[string]ImbalanceStat {
 			Imbalance: value,
 			ZScore:    b.imbalanceHistory.ZScore(value),
 			Ready:     true,
+		}
+	}
+	return result
+}
+
+// GetOFIZScore - Order Flow Imbalance пары (см. константы OFI выше) и его
+// z-score относительно недавней истории самой этой пары.
+//
+// В отличие от GetImbalanceZScore, здесь нет "текущего снимка" - value/zScore
+// относятся к ПОСЛЕДНЕМУ ЗАКОММИЧЕННОМУ окну (см. book.ofiLastValue/
+// ofiLastZScore), обновляются раз в ofiWindowDuration, а не на каждый вызов:
+// сравнивать ещё не полностью накопленное окно с историей полных окон было
+// бы нечестно. ready=false - по паре ещё не было ни одного закоммиченного
+// окна (только что появилась, либо стакан ещё не готов).
+func (ad *AssetsDepth) GetOFIZScore(pair string) (value, zScore float64, ready bool) {
+	ad.mu.RLock()
+	defer ad.mu.RUnlock()
+
+	b, ok := ad.books[pair]
+	if !ok || !b.ready || b.nextOFISampleAt.IsZero() {
+		return 0, 0, false
+	}
+
+	return b.ofiLastValue, b.ofiLastZScore, true
+}
+
+// GetOFIConfirmedSide - сторона OFI (BUY/SELL), если |z-score| держится выше
+// ofiConfirmZThreshold минимум ofiConfirmMinStreak закоммиченных окон подряд
+// (см. book.ofiSideConfirm). Тот же смысл, что у GetImbalanceConfirmedSide,
+// только для потока событий, а не для снимка.
+func (ad *AssetsDepth) GetOFIConfirmedSide(pair string) (side order.SideType, confirmed bool) {
+	ad.mu.RLock()
+	defer ad.mu.RUnlock()
+
+	b, ok := ad.books[pair]
+	if !ok {
+		return "", false
+	}
+
+	s, ok := b.ofiSideConfirm.Confirmed(ofiConfirmMinStreak)
+	if !ok {
+		return "", false
+	}
+	return order.SideType(s), true
+}
+
+// OFIStat - OFI и его z-score для одной пары, для таблицы "по всем парам
+// сразу" (см. GetAllOFIZScore).
+type OFIStat struct {
+	OFI    float64
+	ZScore float64
+	Ready  bool
+}
+
+// GetAllOFIZScore - то же самое, что GetOFIZScore, но сразу по всем
+// отслеживаемым парам одним проходом под одним локом.
+func (ad *AssetsDepth) GetAllOFIZScore() map[string]OFIStat {
+	ad.mu.RLock()
+	defer ad.mu.RUnlock()
+
+	result := make(map[string]OFIStat, len(ad.books))
+	for pair, b := range ad.books {
+		if !b.ready || b.nextOFISampleAt.IsZero() {
+			result[pair] = OFIStat{}
+			continue
+		}
+
+		result[pair] = OFIStat{
+			OFI:    b.ofiLastValue,
+			ZScore: b.ofiLastZScore,
+			Ready:  true,
 		}
 	}
 	return result

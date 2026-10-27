@@ -2,10 +2,12 @@ package executor
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	exModel "github.com/sambly/exchangeService/pkg/model"
+	"github.com/sambly/exchangebot/internal/entrysetup"
 	"github.com/sambly/exchangebot/internal/logger"
 	"github.com/sambly/exchangebot/internal/notification"
 	"github.com/sambly/exchangebot/internal/order"
@@ -14,6 +16,19 @@ import (
 	"github.com/sambly/exchangebot/internal/telegram/menu/model"
 	"github.com/sambly/exchangebot/internal/toggle"
 )
+
+// MarketContext - минимальный срез entrysetup.AssetsSetup, нужный Executor
+// для входных рыночных фильтров (см. marketFiltersAllow). Интерфейс, а не
+// конкретный *entrysetup.AssetsSetup - чтобы тесты подставляли фейк без
+// поднятия настоящих AssetsPrices/AssetsDepth (у GetVolatilityRegime
+// внутреннее состояние копится только через приватный recordVolatility,
+// недоступный за пределами пакета prices). *entrysetup.AssetsSetup
+// реализует его без изменений - сигнатуры совпадают 1:1.
+type MarketContext interface {
+	GetVolatilityRegime(pair, period string) (float64, bool)
+	GetPriceLevels(pair, period string) (entrysetup.PriceLevels, bool)
+	GetTrendStrength(pair, period string) (float64, bool)
+}
 
 const (
 	// signalBuffer - очередь сигналов от детекторов
@@ -47,6 +62,12 @@ type Executor struct {
 	// Signals - вход от ЛЮБОГО детектора. Кто прислал сигнал, исполнителю
 	// неинтересно: важны только его направление, сила и волатильность пары.
 	Signals chan signal.Signal
+
+	// AssetsSetup - рыночный контекст для входных фильтров (см.
+	// Config.MaxVolatilityRegime/RequireLevelsAgree, marketFiltersAllow). Может
+	// быть nil (см. WithAssetsSetup) - тогда оба фильтра просто не
+	// применяются, как будто выключены в конфиге.
+	AssetsSetup MarketContext
 
 	// markets - рыночные тики, переложенные из горутины фида в свою
 	markets chan exModel.MarketsStat
@@ -103,6 +124,11 @@ func (s *Executor) WithTelegramMenu() *Executor {
 
 func (s *Executor) WithSaleStrategy(sale sales.Sales) *Executor {
 	s.Sale = sale
+	return s
+}
+
+func (s *Executor) WithAssetsSetup(assetsSetup MarketContext) *Executor {
+	s.AssetsSetup = assetsSetup
 	return s
 }
 
@@ -170,6 +196,11 @@ func (s *Executor) onSignal(ctx context.Context, sig signal.Signal) {
 		return
 	}
 
+	if reason, ok := s.marketFiltersAllow(sig, side); !ok {
+		execLogger.Infof("вход по %s %s отклонён рыночным фильтром: %s", sig.Pair, sig.Period, reason)
+		return
+	}
+
 	if reason, ok := s.riskAllows(sig); !ok {
 		execLogger.Infof("вход по %s %s отклонён риск-лимитом: %s", sig.Pair, sig.Period, reason)
 		return
@@ -208,6 +239,39 @@ func (s *Executor) OpenPositions() int {
 	return total
 }
 
+// marketFiltersAllow - фильтры по рыночному контексту пары (см.
+// Config.MaxVolatilityRegime/RequireLevelsAgree). Отдельно от riskAllows:
+// riskAllows отвечает на "не превысили ли собственные лимиты исполнителя"
+// (позиции/cooldown, без внешних зависимостей), это - "подходящая ли сейчас
+// пара вообще" (нужен AssetsSetup, поэтому и не в Config.SideFor).
+func (s *Executor) marketFiltersAllow(sig signal.Signal, side order.SideType) (string, bool) {
+	if s.AssetsSetup == nil {
+		return "", true
+	}
+
+	if s.Config.MaxVolatilityRegime > 0 {
+		if regime, ok := s.AssetsSetup.GetVolatilityRegime(sig.Pair, sig.Period); ok && regime > s.Config.MaxVolatilityRegime {
+			return fmt.Sprintf("режим волатильности %.2f выше maxVolatilityRegime %.2f", regime, s.Config.MaxVolatilityRegime), false
+		}
+	}
+
+	if s.Config.RequireLevelsAgree {
+		if levels, ok := s.AssetsSetup.GetPriceLevels(sig.Pair, sig.Period); ok {
+			if levelsSide, _, ok := entrysetup.LevelsSideScore(levels); ok && levelsSide != side {
+				return fmt.Sprintf("уровни рекомендуют %s, а не %s", levelsSide, side), false
+			}
+		}
+	}
+
+	if maxTrend, ok := s.Config.MaxTrendStrengthBySource[sig.Source]; ok {
+		if trend, ok := s.AssetsSetup.GetTrendStrength(sig.Pair, sig.Period); ok && trend > maxTrend {
+			return fmt.Sprintf("сила тренда %.2f выше maxTrendStrengthBySource[%s]=%.2f", trend, sig.Source, maxTrend), false
+		}
+	}
+
+	return "", true
+}
+
 // riskAllows - ограничители, без которых авторежим опасен.
 func (s *Executor) riskAllows(sig signal.Signal) (string, bool) {
 	s.positionsMu.Lock()
@@ -219,12 +283,21 @@ func (s *Executor) riskAllows(sig signal.Signal) (string, bool) {
 		return "по паре уже есть открытая позиция", false
 	}
 
-	total := 0
+	// MaxPositions - лимит НА КАЖДЫЙ источник сигнала независимо, а не общий
+	// потолок: у anomaly и potential (и любого будущего детектора) свой
+	// собственный бюджет позиций, один источник не может выесть его у другого.
+	// Source хранится в Position.Signal (см. addPosition) - учитываем именно
+	// его, а не общее число позиций.
+	fromSource := 0
 	for _, list := range s.positions {
-		total += len(list)
+		for _, pos := range list {
+			if pos.Signal.Source == sig.Source {
+				fromSource++
+			}
+		}
 	}
-	if total >= s.Config.MaxPositions {
-		return "достигнут лимит одновременных позиций", false
+	if fromSource >= s.Config.MaxPositions {
+		return fmt.Sprintf("достигнут лимит одновременных позиций для источника %s", sig.Source), false
 	}
 
 	cooldown := time.Duration(s.Config.PairCooldownMinutes) * time.Minute

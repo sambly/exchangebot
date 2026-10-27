@@ -20,4 +20,11 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Один и тот же фон темы Aura (--p-content-background) для страницы и для
+     всех непокрашенных панелей-обёрток (сайдбар, контейнеры вокруг таблиц и
+     графиков в MainView.vue) - без этого они прозрачны и просвечивают фоном
+     браузера по умолчанию, а DataTable/Card рядом красятся тем же токеном
+     через PrimeVue и выглядят "тёмным островом" на пустом фоне. */
+  background: var(--p-content-background);
 }

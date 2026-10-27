@@ -53,6 +53,7 @@ import {
 
 import Button from 'primevue/button'
 import { toChartTime } from '../../utils/chartTime'
+import { themeBackground } from '../../utils/chartTheme'
 
 const props = defineProps<{
   pair: string
@@ -130,9 +131,7 @@ function getTextColor() {
 }
 
 function getBackgroundColor() {
-  return props.darkMode
-    ? '#131722'
-    : '#ffffff'
+  return themeBackground(!!props.darkMode)
 }
 
 function getGridColor() {

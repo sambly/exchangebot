@@ -84,6 +84,16 @@ type AssetsPrices struct {
 	// activity - история buy-side активности для GetBuyActivityZScore, тем же
 	// принципом изоляции, что и volatility (см. activity.go).
 	activity map[string]map[string]*activityState
+
+	// vpin - объёмно-синхронизированные (а не временнЫе, как activity) бакеты
+	// реальной buy/sell-классификации сделок, см. vpin.go. Один трекер на
+	// пару (не на пару+период, как activity, - у бакета по объёму нет
+	// периода в обычном смысле).
+	vpin map[string]*vpinState
+
+	// relativeStrength - кросс-секционная (пара относительно РЫНКА, а не
+	// относительно своей же истории цены) сила пары, см. relativestrength.go.
+	relativeStrength map[string]map[string]*relativeStrengthState
 }
 
 var pricesLogger = logger.AddFieldsEmpty()
@@ -134,6 +144,8 @@ func NewAssetsPrices(pairs []string, periodsChange, periodsDelta map[string]time
 	assetsPrices.initChangeDelta()
 	assetsPrices.initVolatility()
 	assetsPrices.initActivity()
+	assetsPrices.initVPIN()
+	assetsPrices.initRelativeStrength()
 
 	return assetsPrices, nil
 }
@@ -360,6 +372,15 @@ func (ap *AssetsPrices) updateChangePrices() {
 
 	timeStart := time.Now()
 
+	// changesByPeriod - ChangePercent каждой пары за КАЖДЫЙ период, собранные
+	// в этом же проходе. recordRelativeStrength (см. relativestrength.go)
+	// нужно вызывать ПОСЛЕ того, как ChangePercent посчитан для ВСЕХ пар -
+	// рыночную медиану не по чему считать до этого момента.
+	changesByPeriod := make(map[string]map[string]float64, len(ap.Periods))
+	for period := range ap.Periods {
+		changesByPeriod[period] = make(map[string]float64, len(ap.Pairs))
+	}
+
 	for _, pair := range ap.Pairs {
 		stat := ap.MarketsStat[pair]
 
@@ -373,6 +394,7 @@ func (ap *AssetsPrices) updateChangePrices() {
 			if data.Fill {
 				changePrices.ChangePercent = checkValuesDividing(stat.Price, changePrices.LastPrice)
 				ap.recordVolatility(pair, period, changePrices.ChangePercent, timeStart)
+				changesByPeriod[period][pair] = changePrices.ChangePercent
 			}
 
 			data.pushNewest(DatasetChangePrices{Price: stat.Price, Time: stat.Time})
@@ -385,6 +407,11 @@ func (ap *AssetsPrices) updateChangePrices() {
 			}
 		}
 	}
+
+	for period, changes := range changesByPeriod {
+		ap.recordRelativeStrength(period, changes)
+	}
+
 	duration := time.Since(timeStart)
 
 	pricesLogger.Debugf("Время выполнения UpdateChanges: %v ", duration)
@@ -412,6 +439,11 @@ func (ap *AssetsPrices) updateChangeDelta() error {
 		if !slices.Contains(ap.Pairs, candle.Pair) {
 			continue
 		}
+
+		// recordVPIN - РАЗ на свечу, а не на пару+период (см. vpin.go):
+		// объёмный бакет один на пару, дедупликацию внутри себя делает сам
+		// (lastCandleTime), поэтому вызывается вне цикла по периодам ниже.
+		ap.recordVPIN(candle.Pair, candle.Time, candle.ActiveBuyVolume, candle.Volume)
 
 		for period := range ap.PeriodsDelta {
 

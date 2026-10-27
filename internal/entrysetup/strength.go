@@ -3,33 +3,36 @@ package entrysetup
 import "github.com/sambly/exchangebot/internal/order"
 
 // StrengthComponents - сырые составляющие "скрытой силы" пары: набор
-// независимых наблюдений (книга заявок, стены, уровни, режим волатильности,
-// buy-активность), НЕ сведённых в одно число. Свод в композит и выбор, какие
-// компоненты учитывать, - решение потребителя (веб-таблица с чекбоксами), не
-// этого пакета: тот же принцип "сырое наблюдение / решение", что у Walls и
-// Quality.
+// независимых наблюдений (order flow imbalance, уровни, режим волатильности,
+// объёмная buy-активность), НЕ сведённых в одно число. Свод в композит и
+// выбор, какие компоненты учитывать, - решение потребителя (веб-таблица с
+// чекбоксами), не этого пакета: тот же принцип "сырое наблюдение / решение",
+// что у Walls и Quality.
+//
+// Стены сюда сознательно НЕ включены (были раньше, убраны в рамках
+// strategy_v2 - см. ARCHITECTURE.md §10.3): направленный сигнал по резервному
+// объёму на уровне стакана легко подделывается спуфингом, а confirm-стрик
+// защищает только от однотактного шума, не от целенаправленной подмены
+// ордера. Сам примитив (Walls/Quality) никуда не делся - используется
+// structsale для структурного стоп/тейка, где это не "куда идёт рынок", а
+// "где физическое препятствие", и спуфинг там менее критичен.
 type StrengthComponents struct {
 	Pair   string
 	Period string
 
-	// HasImbalance/ImbalanceZScore - см. depth.GetImbalanceZScore. Знак задаёт
-	// сторону: положительный - перевес покупателей.
-	HasImbalance    bool
-	ImbalanceZScore float64
-	// ImbalanceConfirmed - см. depth.GetImbalanceConfirmedSide: сторона
-	// имбаланса держится уже некоторое время, а не мелькнула на одном сэмпле.
+	// HasOFI/OFIZScore - см. depth.GetOFIZScore (Order Flow Imbalance,
+	// Cont-Kukanov-Stoikov). Заменил снапшот-имбаланс в этой таблице: OFI
+	// событийный (копит вклад каждого изменения топа стакана), снапшот
+	// переписывается одной перевыставленной заявкой. Знак - сторона:
+	// положительный - перевес покупателей.
+	HasOFI    bool
+	OFIZScore float64
+	// OFIConfirmed - см. depth.GetOFIConfirmedSide: сторона OFI держится уже
+	// несколько закоммиченных окон подряд, а не мелькнула в последнем.
 	// Проверяется, что подтверждённая сторона совпадает с ТЕКУЩИМ знаком
-	// ImbalanceZScore - если сторона только что развернулась, подтверждение
-	// от предыдущей стороны не засчитывается (см. GetAllStrengthComponents).
-	ImbalanceConfirmed bool
-
-	// HasWalls/WallsSide/WallsScore - см. Quality (стены стакана).
-	HasWalls   bool
-	WallsSide  order.SideType
-	WallsScore float64
-	// WallsConfirmed - см. GetWallsConfirmedSide, та же логика сверки со
-	// стороной, что и у ImbalanceConfirmed.
-	WallsConfirmed bool
+	// OFIZScore - если сторона только что развернулась, подтверждение от
+	// предыдущей стороны не засчитывается (см. GetAllStrengthComponents).
+	OFIConfirmed bool
 
 	// HasLevels/LevelsSide/LevelsScore - тот же принцип, что у Quality, но по
 	// PriceLevels (свечным разворотам) вместо стакана.
@@ -43,15 +46,38 @@ type StrengthComponents struct {
 	HasRegime bool
 	Regime    float64
 
-	// HasActivity/ActivityZScore - см. AssetsPrices.GetBuyActivityZScore.
-	HasActivity    bool
-	ActivityZScore float64
+	// HasVPIN/VPINZScore - см. AssetsPrices.GetVPINZScore (объёмно-
+	// бакетированная доля покупок, VPIN-подобный). Заменил времяbucketed
+	// AssetsPrices.GetBuyActivityZScore в этой таблице: тот же смысл (перевес
+	// покупательской активности), но бакет копится по набранному объёму, а не
+	// по часам - на всплеске закрывается быстро, в затишье медленно.
+	HasVPIN    bool
+	VPINZScore float64
+	// VPINConfirmed - см. AssetsPrices.GetVPINConfirmedSide, та же сверка с
+	// текущим знаком VPINZScore, что и у OFIConfirmed.
+	VPINConfirmed bool
+
+	// HasRelativeStrength/RelativeStrengthZScore - см.
+	// AssetsPrices.GetRelativeStrengthZScore. В отличие от всех остальных
+	// компонентов (смотрят на пару САМУ ПО СЕБЕ во времени), это
+	// КРОСС-СЕКЦИОННЫЙ сигнал: пара относительно МЕДИАНЫ рынка за тот же
+	// период - отличает идиосинкратическую аномалию пары от бета-движения
+	// всего рынка (когда всё падает вслед за BTC). Единственный из
+	// компонентов, зависящий от period так же, как остальные ПРЯМО ПО СМЫСЛУ
+	// (не только через кэш) - "рынок" за 15m и за 4h - разные сравнения.
+	HasRelativeStrength    bool
+	RelativeStrengthZScore float64
+	// RelativeStrengthConfirmed - та же сверка с текущим знаком, что и у
+	// OFIConfirmed/VPINConfirmed.
+	RelativeStrengthConfirmed bool
 }
 
-// levelsSideScore - тот же принцип "ближе - в стоп, дальше - в тейк", что и у
+// LevelsSideScore - тот же принцип "ближе - в стоп, дальше - в тейк", что и у
 // qualityFromWalls (score.go), только по PriceLevels вместо стакана: PriceLevels
 // сам не даёт готовую сторону/score, только Support/Resistance с дистанциями.
-func levelsSideScore(levels PriceLevels) (order.SideType, float64, bool) {
+// Экспортирован - используется не только сводом композита "Потенциал" здесь,
+// но и стратегией-детектором на swing-уровнях (internal/strategy/levels).
+func LevelsSideScore(levels PriceLevels) (order.SideType, float64, bool) {
 	if !levels.HasSupport || !levels.HasResistance {
 		return "", 0, false
 	}
@@ -69,17 +95,18 @@ func levelsSideScore(levels PriceLevels) (order.SideType, float64, bool) {
 }
 
 // GetAllStrengthComponents - все составляющие "силы" по всем отслеживаемым
-// парам и периодам, для новой таблицы-скринера. Walls/Imbalance от периода не
-// зависят - забираются один раз на пару (та же оптимизация, что у
-// GetAllQuality). PriceLevels берётся из GetAllPriceLevels (её собственный
-// кэш на priceLevelsCacheTTL, см. levels.go) - НЕ вызовом GetPriceLevels
-// (pair, period) внутри цикла по парам: у GetPriceLevels свой поход в БД на
-// КАЖДЫЙ вызов, и дёргать его в цикле по парам значило бы N раз тянуть из БД
-// один и тот же набор свечей на период, выбрасывая из него все пары кроме
-// одной - ровно та ошибка, от которой предостерегает комментарий у
+// парам и периодам, для новой таблицы-скринера. OFI от периода не зависит -
+// забирается один раз на пару (та же оптимизация, что у GetAllQuality).
+// VPIN тоже не зависит от периода (один трекер на пару, см. prices/vpin.go).
+// PriceLevels берётся из GetAllPriceLevels (её собственный кэш на
+// priceLevelsCacheTTL, см. levels.go) - НЕ вызовом GetPriceLevels (pair,
+// period) внутри цикла по парам: у GetPriceLevels свой поход в БД на КАЖДЫЙ
+// вызов, и дёргать его в цикле по парам значило бы N раз тянуть из БД один и
+// тот же набор свечей на период, выбрасывая из него все пары кроме одной -
+// ровно та ошибка, от которой предостерегает комментарий у
 // GetAllPriceLevels (когда-то она уже закралась сюда - см. историю правок).
-// Regime и Activity дешёвые (читают уже накопленную в памяти историю) - их
-// можно звать сколько угодно раз, лишнего похода в БД они не делают.
+// Regime дешёвый (читает уже накопленную в памяти историю) - его можно звать
+// сколько угодно раз, лишнего похода в БД он не делает.
 func (s *AssetsSetup) GetAllStrengthComponents() map[string]map[string]StrengthComponents {
 	result := make(map[string]map[string]StrengthComponents)
 	if s.prices == nil {
@@ -87,56 +114,76 @@ func (s *AssetsSetup) GetAllStrengthComponents() map[string]map[string]StrengthC
 	}
 
 	for _, pair := range s.prices.Pairs {
-		hasImbalance := false
-		imbalanceZ := 0.0
-		imbalanceConfirmed := false
+		hasOFI := false
+		ofiZ := 0.0
+		ofiConfirmed := false
 		if s.depth != nil {
-			if _, z, ok := s.depth.GetImbalanceZScore(pair); ok {
-				hasImbalance, imbalanceZ = true, z
+			if _, z, ok := s.depth.GetOFIZScore(pair); ok {
+				hasOFI, ofiZ = true, z
 			}
-			// Подтверждённая сторона должна совпадать с ТЕКУЩИМ знаком
-			// имбаланса: сэмплирование в depth троттлится (см.
-			// imbalanceSampleInterval), и если сторона только что
-			// развернулась, GetImbalanceConfirmedSide ещё может отдавать
-			// стрик от ПРЕДЫДУЩЕЙ, уже неактуальной стороны - без сверки
-			// композит принял бы устаревшее подтверждение за актуальное.
-			if confirmedSide, ok := s.depth.GetImbalanceConfirmedSide(pair); ok {
+			// Подтверждённая сторона должна совпадать с ТЕКУЩИМ знаком OFI:
+			// коммит окна троттлится (см. ofiWindowDuration), и если сторона
+			// только что развернулась, GetOFIConfirmedSide ещё может
+			// отдавать стрик от ПРЕДЫДУЩЕЙ, уже неактуальной стороны - без
+			// сверки композит принял бы устаревшее подтверждение за
+			// актуальное.
+			if confirmedSide, ok := s.depth.GetOFIConfirmedSide(pair); ok {
 				currentSide := order.SideTypeBuy
-				if imbalanceZ < 0 {
+				if ofiZ < 0 {
 					currentSide = order.SideTypeSell
 				}
-				imbalanceConfirmed = confirmedSide == currentSide
+				ofiConfirmed = confirmedSide == currentSide
 			}
 		}
 
-		walls, hasWalls := s.GetWalls(pair)
-		s.sampleWallsConfirm(pair, walls)
+		hasVPIN := false
+		vpinZ := 0.0
+		vpinConfirmed := false
+		if _, z, ok := s.prices.GetVPINZScore(pair); ok {
+			hasVPIN, vpinZ = true, z
+		}
+		// Та же сверка с текущим знаком, что и у OFI выше - см. комментарий
+		// там же.
+		if confirmedSide, ok := s.prices.GetVPINConfirmedSide(pair); ok {
+			currentSide := "BUY"
+			if vpinZ < 0 {
+				currentSide = "SELL"
+			}
+			vpinConfirmed = confirmedSide == currentSide
+		}
 
 		byPeriod := make(map[string]StrengthComponents, len(s.prices.Periods))
 		for period := range s.prices.Periods {
 			c := StrengthComponents{
-				Pair:               pair,
-				Period:             period,
-				HasImbalance:       hasImbalance,
-				ImbalanceZScore:    imbalanceZ,
-				ImbalanceConfirmed: imbalanceConfirmed,
-			}
-
-			if hasWalls {
-				if q, ok := s.qualityFromWalls(pair, period, walls); ok {
-					c.HasWalls, c.WallsSide, c.WallsScore = true, q.Side, q.Score
-					if confirmedSide, ok := s.GetWallsConfirmedSide(pair); ok {
-						c.WallsConfirmed = confirmedSide == q.Side
-					}
-				}
+				Pair:          pair,
+				Period:        period,
+				HasOFI:        hasOFI,
+				OFIZScore:     ofiZ,
+				OFIConfirmed:  ofiConfirmed,
+				HasVPIN:       hasVPIN,
+				VPINZScore:    vpinZ,
+				VPINConfirmed: vpinConfirmed,
 			}
 
 			if regime, ok := s.GetVolatilityRegime(pair, period); ok {
 				c.HasRegime, c.Regime = true, regime
 			}
 
-			if z, ok := s.prices.GetBuyActivityZScore(pair, period); ok {
-				c.HasActivity, c.ActivityZScore = true, z
+			// В отличие от OFI/VPIN (посчитаны один раз выше, не зависят от
+			// периода), относительная сила ЗАВИСИТ от периода по смыслу -
+			// сравнение с рынком за 15m и за 4h разное, поэтому считается
+			// внутри цикла по периодам.
+			if _, z, ok := s.prices.GetRelativeStrengthZScore(pair, period); ok {
+				c.HasRelativeStrength, c.RelativeStrengthZScore = true, z
+				// Та же сверка с текущим знаком, что и у OFI/VPIN выше - см.
+				// комментарий там же.
+				if confirmedSide, ok := s.prices.GetRelativeStrengthConfirmedSide(pair, period); ok {
+					currentSide := "BUY"
+					if z < 0 {
+						currentSide = "SELL"
+					}
+					c.RelativeStrengthConfirmed = confirmedSide == currentSide
+				}
 			}
 
 			byPeriod[period] = c
@@ -157,7 +204,7 @@ func (s *AssetsSetup) fillStrengthLevels(result map[string]map[string]StrengthCo
 			continue
 		}
 		for period, levels := range byPeriod {
-			side, score, ok := levelsSideScore(levels)
+			side, score, ok := LevelsSideScore(levels)
 			if !ok {
 				continue
 			}

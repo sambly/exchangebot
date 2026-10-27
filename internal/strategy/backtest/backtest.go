@@ -146,6 +146,20 @@ func (e *Engine) placeLimit(sig signal.Signal, side order.SideType, bar exModel.
 	}
 }
 
+// positionsFromSource - сколько сейчас открытых позиций пришло от source.
+// MaxPositions - лимит на каждый источник сигнала независимо (см. тот же
+// комментарий у executor.riskAllows) - здесь считаем ТЕ ЖЕ правила, что в
+// бою, а не общее число открытых позиций.
+func positionsFromSource(open map[string]*simPosition, source string) int {
+	count := 0
+	for _, pos := range open {
+		if pos.position.Signal.Source == source {
+			count++
+		}
+	}
+	return count
+}
+
 // tryFill исполняет лимитку, если бар дотянулся до её цены.
 //
 // Риск-правила проверяются В МОМЕНТ ИСПОЛНЕНИЯ, а не выставления: между ними
@@ -178,7 +192,7 @@ func (e *Engine) tryFill(
 		report.Rejected["по паре уже есть открытая позиция"]++
 		return
 	}
-	if len(open) >= e.entry.MaxPositions {
+	if positionsFromSource(open, ord.sig.Source) >= e.entry.MaxPositions {
 		report.Rejected["достигнут лимит одновременных позиций"]++
 		return
 	}
@@ -346,7 +360,7 @@ func (e *Engine) Run(candles []exModel.Candle) *Report {
 				report.Rejected["по паре уже есть открытая позиция"]++
 				continue
 			}
-			if len(open) >= e.entry.MaxPositions {
+			if positionsFromSource(open, ts.sig.Source) >= e.entry.MaxPositions {
 				report.Rejected["достигнут лимит одновременных позиций"]++
 				continue
 			}
